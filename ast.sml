@@ -38,30 +38,29 @@ datatype lvalue =
     LVALUE of string
 ;
 
-(* The comment indicates what the expression is called in the JSON.*)
 datatype expression =
-     EXP_NUM of int (*num*)
-   | EXP_ID of string (*id*)
-   | EXP_TRUE (*true*)
-   | EXP_FALSE (*false*)
-   | EXP_UNDEFINED (*null*)
-   | EXP_BINARY of {opr: binaryOperator, lft: expression, rht: expression} (*binary*)
-   | EXP_UNARY of {opr: unaryOperator, opnd: expression} (*unary*)
-   | EXP_DOT of {lft: expression, prop: lvalue} (*dot*)
-   | EXP_NEW of string (*new*)
-   | EXP_INVOCATION of {id: string, args: expression list} (*invovation*)
+     EXP_NUM of int
+   | EXP_ID of string
+   | EXP_TRUE
+   | EXP_FALSE
+   | EXP_UNDEFINED
+   | EXP_BINARY of {opr: binaryOperator, lft: expression, rht: expression}
+   | EXP_UNARY of {opr: unaryOperator, opnd: expression}
+   | EXP_DOT of {lft: expression, prop: lvalue}
+   | EXP_NEW of string
+   | EXP_INVOCATION of {id: string, args: expression list}
 ;
 
 datatype statement =
-     ST_BLOCK of statement list (*block*)
-   | ST_ASSIGN of {target: lvalue, source: expression} (*assign*)
-   | ST_PRINT of {body: expression, endl: bool} (*print*)
-   | ST_READ of lvalue (*read*)
-   | ST_IF of {guard: expression, thenBlk: statement, elseBlk: statement} (*if*)
-   | ST_WHILE of {guard: expression, body: statement} (*while*)
-   | ST_DELETE of expression (*delete*)
-   | ST_RETURN of expression (* expression can be undefined*) (*return*)
-   | ST_INVOCATION of {id: string, args: expression list} (*invocation*)
+     ST_BLOCK of statement list
+   | ST_ASSIGN of {target: lvalue, source: expression}
+   | ST_PRINT of {body: expression, endl: bool}
+   | ST_READ of lvalue
+   | ST_IF of {guard: expression, thenBlk: statement, elseBlk: statement}
+   | ST_WHILE of {guard: expression, body: statement}
+   | ST_DELETE of expression
+   | ST_RETURN of expression (* expression can be undefined*)
+   | ST_INVOCATION of {id: string, args: expression list}
 ;
 
 datatype function =

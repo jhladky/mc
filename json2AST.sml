@@ -30,17 +30,13 @@ fun carrier2Ht L =
     let
         val ht = HashTable.mkTable (HashString.hashString, op =)
                                    (10, Fail "Not Found");
-        fun carrier2Ht_ ht [] = ht
-          | carrier2Ht_ ht (EMPTY::pairs) =
-            (*If we are passed an EMPTY then just discard it*)
-            carrier2Ht_ ht pairs
-          | carrier2Ht_ ht (s_c_pair pair::pairs) =
-            (HashTable.insert ht pair;
-             carrier2Ht_ ht pairs)
-          | carrier2Ht_ ht _ = raise Fail "Expected an `s_c_pair`."
+        fun carrier2Ht_ EMPTY = ()
+          | carrier2Ht_ (s_c_pair p) = HashTable.insert ht p
+          | carrier2Ht_ _ = raise Fail "Expected an `s_c_pair`."
         ;
     in
-        carrier2Ht_ ht L
+        (app carrier2Ht_ L;
+         ht)
     end
 ;
 
@@ -70,7 +66,7 @@ fun carrier2MiniType (string "int") = MT_INT
   | carrier2MiniType (string s) = MT_STRUCT s
   | carrier2MiniType _ = raise Fail "Expected a `string`."
 ;
-                     
+
 (*'uwr' stands for 'unwrap'*)
 fun uwrStr (string s) = s | uwrStr _ = raise Fail "Expected a `string`.";
 
@@ -93,19 +89,16 @@ fun uwrCL f (carrier_list L) = map f L
 ;
 
 fun uwrVds c = uwrCL (fn (varDecl vd) => vd | _ => raise Fail "") c;
-fun uwrExprs c = uwrCL (fn (expression e) => e | _ => raise Fail "") c;
-fun uwrStmts c = uwrCL (fn (statement s) => s | _ => raise Fail "") c;
-                     
+fun uwrExprs c = uwrCL uwrExpr c;
+fun uwrStmts c = uwrCL uwrStmt c;
+
 fun expression2Ast ht =
     expression (
         case uwrStr (HashTable.lookup ht "exp") of
             "num" =>
-            let
-                val (SOME i) =
-                    Int.fromString (uwrStr (HashTable.lookup ht "value"));
-            in
-                EXP_NUM i
-            end
+            (case Int.fromString (uwrStr (HashTable.lookup ht "value")) of
+                 SOME n => EXP_NUM n
+               | NONE => raise Fail "Bad integer conversion.")
           | "id" => EXP_ID (uwrStr (HashTable.lookup ht "id"))
           | "true" => EXP_TRUE
           | "false" => EXP_FALSE
@@ -184,7 +177,7 @@ fun statement2Ast ht =
           | s => raise Fail s
     )
 ;
-                     
+
 fun varDecl2Ast ht =
     varDecl (
         VAR_DECL (
@@ -214,7 +207,7 @@ fun function2Ast ht =
         }
     )
 ;
-                     
+
 fun lvalue2Ast ht =
     lvalue (LVALUE (uwrStr (HashTable.lookup ht "id")))
 ;
@@ -230,7 +223,7 @@ fun program2Ast ht =
         }
     )
 ;
-                     
+
 fun json_object L =
     let
         val ht = carrier2Ht L;
@@ -266,6 +259,8 @@ end;
 
 structure parser = JSONParser (Json2Ast);
 
+(*I think we're going to want to get rid of this
+ * function at some point in the future.*)
 fun json2Ast file =
     let
         val ins = TextIO.openIn file; (*'ins' is short for 'instream'.*)

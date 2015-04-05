@@ -1,6 +1,12 @@
 open TextIO;
-use "json2Ast.sml";
+use "json2AST.sml";
 
+structure printAST :
+          sig
+              val printAST : program -> unit
+          end
+=
+struct
 fun printBinaryOpr BOP_PLUS = " + "
   | printBinaryOpr BOP_MINUS = " - "
   | printBinaryOpr BOP_TIMES = " * "
@@ -20,10 +26,10 @@ fun printUnaryOpr UOP_NOT = "!"
   | printUnaryOpr UOP_MINUS = "-"
 ;
 
-fun printMiniType T_VOID = ">>>VOID<<<"
-  | printMiniType T_INT = "int"
-  | printMiniType T_BOOL = "bool"
-  | printMiniType (T_STRUCT s) = "struct " ^ s
+fun printMiniType MT_VOID = ""
+  | printMiniType MT_INT = "int"
+  | printMiniType MT_BOOL = "bool"
+  | printMiniType (MT_STRUCT s) = "struct " ^ s
 ;
 
 fun printVarDecl (VAR_DECL (t, s)) =
@@ -50,11 +56,11 @@ fun printExpression (EXP_NUM n) = Int.toString n
     (printExpression lft) ^ (printBinaryOpr opr) ^ (printExpression rht)
   | printExpression (EXP_UNARY {opr=opr, opnd=opnd}) =
     (printUnaryOpr opr) ^ (printExpression opnd)
-  | printExpression (EXP_ACCESS {lft=lft, prop=prop}) =
+  | printExpression (EXP_DOT {lft=lft, prop=prop}) =
     (printExpression lft) ^ "." ^ (printLvalue prop)
   | printExpression (EXP_NEW s) =
     "new " ^ s
-  | printExpression (EXP_INVOKE {id=id, args=args}) =
+  | printExpression (EXP_INVOCATION {id=id, args=args}) =
     id ^ "(" ^ (printArgs args) ^ ")"
 
 and printStatement (ST_BLOCK body) =
@@ -65,15 +71,16 @@ and printStatement (ST_BLOCK body) =
     "print " ^ (printExpression body) ^ (if endl then " endl" else "")
   | printStatement (ST_READ l) =
     "read " ^ (printLvalue l)
-  | printStatement (ST_COND {guard=guard, thenBlk=thenBlk, elseBlk=elseBlk}) =
-    "if (" ^ (printExpression guard) ^ ")\n" ^ (printStatement thenBlk)
-  | printStatement (ST_LOOP {guard=guard, body=body}) =
-    "ST_LOOP"
+  | printStatement (ST_IF {guard=guard, thenBlk=thenBlk, elseBlk=elseBlk}) =
+    "if (" ^ (printExpression guard) ^ ")\n" ^ (printStatement thenBlk)  ^
+    " else " ^ (printStatement elseBlk)
+  | printStatement (ST_WHILE {guard=guard, body=body}) =
+    "while (" ^ (printExpression guard) ^ ")\n" ^ (printStatement body)
   | printStatement (ST_DELETE exp) =
     "delete " ^ (printExpression exp)
   | printStatement (ST_RETURN exp) =
     "return " ^ (printExpression exp)
-  | printStatement (ST_INVOKE {id=id, args=args}) =
+  | printStatement (ST_INVOCATION {id=id, args=args}) =
     id ^ "(" ^ (printArgs args) ^ ")"
 
 and printBody [] = ""
@@ -113,10 +120,12 @@ fun printTypeDecls [] = ""
     (printTypeDecl decl) ^ "\n" ^ (printTypeDecls decls)
 ;
 
-fun printAst (PROGRAM {types=types, decls=decls, funcs=funcs}) =
+fun printAST (PROGRAM {types=types, decls=decls, funcs=funcs}) =
     print ((printTypeDecls types) ^ "\n" ^
            (printVarDecls decls) ^ "\n" ^
            (printFuncs funcs))
 ;
 
-printAst (json2Ast "tests/1.json");
+end;
+    
+printAST.printAST (json2Ast "tests/1.json");
