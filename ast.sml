@@ -20,10 +20,10 @@ datatype unaryOperator =
 ;
 
 datatype miniType =
-    T_VOID
-  | T_INT
-  | T_BOOL
-  | T_STRUCT of string
+    MT_VOID
+  | MT_INT
+  | MT_BOOL
+  | MT_STRUCT of string
 ;
 
 datatype varDecl =
@@ -47,9 +47,9 @@ datatype expression =
    | EXP_UNDEFINED (*null*)
    | EXP_BINARY of {opr: binaryOperator, lft: expression, rht: expression} (*binary*)
    | EXP_UNARY of {opr: unaryOperator, opnd: expression} (*unary*)
-   | EXP_ACCESS of {lft: expression, prop: lvalue} (*dot*)
+   | EXP_DOT of {lft: expression, prop: lvalue} (*dot*)
    | EXP_NEW of string (*new*)
-   | EXP_INVOKE of {id: string, args: expression list} (*invovation*)
+   | EXP_INVOCATION of {id: string, args: expression list} (*invovation*)
 ;
 
 datatype statement =
@@ -57,11 +57,11 @@ datatype statement =
    | ST_ASSIGN of {target: lvalue, source: expression} (*assign*)
    | ST_PRINT of {body: expression, endl: bool} (*print*)
    | ST_READ of lvalue (*read*)
-   | ST_COND of {guard: expression, thenBlk: statement, elseBlk: statement} (*if*)
-   | ST_LOOP of {guard: expression, body: statement} (*while*)
+   | ST_IF of {guard: expression, thenBlk: statement, elseBlk: statement} (*if*)
+   | ST_WHILE of {guard: expression, body: statement} (*while*)
    | ST_DELETE of expression (*delete*)
    | ST_RETURN of expression (* expression can be undefined*) (*return*)
-   | ST_INVOKE of {id: string, args: expression list} (*invocation*)
+   | ST_INVOCATION of {id: string, args: expression list} (*invocation*)
 ;
 
 datatype function =

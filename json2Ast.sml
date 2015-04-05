@@ -20,6 +20,10 @@ datatype carrier =
    | EMPTY
 ;
 
+structure Json2Ast : JSON_CALLBACKS = struct
+
+type json_data = carrier
+
 (* HELPER FUNCTIONS *)
 
 fun carrier2Ht L =
@@ -61,14 +65,13 @@ fun str2UnaryOpr "!" = UOP_NOT
   | str2UnaryOpr s = raise Fail s
 ;
 
-fun str2MiniType (string "int") = T_INT
-  | str2MiniType (string "bool") = T_BOOL
-  | str2MiniType (string s) = T_STRUCT s
-  | str2MiniType _ = raise Fail "Expected a `string`."
+fun carrier2MiniType (string "int") = MT_INT
+  | carrier2MiniType (string "bool") = MT_BOOL
+  | carrier2MiniType (string s) = MT_STRUCT s
+  | carrier2MiniType _ = raise Fail "Expected a `string`."
 ;
-
+                     
 (*'uwr' stands for 'unwrap'*)
-
 fun uwrStr (string s) = s | uwrStr _ = raise Fail "Expected a `string`.";
 
 fun uwrExpr (expression e) = e
@@ -85,33 +88,14 @@ fun uwrLvalue (lvalue l) = l
 
 fun uwrBool (bool b) = b | uwrBool _ = raise Fail "Expected a `bool`.";
 
-fun uwrTds (carrier_list exprs) =
-    map (fn (typeDecl e) => e | _ => raise Fail "") exprs
-  | uwrTds _ = raise Fail "Expected a `carrier_list`"
+fun uwrCL f (carrier_list L) = map f L
+  | uwrCL _ _ = raise Fail "Expected a `carrier_list`"
 ;
 
-fun uwrVds (carrier_list exprs) =
-    map (fn (varDecl e) => e | _ => raise Fail "") exprs
-  | uwrVds _ = raise Fail "Expected a `carrier_list`"
-;
-  
-fun uwrExprs (carrier_list exprs) =
-    map (fn (expression e) => e | _ => raise Fail "") exprs
-  | uwrExprs _ = raise Fail "Expected a `carrier_list`"
-;
-
-fun uwrStmts (carrier_list exprs) =
-    map (fn (statement e) => e | _ => raise Fail "") exprs
-  | uwrStmts _ = raise Fail "Expected a `carrier_list`"
-;
-
-fun uwrFuncs (carrier_list exprs) =
-    map (fn (function e) => e | _ => raise Fail "") exprs
-  | uwrFuncs _ = raise Fail "Expected a `carrier_list`"
-;
-
-(* AST NODE CONVERSION FUNCTIONS *)
-
+fun uwrVds c = uwrCL (fn (varDecl vd) => vd | _ => raise Fail "") c;
+fun uwrExprs c = uwrCL (fn (expression e) => e | _ => raise Fail "") c;
+fun uwrStmts c = uwrCL (fn (statement s) => s | _ => raise Fail "") c;
+                     
 fun expression2Ast ht =
     expression (
         case uwrStr (HashTable.lookup ht "exp") of
@@ -138,13 +122,13 @@ fun expression2Ast ht =
                 opnd=uwrExpr (HashTable.lookup ht "operand")
             }
           | "dot" =>
-            EXP_ACCESS {
+            EXP_DOT {
                 lft=uwrExpr (HashTable.lookup ht "left"),
                 prop=LVALUE (uwrStr (HashTable.lookup ht "id"))
             }
           | "new" => EXP_NEW (uwrStr (HashTable.lookup ht "id"))
           | "invocation" =>
-            EXP_INVOKE {
+            EXP_INVOCATION {
                 id=uwrStr (HashTable.lookup ht "id"),
                 args=uwrExprs (HashTable.lookup ht "args")
             }
@@ -172,7 +156,7 @@ fun statement2Ast ht =
           | "read" =>
             ST_READ (uwrLvalue (HashTable.lookup ht "target"))
           | "if" =>
-            ST_COND {
+            ST_IF {
                 guard=uwrExpr (HashTable.lookup ht "guard"),
                 thenBlk=uwrStmt (HashTable.lookup ht "then"),
                 elseBlk=(case HashTable.find ht "else" of
@@ -181,7 +165,7 @@ fun statement2Ast ht =
                            | SOME _ => raise Fail "Expected a `statament`.")
             }
           | "while" =>
-            ST_LOOP {
+            ST_WHILE {
                 guard=uwrExpr (HashTable.lookup ht "guard"),
                 body=uwrStmt (HashTable.lookup ht "body")
             }
@@ -193,18 +177,18 @@ fun statement2Ast ht =
                          | SOME (expression e) => e
                          | SOME _ => raise Fail "Expected an `expression`.")
           | "invocation" =>
-            ST_INVOKE {
+            ST_INVOCATION {
                 id=uwrStr (HashTable.lookup ht "id"),
                 args=uwrExprs (HashTable.lookup ht "args")
             }
           | s => raise Fail s
     )
 ;
-
+                     
 fun varDecl2Ast ht =
     varDecl (
         VAR_DECL (
-            str2MiniType (HashTable.lookup ht "type"),
+            carrier2MiniType (HashTable.lookup ht "type"),
             uwrStr (HashTable.lookup ht "id")
         )
     )
@@ -223,14 +207,14 @@ fun function2Ast ht =
     function (
         FUNCTION {
             id=uwrStr (HashTable.lookup ht "id"),
-            returnType=str2MiniType (HashTable.lookup ht "return_type"),
+            returnType=carrier2MiniType (HashTable.lookup ht "return_type"),
             params=uwrVds (HashTable.lookup ht "parameters"),
             decls=uwrVds (HashTable.lookup ht "declarations"),
             body=uwrStmts (HashTable.lookup ht "body")
         }
     )
 ;
-
+                     
 fun lvalue2Ast ht =
     lvalue (LVALUE (uwrStr (HashTable.lookup ht "id")))
 ;
@@ -238,19 +222,15 @@ fun lvalue2Ast ht =
 fun program2Ast ht =
     program (
         PROGRAM {
-            types=uwrTds (HashTable.lookup ht "types"),
+            types=uwrCL (fn (typeDecl td) => td | _ => raise Fail "")
+                        (HashTable.lookup ht "types"),
             decls=uwrVds (HashTable.lookup ht "declarations"),
-            funcs=uwrFuncs (HashTable.lookup ht "functions")
+            funcs=uwrCL (fn (function f) => f | _ => raise Fail "")
+                        (HashTable.lookup ht "functions")
         }
     )
 ;
-
-(* JSON PARSING FUNCTIONS*)
-
-structure Json2Ast =
-struct
-type json_data = carrier
-
+                     
 fun json_object L =
     let
         val ht = carrier2Ht L;
@@ -269,10 +249,7 @@ fun json_object L =
 
 (* Discard line number pairs. Pass all other pairs up to the
  * json_object callback*)
-fun json_pair ("line", _) = EMPTY
-  | json_pair (s, c) = s_c_pair (s, c)
-;
-
+fun json_pair ("line", _) = EMPTY | json_pair (s, c) = s_c_pair (s, c);
 fun json_array L = carrier_list L;
 fun json_value v = v;
 fun json_int i = int i;
@@ -285,7 +262,7 @@ fun error_handle (msg, pos, data) =
     raise Fail ("Error: " ^ msg ^ " near " ^ Int.toString pos ^ " data: " ^
                 data)
 ;
-end
+end;
 
 structure parser = JSONParser (Json2Ast);
 
@@ -300,4 +277,4 @@ fun json2Ast file =
     end
 ;
 
-val ast = json2Ast "tests/1.json";
+(* val ast = json2Ast "tests/1.json"; *)
