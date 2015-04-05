@@ -23,6 +23,7 @@ datatype miniType =
     MT_VOID
   | MT_INT
   | MT_BOOL
+  | MT_FUNC
   | MT_STRUCT of string
 ;
 
