@@ -10,7 +10,8 @@ exception ReturnTypeException of int * miniType * miniType;
 exception NoReturnException of int;
 exception InvocationException of int; (*I'll add arguments to this later.*)
 
-fun makeHt () = HashTable.mkTable (HashString.hashString, op =) (10, Fail "");
+fun makeHt () = HashTable.mkTable (HashString.hashString, op =)
+                                  (10, Fail "Not Found");
 
 (*GLOBALS*)
 (* Variables and functions are in the same namespace,
@@ -22,9 +23,8 @@ val funcs : (string, function) HashTable.hash_table = makeHt ();
 
 (*HELPER FUNCTIONS*)
 
-fun fail fileName line message =
-    (TextIO.output (TextIO.stdErr, fileName ^ ":" ^
-                                   (Int.toString line) ^ ":" ^ message);
+fun fail file l msg =
+    (TextIO.output (TextIO.stdErr, file ^ ":" ^ (Int.toString l) ^ ":" ^ msg);
      OS.Process.exit OS.Process.failure)
 ;
 
@@ -52,10 +52,6 @@ fun typ2Str MT_INT = "integer"
   | typ2Str (MT_STRUCT s) = "struct " ^ s
 ;
 
-fun requireStruct l (t as MT_STRUCT _) = t
-  | requireStruct l t = raise NotAStructException (l, t)
-;
-
 fun checkType l (MT_INT, MT_INT) = ()
   | checkType l (MT_BOOL, MT_BOOL) = ()
   | checkType l (_, MT_VOID) = () (*This says MT_VOID is equal to anything... not sure...*)
@@ -73,9 +69,9 @@ fun checkLvalue ht (LVALUE lval) =
 fun checkArgs l ht [] [] = ()
   | checkArgs l ht (x::xs) [] = raise InvocationException l
   | checkArgs l ht [] (x::xs) = raise InvocationException l
-  | checkArgs l ht (arg::args) (VAR_DECL {typ=tParam, ...}::params) =
-    (checkType l (checkExpr ht arg, tParam);
-     checkArgs l ht args params)
+  | checkArgs l ht (VAR_DECL {typ=tParam, ...}::params) (arg::args)  =
+    (checkType l (tParam, checkExpr ht arg);
+     checkArgs l ht params args)
 
 (*the type of the invocation expression is the RETURN TYPE of the function...*)
 and checkInvocation l ht id args =
@@ -84,16 +80,49 @@ and checkInvocation l ht id args =
                      SOME MT_FUNC => MT_VOID
                    | SOME t => raise NotAFunctionException (l, t)
                    | NONE => raise NotAFunctionException (l, MT_VOID));
-        (*We can so this safely since we already checked to
+        (*We can do this safely since we already checked to
          * make sure f was a function*)
         val (FUNCTION {params=params, returnType=rt, ...}) =
             HashTable.lookup funcs id;
     in
-        (checkArgs l ht args params;
+        (checkArgs l ht params args;
          rt)
     end
 
-(*This should return the type of the expression*)
+and checkBinExpr ht opr lft rht l =
+    let
+        val tLft = checkExpr ht lft;
+        val tRht = checkExpr ht rht;
+    in
+        (checkType l (tLft, tRht);
+         case (opr, tLft) of
+             (BOP_PLUS, MT_INT) => MT_INT
+           | (BOP_MINUS, MT_INT) => MT_INT
+           | (BOP_TIMES, MT_INT) => MT_INT
+           | (BOP_DIVIDE, MT_INT) => MT_INT
+           | (BOP_MOD, MT_INT) => MT_INT
+           | (BOP_PLUS, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_MINUS, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_TIMES, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_DIVIDE, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_MOD, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_LT, MT_INT) => MT_BOOL
+           | (BOP_GT, MT_INT) => MT_BOOL
+           | (BOP_LE, MT_INT) => MT_BOOL
+           | (BOP_GE, MT_INT) => MT_BOOL
+           | (BOP_LT, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_GT, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_LE, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_GE, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_AND, MT_BOOL) => MT_BOOL
+           | (BOP_OR, MT_BOOL) => MT_BOOL
+           | (BOP_AND, _) => raise BinOpException (l, opr, MT_BOOL)
+           | (BOP_OR, _) => raise BinOpException (l, opr, MT_BOOL)
+           | (BOP_EQ, _) => MT_BOOL
+           | (BOP_NE, _) => MT_BOOL
+        )
+    end
+
 and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
   | checkExpr ht (EXP_ID {id=s, line=l}) =
     (case HashTable.find ht s of
@@ -103,38 +132,7 @@ and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
   | checkExpr ht (EXP_FALSE {...}) = MT_BOOL
   | checkExpr ht EXP_UNDEFINED = MT_VOID (*Not sure about this...*)
   | checkExpr ht (EXP_BINARY {opr=opr, lft=lft, rht=rht, line=l}) =
-    let
-        val tLft = checkExpr ht lft;
-        val tRht = checkExpr ht rht;
-    in
-        (checkType l (tLft, tRht);
-         case (opr, tLft) of
-             (BOP_PLUS, MT_INT) => MT_INT
-           | (BOP_PLUS, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_MINUS, MT_INT) => MT_INT
-           | (BOP_MINUS, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_TIMES, MT_INT) => MT_INT
-           | (BOP_TIMES, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_DIVIDE, MT_INT) => MT_INT
-           | (BOP_DIVIDE, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_MOD, MT_INT) => MT_INT
-           | (BOP_MOD, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_LT, MT_INT) => MT_BOOL
-           | (BOP_LT, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_GT, MT_INT) => MT_BOOL
-           | (BOP_GT, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_LE, MT_INT) => MT_BOOL
-           | (BOP_LE, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_GE, MT_INT) => MT_BOOL
-           | (BOP_GE, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_AND, MT_BOOL) => MT_BOOL
-           | (BOP_AND, _) => raise BinOpException (l, opr, MT_BOOL)
-           | (BOP_OR, MT_BOOL) => MT_BOOL
-           | (BOP_OR, _) => raise BinOpException (l, opr, MT_BOOL)
-           | (BOP_EQ, _) => MT_BOOL
-           | (BOP_NE, _) => MT_BOOL
-        )
-    end
+    checkBinExpr ht opr lft rht l
   | checkExpr ht (EXP_UNARY {opr=opr, opnd=opnd, line=l}) =
     let
         val tOpnd = checkExpr ht opnd;
@@ -147,14 +145,18 @@ and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
     end
   | checkExpr ht (EXP_DOT {lft=lft, prop=prop, line=l}) =
     let
-        val (MT_STRUCT r) = requireStruct l (checkExpr ht lft);
+        val r = case checkExpr ht lft of
+                    MT_STRUCT r => r
+                  | t => raise NotAStructException (l, t);
         val rVars = HashTable.lookup types r;
         val tProp = checkLvalue rVars prop;
     in
         tProp
     end
   | checkExpr ht (EXP_NEW {id=s, line=l}) =
-    requireStruct l (HashTable.lookup ht s)
+    (case HashTable.find types s of
+         SOME _ => MT_STRUCT s
+       | NONE => raise NotAStructException (l, MT_VOID))
   | checkExpr ht (EXP_INVOCATION {id=id, args=args, line=l}) =
     checkInvocation l ht id args
 ;

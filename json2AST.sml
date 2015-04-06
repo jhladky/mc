@@ -283,11 +283,9 @@ end;
 structure parser = JSONParser (Json2Ast);
 
 fun json2AST ins =
-    let
-        val (program p) = parser.parse (TextIO.inputAll ins);
-    in
-        p
-    end
+    case parser.parse (TextIO.inputAll ins) of
+        program p => p
+      | _ => raise Fail ""
 ;
             
 
