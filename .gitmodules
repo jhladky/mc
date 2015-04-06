@@ -1,3 +1,6 @@
 [submodule "mini-parser"]
 	path = mini-parser
 	url = https://github.com/jhladky/mini-parser.git
+[submodule "SML-JSON"]
+	path = SML-JSON
+	url = https://github.com/jhladky/SML-JSON.git
