@@ -17,7 +17,6 @@ datatype carrier =
    | string of string
    | int of int
    | bool of bool
-   | EMPTY
 ;
 
 structure Json2Ast : JSON_CALLBACKS = struct
@@ -30,8 +29,7 @@ fun carrier2Ht L =
     let
         val ht = HashTable.mkTable (HashString.hashString, op =)
                                    (10, Fail "Not Found");
-        fun carrier2Ht_ EMPTY = ()
-          | carrier2Ht_ (s_c_pair p) = HashTable.insert ht p
+        fun carrier2Ht_ (s_c_pair p) = HashTable.insert ht p
           | carrier2Ht_ _ = raise Fail "Expected an `s_c_pair`."
         ;
     in
@@ -92,38 +90,52 @@ fun uwrVds c = uwrCL (fn (varDecl vd) => vd | _ => raise Fail "") c;
 fun uwrExprs c = uwrCL uwrExpr c;
 fun uwrStmts c = uwrCL uwrStmt c;
 
+fun line ht = (fn (int n) => n | _ => raise Fail "Expected an `int`.")
+                  (HashTable.lookup ht "line");
+
 fun expression2Ast ht =
     expression (
         case uwrStr (HashTable.lookup ht "exp") of
             "num" =>
             (case Int.fromString (uwrStr (HashTable.lookup ht "value")) of
-                 SOME n => EXP_NUM n
+                 SOME n => EXP_NUM {value=n, line=line ht}
                | NONE => raise Fail "Bad integer conversion.")
-          | "id" => EXP_ID (uwrStr (HashTable.lookup ht "id"))
-          | "true" => EXP_TRUE
-          | "false" => EXP_FALSE
+          | "id" =>
+            EXP_ID {id=uwrStr (HashTable.lookup ht "id"), line=line ht}
+          | "true" =>
+            EXP_TRUE {line=line ht}
+          | "false" =>
+            EXP_FALSE {line=line ht}
           | "null" => EXP_UNDEFINED
           | "binary" =>
             EXP_BINARY {
                 opr=str2BinaryOpr (uwrStr (HashTable.lookup ht "operator")),
                 lft=uwrExpr (HashTable.lookup ht "lft"),
-                rht=uwrExpr (HashTable.lookup ht "rht")
+                rht=uwrExpr (HashTable.lookup ht "rht"),
+                line=line ht
             }
           | "unary" =>
             EXP_UNARY {
                 opr=str2UnaryOpr (uwrStr (HashTable.lookup ht "operator")),
-                opnd=uwrExpr (HashTable.lookup ht "operand")
+                opnd=uwrExpr (HashTable.lookup ht "operand"),
+                line=line ht
             }
           | "dot" =>
             EXP_DOT {
                 lft=uwrExpr (HashTable.lookup ht "left"),
-                prop=LVALUE (uwrStr (HashTable.lookup ht "id"))
+                prop=LVALUE (uwrStr (HashTable.lookup ht "id")),
+                line=line ht
             }
-          | "new" => EXP_NEW (uwrStr (HashTable.lookup ht "id"))
+          | "new" =>
+            EXP_NEW {
+                id=uwrStr (HashTable.lookup ht "id"),
+                line=line ht
+            }
           | "invocation" =>
             EXP_INVOCATION {
                 id=uwrStr (HashTable.lookup ht "id"),
-                args=uwrExprs (HashTable.lookup ht "args")
+                args=uwrExprs (HashTable.lookup ht "args"),
+                line=line ht
             }
           | s => raise Fail s
     )
@@ -134,20 +146,24 @@ fun expression2Ast ht =
 fun statement2Ast ht =
     statement (
         case uwrStr (HashTable.lookup ht "stmt") of
-            "block" =>
-            ST_BLOCK (uwrStmts (HashTable.lookup ht "list"))
+            "block" => ST_BLOCK (uwrStmts (HashTable.lookup ht "list"))
           | "assign" =>
             ST_ASSIGN {
                 target=uwrLvalue (HashTable.lookup ht "target"),
-                source=uwrExpr (HashTable.lookup ht "source")
+                source=uwrExpr (HashTable.lookup ht "source"),
+                line=line ht
             }
           | "print" =>
             ST_PRINT {
                 body=uwrExpr (HashTable.lookup ht "exp"),
-                endl=uwrBool (HashTable.lookup ht "endl")
+                endl=uwrBool (HashTable.lookup ht "endl"),
+                line=line ht
             }
           | "read" =>
-            ST_READ (uwrLvalue (HashTable.lookup ht "target"))
+            ST_READ {
+                id=uwrLvalue (HashTable.lookup ht "target"),
+                line=line ht
+            }
           | "if" =>
             ST_IF {
                 guard=uwrExpr (HashTable.lookup ht "guard"),
@@ -155,24 +171,33 @@ fun statement2Ast ht =
                 elseBlk=(case HashTable.find ht "else" of
                              NONE => ST_BLOCK []
                            | SOME (statement s) => s
-                           | SOME _ => raise Fail "Expected a `statament`.")
+                           | SOME _ => raise Fail "Expected a `statament`."),
+                line=line ht
             }
           | "while" =>
             ST_WHILE {
                 guard=uwrExpr (HashTable.lookup ht "guard"),
-                body=uwrStmt (HashTable.lookup ht "body")
+                body=uwrStmt (HashTable.lookup ht "body"),
+                line=line ht
             }
           | "delete" =>
-            ST_DELETE (uwrExpr (HashTable.lookup ht "exp"))
+            ST_DELETE {
+                exp=uwrExpr (HashTable.lookup ht "exp"),
+                line=line ht
+            }
           | "return" =>
-            ST_RETURN (case HashTable.find ht "exp" of
-                           NONE => EXP_UNDEFINED
-                         | SOME (expression e) => e
-                         | SOME _ => raise Fail "Expected an `expression`.")
+            ST_RETURN {
+                exp=case HashTable.find ht "exp" of
+                        NONE => EXP_UNDEFINED
+                      | SOME (expression e) => e
+                      | SOME _ => raise Fail "Expected an `expression`.",
+                line=line ht
+            }
           | "invocation" =>
             ST_INVOCATION {
                 id=uwrStr (HashTable.lookup ht "id"),
-                args=uwrExprs (HashTable.lookup ht "args")
+                args=uwrExprs (HashTable.lookup ht "args"),
+                line=line ht
             }
           | s => raise Fail s
     )
@@ -180,10 +205,11 @@ fun statement2Ast ht =
 
 fun varDecl2Ast ht =
     varDecl (
-        VAR_DECL (
-            carrier2MiniType (HashTable.lookup ht "type"),
-            uwrStr (HashTable.lookup ht "id")
-        )
+        VAR_DECL {
+            typ=carrier2MiniType (HashTable.lookup ht "type"),
+            id=uwrStr (HashTable.lookup ht "id"),
+            line=line ht
+        }
     )
 ;
 
@@ -191,7 +217,8 @@ fun typeDecl2Ast ht =
     typeDecl (
         TYPE_DECL {
             id=uwrStr (HashTable.lookup ht "id"),
-            decls=uwrVds (HashTable.lookup ht "fields")
+            decls=uwrVds (HashTable.lookup ht "fields"),
+            line=line ht
         }
     )
 ;
@@ -203,7 +230,8 @@ fun function2Ast ht =
             returnType=carrier2MiniType (HashTable.lookup ht "return_type"),
             params=uwrVds (HashTable.lookup ht "parameters"),
             decls=uwrVds (HashTable.lookup ht "declarations"),
-            body=uwrStmts (HashTable.lookup ht "body")
+            body=uwrStmts (HashTable.lookup ht "body"),
+            line=line ht
         }
     )
 ;
@@ -240,9 +268,7 @@ fun json_object L =
     end
 ;
 
-(* Discard line number pairs. Pass all other pairs up to the
- * json_object callback*)
-fun json_pair ("line", _) = EMPTY | json_pair (s, c) = s_c_pair (s, c);
+fun json_pair p = s_c_pair p;
 fun json_array L = carrier_list L;
 fun json_value v = v;
 fun json_int i = int i;
