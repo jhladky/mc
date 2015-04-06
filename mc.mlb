@@ -1,0 +1,6 @@
+$(SML_LIB)/basis/basis.mlb
+$(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
+ast.sml
+sml-json.sml
+json2AST.sml
+staticCheck.sml

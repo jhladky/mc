@@ -1,6 +1,4 @@
-use "json2AST.sml";
-
-exception UndefException of int option * string; (*Fix this later*)
+exception UndefException of int * string;
 exception BinOpException of int * binaryOperator * miniType;
 exception UnOpException of int * unaryOperator * miniType;
 exception TypeMatchException of int * miniType * miniType;
@@ -25,12 +23,9 @@ val funcs : (string, function) HashTable.hash_table = makeHt ();
 (*HELPER FUNCTIONS*)
 
 fun fail fileName line message =
-    let
-        val s = case line of SOME n => (Int.toString n) ^ ":" | NONE => "";
-    in
-        (TextIO.output (TextIO.stdErr, fileName ^ ":" ^ s ^ message);
-         OS.Process.exit OS.Process.failure)
-    end
+    (TextIO.output (TextIO.stdErr, fileName ^ ":" ^
+                                   (Int.toString line) ^ ":" ^ message);
+     OS.Process.exit OS.Process.failure)
 ;
 
 fun binOp2Str BOP_PLUS = "+"
@@ -50,11 +45,11 @@ fun binOp2Str BOP_PLUS = "+"
 
 fun unOp2Str UOP_NOT = "!" | unOp2Str UOP_MINUS = "-";
 
-fun miniType2Str MT_INT = "integer"
-  | miniType2Str MT_VOID = "undefined"
-  | miniType2Str MT_BOOL = "boolean"
-  | miniType2Str MT_FUNC = "function"
-  | miniType2Str (MT_STRUCT s) = "struct " ^ s
+fun typ2Str MT_INT = "integer"
+  | typ2Str MT_VOID = "undefined"
+  | typ2Str MT_BOOL = "boolean"
+  | typ2Str MT_FUNC = "function"
+  | typ2Str (MT_STRUCT s) = "struct " ^ s
 ;
 
 fun requireStruct l (t as MT_STRUCT _) = t
@@ -72,10 +67,11 @@ fun checkType l (MT_INT, MT_INT) = ()
 fun checkLvalue ht (LVALUE lval) =
     case HashTable.find ht lval of
         SOME t => t
-      | NONE => raise UndefException (NONE, lval)
+      | NONE => raise UndefException (0, lval) (*Fix this later*)
 ;
 
-fun checkArgs l ht (x::xs) [] = raise InvocationException l
+fun checkArgs l ht [] [] = ()
+  | checkArgs l ht (x::xs) [] = raise InvocationException l
   | checkArgs l ht [] (x::xs) = raise InvocationException l
   | checkArgs l ht (arg::args) (VAR_DECL {typ=tParam, ...}::params) =
     (checkType l (checkExpr ht arg, tParam);
@@ -93,7 +89,7 @@ and checkInvocation l ht id args =
         val (FUNCTION {params=params, returnType=rt, ...}) =
             HashTable.lookup funcs id;
     in
-        ((* checkArgs l ht args params; *)
+        (checkArgs l ht args params;
          rt)
     end
 
@@ -102,8 +98,9 @@ and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
   | checkExpr ht (EXP_ID {id=s, line=l}) =
     (case HashTable.find ht s of
         SOME t => t
-      | NONE => raise UndefException (SOME l, s))
-  | checkExpr ht (EXP_TRUE {...} | EXP_FALSE {...}) = MT_BOOL
+      | NONE => raise UndefException (l, s))
+  | checkExpr ht (EXP_TRUE {...}) = MT_BOOL
+  | checkExpr ht (EXP_FALSE {...}) = MT_BOOL
   | checkExpr ht EXP_UNDEFINED = MT_VOID (*Not sure about this...*)
   | checkExpr ht (EXP_BINARY {opr=opr, lft=lft, rht=rht, line=l}) =
     let
@@ -111,20 +108,31 @@ and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
         val tRht = checkExpr ht rht;
     in
         (checkType l (tLft, tRht);
-         case opr of
-             (BOP_PLUS | BOP_MINUS | BOP_TIMES | BOP_DIVIDE | BOP_MOD) =>
-             (case tLft of
-                  MT_INT => MT_INT
-                | _ => raise BinOpException (l, opr, MT_INT))
-           | (BOP_LT | BOP_GT | BOP_LE | BOP_GE) =>
-             (case tLft of
-                  MT_INT => MT_BOOL
-                | _ => raise BinOpException (l, opr, MT_INT))
-           | (BOP_AND | BOP_OR) =>
-             (case tLft of
-                  MT_BOOL => MT_BOOL
-                | _ => raise BinOpException (l, opr, MT_BOOL))
-           | (BOP_EQ | BOP_NE) => MT_BOOL
+         case (opr, tLft) of
+             (BOP_PLUS, MT_INT) => MT_INT
+           | (BOP_PLUS, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_MINUS, MT_INT) => MT_INT
+           | (BOP_MINUS, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_TIMES, MT_INT) => MT_INT
+           | (BOP_TIMES, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_DIVIDE, MT_INT) => MT_INT
+           | (BOP_DIVIDE, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_MOD, MT_INT) => MT_INT
+           | (BOP_MOD, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_LT, MT_INT) => MT_BOOL
+           | (BOP_LT, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_GT, MT_INT) => MT_BOOL
+           | (BOP_GT, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_LE, MT_INT) => MT_BOOL
+           | (BOP_LE, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_GE, MT_INT) => MT_BOOL
+           | (BOP_GE, _) => raise BinOpException (l, opr, MT_INT)
+           | (BOP_AND, MT_BOOL) => MT_BOOL
+           | (BOP_AND, _) => raise BinOpException (l, opr, MT_BOOL)
+           | (BOP_OR, MT_BOOL) => MT_BOOL
+           | (BOP_OR, _) => raise BinOpException (l, opr, MT_BOOL)
+           | (BOP_EQ, _) => MT_BOOL
+           | (BOP_NE, _) => MT_BOOL
         )
     end
   | checkExpr ht (EXP_UNARY {opr=opr, opnd=opnd, line=l}) =
@@ -215,47 +223,54 @@ fun addTypeDecl (TYPE_DECL {id=id, decls=ds, line=_}) =
         )
     end
 ;
-  
-fun staticCheck file =
+
+fun printUsage () =
+    (TextIO.output (TextIO.stdErr, "Usage: mc <filename>\n");
+     OS.Process.exit OS.Process.failure)
+;
+
+fun staticCheck () =
     let
-        val PROGRAM {decls=ds, funcs=fs, types=ts} = json2Ast file;
+        val args = CommandLine.arguments ();
+        val _ = if (length args) = 0 then printUsage () else ();
+        val file = hd args;
+        val ins = TextIO.openIn file; (*'ins' is short for 'instream'.*)
+        val PROGRAM {decls=ds, funcs=fs, types=ts} = json2AST ins;
     in
-        (app addTypeDecl ts;
+        (TextIO.closeIn ins;
+         app addTypeDecl ts;
          app (fn (VAR_DECL {id=s, typ=t, ...}) =>
                  HashTable.insert decls (s, t)) ds;
          app (fn (func as FUNCTION {id=id, ...}) =>
                  (HashTable.insert decls (id, MT_FUNC);
                   HashTable.insert funcs (id, func))) fs;
-         app checkFunc fs)
+         app checkFunc fs
+         handle BinOpException (line, opr, t) =>
+                fail file line ("Operator " ^ (binOp2Str opr) ^
+                                " requires an " ^ (typ2Str t) ^ "type.\n")
+              | UnOpException (line, opr, t) =>
+                fail file line ("Operator " ^ (unOp2Str opr) ^
+                                " requires an " ^ (typ2Str t) ^ "type.\n")
+              | TypeMatchException (line, t1, t2) =>
+                fail file line ("Types " ^ (typ2Str t1) ^
+                                " and " ^ (typ2Str t2) ^ " do not match.\n")
+              | NotAFunctionException (line, t) =>
+                fail file line ("Type " ^ (typ2Str t) ^ " is not callable.\n")
+              | NotAStructException (line, t) =>
+                fail file line ("Expression requires a struct type " ^
+                                "(Supplied " ^ (typ2Str t) ^ ").\n")
+              | PrintException (line, t) =>
+                fail file line ("`print` requires an integer" ^
+                                "argument (Supplied " ^ (typ2Str t) ^ ").\n")
+              | BooleanGuardException (line, t) =>
+                fail file line ("Statement requires a boolean " ^
+                                "expression (Supplied " ^ (typ2Str t) ^ ").\n")
+              | UndefException (line, id) =>
+                fail file line ("Undefined variable " ^ id ^ ".\n")
+              | InvocationException line =>
+                fail file line "Bad function invocation.\n"
+        )
     end
-    handle BinOpException (line, opr, t) =>
-           fail file (SOME line) ("Operator " ^ (binOp2Str opr) ^ " requires an " ^
-                                  (miniType2Str t) ^ "type.\n")
-         | UnOpException (line, opr, t) =>
-           fail file (SOME line) ("Operator " ^ (unOp2Str opr) ^ " requires an " ^
-                                  (miniType2Str t) ^ "type.\n")
-         | TypeMatchException (line, t1, t2) =>
-           fail file (SOME line) ("Types " ^ (miniType2Str t1) ^
-                                  " and " ^ (miniType2Str t2) ^
-                                  " do not match.\n")
-         | NotAFunctionException (line, t) =>
-           fail file (SOME line) ("Type " ^ (miniType2Str t) ^
-                                  " is not callable.\n")
-         | NotAStructException (line, t) =>
-           fail file (SOME line) ("Expression requires a struct type (Supplied " ^
-                                  (miniType2Str t) ^ ").\n")
-         | PrintException (line, t) =>
-           fail file (SOME line) ("`print` requires an integer argument (Supplied " ^
-                                  (miniType2Str t) ^ ").\n")
-         | BooleanGuardException (line, t) =>
-           fail file (SOME line) ("Statement requires a boolean expression (Supplied " ^
-                                  (miniType2Str t) ^ ").\n")
-         | UndefException (line, id) =>
-           fail file line ("Undefined variable " ^ id ^ ".\n")
-         | InvocationException line =>
-           fail file (SOME line) "Bad function invocation.\n"
 ;
 
-staticCheck "tests/1.json";
-staticCheck "tests/2.json";
-staticCheck "tests/ret.json";
+val _ = staticCheck();

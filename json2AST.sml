@@ -1,6 +1,3 @@
-use "sml-json.sml";
-use "ast.sml";
-
 (* All of the sml-json callbacks have to return data of the same type.
  * So `carrier` acts as a sort-of 'superclass' for the various parts
  * of the AST.*)
@@ -285,17 +282,12 @@ end;
 
 structure parser = JSONParser (Json2Ast);
 
-(*I think we're going to want to get rid of this
- * function at some point in the future.*)
-fun json2Ast file =
+fun json2AST ins =
     let
-        val ins = TextIO.openIn file; (*'ins' is short for 'instream'.*)
-        val json = TextIO.inputAll ins;
-        val (program p) = parser.parse json;
+        val (program p) = parser.parse (TextIO.inputAll ins);
     in
-        (TextIO.closeIn ins;
-         p)
+        p
     end
 ;
+            
 
-(* val ast = json2Ast "tests/1.json"; *)
