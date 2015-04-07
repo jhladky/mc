@@ -58,6 +58,7 @@ fun str2UnaryOpr "!" = UOP_NOT
 
 fun carrier2MiniType (string "int") = MT_INT
   | carrier2MiniType (string "bool") = MT_BOOL
+  | carrier2MiniType (string "void") = MT_VOID
   | carrier2MiniType (string s) = MT_STRUCT s
   | carrier2MiniType _ = raise Fail "Expected a `string`."
 ;

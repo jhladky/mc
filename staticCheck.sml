@@ -9,6 +9,7 @@ exception BooleanGuardException of int * miniType;
 exception NoReturnException of int;
 exception BadReturnException of int;
 exception InvocationException of int; (*I'll add arguments to this later.*)
+exception NoMainException of int
 
 fun makeHt () = HashTable.mkTable (HashString.hashString, op =)
                                   (10, Fail "Not Found");
@@ -46,15 +47,16 @@ fun binOp2Str BOP_PLUS = "+"
 fun unOp2Str UOP_NOT = "!" | unOp2Str UOP_MINUS = "-";
 
 fun typ2Str MT_INT = "integer"
-  | typ2Str MT_VOID = "undefined"
+  | typ2Str MT_VOID = "void"
   | typ2Str MT_BOOL = "boolean"
   | typ2Str MT_FUNC = "function"
   | typ2Str (MT_STRUCT s) = "struct " ^ s
 ;
 
+(* null can be assigned to any struct type*)
 fun checkType l (MT_INT, MT_INT) = ()
   | checkType l (MT_BOOL, MT_BOOL) = ()
-  | checkType l (_, MT_VOID) = () (* MT_VOID as an assigner is equal to anything*)
+  | checkType l (MT_STRUCT _, MT_VOID) = ()
   | checkType l (MT_VOID, t2) = raise TypeMatchException (l, MT_VOID, t2)
   | checkType l (t1 as MT_STRUCT s1, t2 as MT_STRUCT s2) =
     if s1 = s2 then () else raise TypeMatchException (l, t1, t2)
@@ -120,8 +122,7 @@ and checkBinExpr ht opr lft rht l =
            | (BOP_AND, _) => raise BinOpException (l, opr, MT_BOOL)
            | (BOP_OR, _) => raise BinOpException (l, opr, MT_BOOL)
            | (BOP_EQ, _) => MT_BOOL
-           | (BOP_NE, _) => MT_BOOL
-        )
+           | (BOP_NE, _) => MT_BOOL)
     end
 
 and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
@@ -135,15 +136,11 @@ and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
   | checkExpr ht (EXP_BINARY {opr=opr, lft=lft, rht=rht, line=l}) =
     checkBinExpr ht opr lft rht l
   | checkExpr ht (EXP_UNARY {opr=opr, opnd=opnd, line=l}) =
-    let
-        val tOpnd = checkExpr ht opnd;
-    in
-        case (opr, tOpnd) of
-            (UOP_NOT, MT_BOOL) => MT_BOOL
-          | (UOP_MINUS, MT_INT) => MT_INT
-          | (UOP_NOT, _) => raise UnOpException (l, opr, MT_BOOL)
-          | (UOP_MINUS, _) => raise UnOpException (l, opr, MT_INT)
-    end
+    (case (opr, checkExpr ht opnd) of
+         (UOP_NOT, MT_BOOL) => MT_BOOL
+       | (UOP_MINUS, MT_INT) => MT_INT
+       | (UOP_NOT, _) => raise UnOpException (l, opr, MT_BOOL)
+       | (UOP_MINUS, _) => raise UnOpException (l, opr, MT_INT))
   | checkExpr ht (EXP_DOT {lft=lft, prop=prop, line=l}) =
     let
         val r = case checkExpr ht lft of
@@ -172,8 +169,7 @@ fun checkStmt rt ht (ST_BLOCK stmts) =
     (case checkExpr ht body of
          MT_INT => false
        | t => raise PrintException (l, t))
-  | checkStmt rt ht (ST_READ lval) =
-    false
+  | checkStmt rt ht (ST_READ lval) = false
   | checkStmt rt ht (ST_IF {guard=guard, thenBlk=thenBlk,
                             elseBlk=elseBlk, line=l}) =
     (case checkExpr ht guard of
@@ -184,29 +180,23 @@ fun checkStmt rt ht (ST_BLOCK stmts) =
      case checkExpr ht guard of
          MT_BOOL => false
        | t => raise BooleanGuardException (l, t))
-  | checkStmt rt ht (ST_DELETE {exp=exp, line=_}) =
-    false
+  | checkStmt rt ht (ST_DELETE {exp=exp, line=_}) = false
   | checkStmt rt ht (ST_RETURN {exp=exp, line=l}) =
     (checkType l (rt, checkExpr ht exp);
      true)
   | checkStmt rt ht (ST_INVOCATION {id=id, args=args, line=l}) =
     (checkInvocation l ht id args;
      false)
-    
 
 and checkStmts1 retDetect rt ht [] = retDetect
   | checkStmts1 retDetect rt ht (stmt::stmts) =
-    let
-        val stmtRes = checkStmt rt ht stmt;
-    in
-        if stmtRes then checkStmts1 true rt ht stmts
-        else checkStmts1 retDetect rt ht stmts
-    end
+    if checkStmt rt ht stmt then checkStmts1 true rt ht stmts
+    else checkStmts1 retDetect rt ht stmts
 
 and checkStmts rt ht L =
     checkStmts1 false rt ht L
 ;
-  
+
 fun checkFunc (FUNCTION {id=id, params=params, returnType=rt,
                          decls=ds, body=body, line=l}) =
     let
@@ -239,6 +229,22 @@ fun printUsage () =
      OS.Process.exit OS.Process.failure)
 ;
 
+fun checkForMain1 mainDetect [] = mainDetect
+  | checkForMain1 mainDetect ((s, FUNCTION {params=params,
+                                            returnType=rt, ...})::funcs) =
+    if s = "main" andalso length params = 0 andalso rt = MT_INT then
+        checkForMain1 true funcs
+    else checkForMain1 mainDetect funcs
+;
+
+fun checkForMain () =
+    case HashTable.find funcs "main" of
+        SOME (FUNCTION {params=params, returnType=rt, ...}) =>
+        if length params = 0 andalso rt = MT_INT then ()
+        else raise NoMainException 1
+      | NONE => raise NoMainException 1
+;
+
 fun staticCheck () =
     let
         val args = CommandLine.arguments ();
@@ -254,34 +260,36 @@ fun staticCheck () =
          app (fn (func as FUNCTION {id=id, ...}) =>
                  (HashTable.insert decls (id, MT_FUNC);
                   HashTable.insert funcs (id, func))) fs;
-         app checkFunc fs
-         handle BinOpException (line, opr, t) =>
-                fail file line ("Operator " ^ (binOp2Str opr) ^
-                                " requires an " ^ (typ2Str t) ^ "type.\n")
-              | UnOpException (line, opr, t) =>
-                fail file line ("Operator " ^ (unOp2Str opr) ^
-                                " requires an " ^ (typ2Str t) ^ "type.\n")
-              | TypeMatchException (line, t1, t2) =>
-                fail file line ("Types " ^ (typ2Str t1) ^
-                                " and " ^ (typ2Str t2) ^ " do not match.\n")
-              | NotAFunctionException (line, t) =>
-                fail file line ("Type " ^ (typ2Str t) ^ " is not callable.\n")
-              | NotAStructException (line, t) =>
-                fail file line ("Expression requires a struct type " ^
-                                "(Supplied " ^ (typ2Str t) ^ ").\n")
-              | PrintException (line, t) =>
-                fail file line ("`print` requires an integer" ^
-                                "argument (Supplied " ^ (typ2Str t) ^ ").\n")
-              | BooleanGuardException (line, t) =>
-                fail file line ("Statement requires a boolean " ^
-                                "expression (Supplied " ^ (typ2Str t) ^ ").\n")
-              | UndefException (line, id) =>
-                fail file line ("Undefined variable " ^ id ^ ".\n")
-              | InvocationException line =>
-                fail file line "Bad function invocation.\n"
-              | NoReturnException line =>
-                fail file line "Function does not return on all paths.\n"
-        )
+         app checkFunc fs;
+         checkForMain ())
+        handle BinOpException (line, opr, t) =>
+               fail file line ("Operator " ^ (binOp2Str opr) ^
+                               " requires an " ^ (typ2Str t) ^ "type.\n")
+             | UnOpException (line, opr, t) =>
+               fail file line ("Operator " ^ (unOp2Str opr) ^
+                               " requires an " ^ (typ2Str t) ^ "type.\n")
+             | TypeMatchException (line, t1, t2) =>
+               fail file line ("Types " ^ (typ2Str t1) ^
+                               " and " ^ (typ2Str t2) ^ " do not match.\n")
+             | NotAFunctionException (line, t) =>
+               fail file line ("Type " ^ (typ2Str t) ^ " is not callable.\n")
+             | NotAStructException (line, t) =>
+               fail file line ("Expression requires a struct type " ^
+                               "(Supplied " ^ (typ2Str t) ^ ").\n")
+             | PrintException (line, t) =>
+               fail file line ("`print` requires an integer" ^
+                               "argument (Supplied " ^ (typ2Str t) ^ ").\n")
+             | BooleanGuardException (line, t) =>
+               fail file line ("Statement requires a boolean " ^
+                               "expression (Supplied " ^ (typ2Str t) ^ ").\n")
+             | UndefException (line, id) =>
+               fail file line ("Undefined variable " ^ id ^ ".\n")
+             | InvocationException line =>
+               fail file line "Bad function invocation.\n"
+             | NoReturnException line =>
+               fail file line "Function does not return on all paths.\n"
+             | NoMainException line =>
+               fail file line "No function matching `main` signature.\n"
     end
 ;
 
