@@ -1,5 +1,4 @@
 open TextIO;
-use "json2AST.sml";
 
 structure printAST :
           sig

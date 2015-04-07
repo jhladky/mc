@@ -1,3 +1,14 @@
+(*This is going to stay global for now until I figure out what to do with it*)
+fun makeHt () = HashTable.mkTable (HashString.hashString, op =)
+                                  (10, Fail "Not Found");
+
+structure staticCheck :
+          sig
+              val staticCheck : string -> program -> unit
+          end
+=
+struct
+
 exception UndefException of int * string;
 exception BinOpException of int * binaryOperator * miniType;
 exception UnOpException of int * unaryOperator * miniType;
@@ -11,10 +22,6 @@ exception BadReturnException of int;
 exception InvocationException of int; (*I'll add arguments to this later.*)
 exception NoMainException of int
 
-fun makeHt () = HashTable.mkTable (HashString.hashString, op =)
-                                  (10, Fail "Not Found");
-
-(*GLOBALS*)
 (* Variables and functions are in the same namespace,
  * but structure names are in a DIFFERENT namespace.*)
 val types : (string, (string, miniType) HashTable.hash_table)
@@ -53,6 +60,7 @@ fun typ2Str MT_INT = "integer"
   | typ2Str (MT_STRUCT s) = "struct " ^ s
 ;
 
+(*AST FUNCTIONS*)
 (* null can be assigned to any struct type*)
 fun checkType l (MT_INT, MT_INT) = ()
   | checkType l (MT_BOOL, MT_BOOL) = ()
@@ -224,11 +232,6 @@ fun addTypeDecl (TYPE_DECL {id=id, decls=ds, line=_}) =
     end
 ;
 
-fun printUsage () =
-    (TextIO.output (TextIO.stdErr, "Usage: mc <filename>\n");
-     OS.Process.exit OS.Process.failure)
-;
-
 fun checkForMain1 mainDetect [] = mainDetect
   | checkForMain1 mainDetect ((s, FUNCTION {params=params,
                                             returnType=rt, ...})::funcs) =
@@ -245,52 +248,62 @@ fun checkForMain () =
       | NONE => raise NoMainException 1
 ;
 
-fun staticCheck () =
+fun staticCheck file (PROGRAM {types=ts, decls=ds, funcs=fs}) =
+    (app addTypeDecl ts;
+     app (fn (VAR_DECL {id=s, typ=t, ...}) =>
+             HashTable.insert decls (s, t)) ds;
+     app (fn (func as FUNCTION {id=id, ...}) =>
+        (HashTable.insert decls (id, MT_FUNC);
+         HashTable.insert funcs (id, func))) fs;
+     app checkFunc fs;
+     checkForMain ())
+    handle BinOpException (line, opr, t) =>
+           fail file line ("Operator " ^ (binOp2Str opr) ^
+                           " requires an " ^ (typ2Str t) ^ "type.\n")
+         | UnOpException (line, opr, t) =>
+           fail file line ("Operator " ^ (unOp2Str opr) ^
+                           " requires an " ^ (typ2Str t) ^ "type.\n")
+         | TypeMatchException (line, t1, t2) =>
+           fail file line ("Types " ^ (typ2Str t1) ^
+                           " and " ^ (typ2Str t2) ^ " do not match.\n")
+         | NotAFunctionException (line, t) =>
+           fail file line ("Type " ^ (typ2Str t) ^ " is not callable.\n")
+         | NotAStructException (line, t) =>
+           fail file line ("Expression requires a struct type " ^
+                           "(Supplied " ^ (typ2Str t) ^ ").\n")
+         | PrintException (line, t) =>
+           fail file line ("`print` requires an integer" ^
+                           "argument (Supplied " ^ (typ2Str t) ^ ").\n")
+         | BooleanGuardException (line, t) =>
+           fail file line ("Statement requires a boolean " ^
+                           "expression (Supplied " ^ (typ2Str t) ^ ").\n")
+         | UndefException (line, id) =>
+           fail file line ("Undefined variable " ^ id ^ ".\n")
+         | InvocationException line =>
+           fail file line "Bad function invocation.\n"
+         | NoReturnException line =>
+           fail file line "Function does not return on all paths.\n"
+         | NoMainException line =>
+           fail file line "No function matching `main` signature.\n"
+;
+  
+end;
+
+fun printUsage () =
+    (TextIO.output (TextIO.stdErr, "Usage: mc <filename>\n");
+     OS.Process.exit OS.Process.failure)
+;
+
+fun main () =
     let
         val args = CommandLine.arguments ();
         val _ = if (length args) = 0 then printUsage () else ();
         val file = hd args;
         val ins = TextIO.openIn file; (*'ins' is short for 'instream'.*)
-        val PROGRAM {decls=ds, funcs=fs, types=ts} = json2AST ins;
     in
-        (TextIO.closeIn ins;
-         app addTypeDecl ts;
-         app (fn (VAR_DECL {id=s, typ=t, ...}) =>
-                 HashTable.insert decls (s, t)) ds;
-         app (fn (func as FUNCTION {id=id, ...}) =>
-                 (HashTable.insert decls (id, MT_FUNC);
-                  HashTable.insert funcs (id, func))) fs;
-         app checkFunc fs;
-         checkForMain ())
-        handle BinOpException (line, opr, t) =>
-               fail file line ("Operator " ^ (binOp2Str opr) ^
-                               " requires an " ^ (typ2Str t) ^ "type.\n")
-             | UnOpException (line, opr, t) =>
-               fail file line ("Operator " ^ (unOp2Str opr) ^
-                               " requires an " ^ (typ2Str t) ^ "type.\n")
-             | TypeMatchException (line, t1, t2) =>
-               fail file line ("Types " ^ (typ2Str t1) ^
-                               " and " ^ (typ2Str t2) ^ " do not match.\n")
-             | NotAFunctionException (line, t) =>
-               fail file line ("Type " ^ (typ2Str t) ^ " is not callable.\n")
-             | NotAStructException (line, t) =>
-               fail file line ("Expression requires a struct type " ^
-                               "(Supplied " ^ (typ2Str t) ^ ").\n")
-             | PrintException (line, t) =>
-               fail file line ("`print` requires an integer" ^
-                               "argument (Supplied " ^ (typ2Str t) ^ ").\n")
-             | BooleanGuardException (line, t) =>
-               fail file line ("Statement requires a boolean " ^
-                               "expression (Supplied " ^ (typ2Str t) ^ ").\n")
-             | UndefException (line, id) =>
-               fail file line ("Undefined variable " ^ id ^ ".\n")
-             | InvocationException line =>
-               fail file line "Bad function invocation.\n"
-             | NoReturnException line =>
-               fail file line "Function does not return on all paths.\n"
-             | NoMainException line =>
-               fail file line "No function matching `main` signature.\n"
+        (staticCheck.staticCheck file (json2AST ins);
+         TextIO.closeIn ins)
     end
 ;
 
-val _ = staticCheck();
+val _ = main ();
