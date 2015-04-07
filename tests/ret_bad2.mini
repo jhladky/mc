@@ -1,0 +1,10 @@
+fun foo(int i) int      # standard case
+{
+   return i;
+}
+
+fun bar(int i) void      # control flow case
+{
+   return i;
+}
+

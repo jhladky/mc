@@ -33,3 +33,5 @@
 
 # Application binary
 mc
+# Test JSON files
+tests/*.json

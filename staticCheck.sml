@@ -6,8 +6,8 @@ exception NotAFunctionException of int * miniType;
 exception NotAStructException of int * miniType;
 exception PrintException of int * miniType;
 exception BooleanGuardException of int * miniType;
-exception ReturnTypeException of int * miniType * miniType;
 exception NoReturnException of int;
+exception BadReturnException of int;
 exception InvocationException of int; (*I'll add arguments to this later.*)
 
 fun makeHt () = HashTable.mkTable (HashString.hashString, op =)
@@ -54,7 +54,8 @@ fun typ2Str MT_INT = "integer"
 
 fun checkType l (MT_INT, MT_INT) = ()
   | checkType l (MT_BOOL, MT_BOOL) = ()
-  | checkType l (_, MT_VOID) = () (*This says MT_VOID is equal to anything... not sure...*)
+  | checkType l (_, MT_VOID) = () (* MT_VOID as an assigner is equal to anything*)
+  | checkType l (MT_VOID, t2) = raise TypeMatchException (l, MT_VOID, t2)
   | checkType l (t1 as MT_STRUCT s1, t2 as MT_STRUCT s2) =
     if s1 = s2 then () else raise TypeMatchException (l, t1, t2)
   | checkType l (t1, t2) = raise TypeMatchException (l, t1, t2)
@@ -161,57 +162,64 @@ and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
     checkInvocation l ht id args
 ;
 
+(*Returns a boolean indicating whether the statement returns on all paths*)
 fun checkStmt rt ht (ST_BLOCK stmts) =
-    app (checkStmt rt ht) stmts
+    checkStmts rt ht stmts
   | checkStmt rt ht (ST_ASSIGN {target=target, source=source, line=l}) =
-    let
-        val tTarget = checkLvalue ht target;
-        val tSource = checkExpr ht source;
-    in
-        checkType l (tTarget, tSource)
-    end
+    (checkType l (checkLvalue ht target, checkExpr ht source);
+     false)
   | checkStmt rt ht (ST_PRINT {body=body, line=l, ...}) =
     (case checkExpr ht body of
-         MT_INT => ()
+         MT_INT => false
        | t => raise PrintException (l, t))
   | checkStmt rt ht (ST_READ lval) =
-    ()
+    false
   | checkStmt rt ht (ST_IF {guard=guard, thenBlk=thenBlk,
                             elseBlk=elseBlk, line=l}) =
-    (checkStmt rt ht thenBlk;
-     checkStmt rt ht elseBlk;
-     case checkExpr ht guard of
-         MT_BOOL => ()
-       | t => raise BooleanGuardException (l, t)
-    )
+    (case checkExpr ht guard of
+         MT_BOOL => (checkStmt rt ht thenBlk) andalso (checkStmt rt ht elseBlk)
+       | t => raise BooleanGuardException (l, t))
   | checkStmt rt ht (ST_WHILE {guard=guard, body=body, line=l}) =
     (checkStmt rt ht body;
      case checkExpr ht guard of
-         MT_BOOL => ()
-       | t => raise BooleanGuardException (l, t)
-    )
+         MT_BOOL => false
+       | t => raise BooleanGuardException (l, t))
   | checkStmt rt ht (ST_DELETE {exp=exp, line=_}) =
-    ()
+    false
   | checkStmt rt ht (ST_RETURN {exp=exp, line=l}) =
-    checkType l (rt, checkExpr ht exp)
+    (checkType l (rt, checkExpr ht exp);
+     true)
   | checkStmt rt ht (ST_INVOCATION {id=id, args=args, line=l}) =
     (checkInvocation l ht id args;
-     ())
-    handle TypeMatchException t=>
-           raise ReturnTypeException t
-;
+     false)
+    
 
+and checkStmts1 retDetect rt ht [] = retDetect
+  | checkStmts1 retDetect rt ht (stmt::stmts) =
+    let
+        val stmtRes = checkStmt rt ht stmt;
+    in
+        if stmtRes then checkStmts1 true rt ht stmts
+        else checkStmts1 retDetect rt ht stmts
+    end
+
+and checkStmts rt ht L =
+    checkStmts1 false rt ht L
+;
+  
 fun checkFunc (FUNCTION {id=id, params=params, returnType=rt,
-                         decls=ds, body=body, line=_}) =
+                         decls=ds, body=body, line=l}) =
     let
         val locals = HashTable.copy decls;
+        val _ = app (fn (VAR_DECL {id=s, typ=t, ...}) =>
+                        HashTable.insert locals (s, t)) ds;
+        val _ = app (fn (VAR_DECL {id=s, typ=t, ...}) =>
+                        HashTable.insert locals (s, t)) params;
+        val retDetect = checkStmts rt locals body;
     in
-        (app (fn (VAR_DECL {id=s, typ=t, ...}) =>
-                 HashTable.insert locals (s, t)) ds;
-         app (fn (VAR_DECL {id=s, typ=t, ...}) =>
-                 HashTable.insert locals (s, t)) params;
-         app (checkStmt rt locals) body
-        )
+        if retDetect = false andalso rt <> MT_VOID then
+            raise NoReturnException l
+        else ()
     end
 ;
 
@@ -271,6 +279,8 @@ fun staticCheck () =
                 fail file line ("Undefined variable " ^ id ^ ".\n")
               | InvocationException line =>
                 fail file line "Bad function invocation.\n"
+              | NoReturnException line =>
+                fail file line "Function does not return on all paths.\n"
         )
     end
 ;
