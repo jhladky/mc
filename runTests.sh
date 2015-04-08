@@ -1,18 +1,25 @@
 #!/bin/bash
 
+NAME=""
+
+get_file_name () {
+    local IFS='/'
+    arr=($1)
+    NAME=${arr[2]}
+    local IFS='.'
+    arr=($NAME)
+    NAME=${arr[0]}
+}
+
 cd mini-parser
 make
-java Mini ../tests/1.mini > ../tests/1.json
-java Mini ../tests/2.mini > ../tests/2.json
-java Mini ../tests/ret.mini > ../tests/ret.json
-java Mini ../tests/ret_bad.mini > ../tests/ret_bad.json
-java Mini ../tests/ret_bad2.mini > ../tests/ret_bad2.json
+for f in ../tests/*.mini; do
+    get_file_name $f
+    java Mini $f > "../tests/$NAME.json"
+done
 cd ..
 
 mlton mc.mlb
-./mc tests/1.json
-./mc tests/2.json
-./mc tests/ret.json
-./mc tests/ret_bad.json
-./mc tests/ret_bad2.json
-
+for f in tests/*.json; do
+    ./mc $f
+done
