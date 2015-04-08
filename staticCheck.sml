@@ -6,8 +6,7 @@ structure staticCheck :
           sig
               val staticCheck : string -> program -> unit
           end
-=
-struct
+= struct
 
 exception UndefException of int * string;
 exception BinOpException of int * binaryOperator * miniType;
@@ -258,22 +257,22 @@ fun staticCheck file (PROGRAM {types=ts, decls=ds, funcs=fs}) =
      app checkFunc fs;
      checkForMain ())
     handle BinOpException (line, opr, t) =>
-           fail file line ("Operator " ^ (binOp2Str opr) ^
-                           " requires an " ^ (typ2Str t) ^ "type.\n")
+           fail file line ("Operator " ^ (binOp2Str opr) ^ " requires an " ^
+                           (typ2Str t) ^ "type.\n")
          | UnOpException (line, opr, t) =>
-           fail file line ("Operator " ^ (unOp2Str opr) ^
-                           " requires an " ^ (typ2Str t) ^ "type.\n")
+           fail file line ("Operator " ^ (unOp2Str opr) ^ " requires an " ^
+                           (typ2Str t) ^ "type.\n")
          | TypeMatchException (line, t1, t2) =>
-           fail file line ("Types " ^ (typ2Str t1) ^
-                           " and " ^ (typ2Str t2) ^ " do not match.\n")
+           fail file line ("Types " ^ (typ2Str t1) ^ " and " ^ (typ2Str t2) ^
+                           " do not match.\n")
          | NotAFunctionException (line, t) =>
            fail file line ("Type " ^ (typ2Str t) ^ " is not callable.\n")
          | NotAStructException (line, t) =>
-           fail file line ("Expression requires a struct type " ^
-                           "(Supplied " ^ (typ2Str t) ^ ").\n")
+           fail file line ("Expression requires a struct type (Supplied " ^
+                           (typ2Str t) ^ ").\n")
          | PrintException (line, t) =>
-           fail file line ("`print` requires an integer" ^
-                           "argument (Supplied " ^ (typ2Str t) ^ ").\n")
+           fail file line ("`print` requires an integer argument (Supplied " ^
+                           (typ2Str t) ^ ").\n")
          | BooleanGuardException (line, t) =>
            fail file line ("Statement requires a boolean " ^
                            "expression (Supplied " ^ (typ2Str t) ^ ").\n")
@@ -286,24 +285,5 @@ fun staticCheck file (PROGRAM {types=ts, decls=ds, funcs=fs}) =
          | NoMainException line =>
            fail file line "No function matching `main` signature.\n"
 ;
-  
+
 end;
-
-fun printUsage () =
-    (TextIO.output (TextIO.stdErr, "Usage: mc <filename>\n");
-     OS.Process.exit OS.Process.failure)
-;
-
-fun main () =
-    let
-        val args = CommandLine.arguments ();
-        val _ = if (length args) = 0 then printUsage () else ();
-        val file = hd args;
-        val ins = TextIO.openIn file; (*'ins' is short for 'instream'.*)
-    in
-        (staticCheck.staticCheck file (json2AST ins);
-         TextIO.closeIn ins)
-    end
-;
-
-val _ = main ();

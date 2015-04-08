@@ -4,8 +4,8 @@ structure printAST :
           sig
               val printAST : program -> unit
           end
-=
-struct
+= struct
+
 fun printBinaryOpr BOP_PLUS = " + "
   | printBinaryOpr BOP_MINUS = " - "
   | printBinaryOpr BOP_TIMES = " * "
@@ -25,106 +25,87 @@ fun printUnaryOpr UOP_NOT = "!"
   | printUnaryOpr UOP_MINUS = "-"
 ;
 
-fun printMiniType MT_VOID = ""
+fun printMiniType MT_VOID = "void"
   | printMiniType MT_INT = "int"
   | printMiniType MT_BOOL = "bool"
+  | printMiniType MT_FUNC = ""
   | printMiniType (MT_STRUCT s) = "struct " ^ s
 ;
 
-fun printVarDecl (VAR_DECL (t, s)) =
+fun printVarDecl (VAR_DECL {id=s, typ=t, line=_}) =
     (printMiniType t) ^ " " ^ s;
 ;
 
-fun printNestedVarDecls [] = ""
-  | printNestedVarDecls (decl::decls) =
-    (printVarDecl decl) ^ ";\n" ^ (printNestedVarDecls decls)
-;
+fun printNestedDecls ds = foldr (fn (d, s) => (printVarDecl d) ^ ";\n" ^ s)
+                                "" ds;
 
-fun printTypeDecl (TYPE_DECL {id=id, decls=decls}) =
-    "struct " ^ id ^ "\n{\n" ^ (printNestedVarDecls decls) ^ "};"
+fun printTypeDecl (TYPE_DECL {id=id, decls=decls, line=_}) =
+    "struct " ^ id ^ "\n{\n" ^ (printNestedDecls decls) ^ "};"
 ;
 
 fun printLvalue (LVALUE l) = l;
-  
-fun printExpression (EXP_NUM n) = Int.toString n
-  | printExpression (EXP_ID id) = id
-  | printExpression EXP_TRUE = "true"
-  | printExpression EXP_FALSE = "false"
+
+fun printExpression (EXP_NUM {value=n, line=_}) = Int.toString n
+  | printExpression (EXP_ID {id=id, line=_}) = id
+  | printExpression (EXP_TRUE {...}) = "true"
+  | printExpression (EXP_FALSE {...}) = "false"
   | printExpression EXP_UNDEFINED = "null"
-  | printExpression (EXP_BINARY {opr=opr, lft=lft, rht=rht}) =
+  | printExpression (EXP_BINARY {opr=opr, lft=lft, rht=rht, line=_}) =
     (printExpression lft) ^ (printBinaryOpr opr) ^ (printExpression rht)
-  | printExpression (EXP_UNARY {opr=opr, opnd=opnd}) =
+  | printExpression (EXP_UNARY {opr=opr, opnd=opnd, line=_}) =
     (printUnaryOpr opr) ^ (printExpression opnd)
-  | printExpression (EXP_DOT {lft=lft, prop=prop}) =
+  | printExpression (EXP_DOT {lft=lft, prop=prop, line=_}) =
     (printExpression lft) ^ "." ^ (printLvalue prop)
-  | printExpression (EXP_NEW s) =
+  | printExpression (EXP_NEW {id=s, line=_}) =
     "new " ^ s
-  | printExpression (EXP_INVOCATION {id=id, args=args}) =
+  | printExpression (EXP_INVOCATION {id=id, args=args, line=_}) =
     id ^ "(" ^ (printArgs args) ^ ")"
 
 and printStatement (ST_BLOCK body) =
-    "{\n" ^ (printBody body) ^ "}"
-  | printStatement (ST_ASSIGN {target=target, source=source}) =
+    "{\n" ^ (foldr (fn (t, s) => (printStatement t) ^ ";\n") "" body) ^ "}"
+  | printStatement (ST_ASSIGN {target=target, source=source, line=_}) =
     (printLvalue target) ^ " = " ^ (printExpression source)
-  | printStatement (ST_PRINT {body=body, endl=endl}) =
+  | printStatement (ST_PRINT {body=body, endl=endl, line=_}) =
     "print " ^ (printExpression body) ^ (if endl then " endl" else "")
-  | printStatement (ST_READ l) =
+  | printStatement (ST_READ {id=l, line=_}) =
     "read " ^ (printLvalue l)
-  | printStatement (ST_IF {guard=guard, thenBlk=thenBlk, elseBlk=elseBlk}) =
+  | printStatement (ST_IF {guard=guard, thenBlk=thenBlk,
+                           elseBlk=elseBlk, line=_}) =
     "if (" ^ (printExpression guard) ^ ")\n" ^ (printStatement thenBlk)  ^
     " else " ^ (printStatement elseBlk)
-  | printStatement (ST_WHILE {guard=guard, body=body}) =
+  | printStatement (ST_WHILE {guard=guard, body=body, line=_}) =
     "while (" ^ (printExpression guard) ^ ")\n" ^ (printStatement body)
-  | printStatement (ST_DELETE exp) =
+  | printStatement (ST_DELETE {exp=exp, line=_}) =
     "delete " ^ (printExpression exp)
-  | printStatement (ST_RETURN exp) =
+  | printStatement (ST_RETURN {exp=exp, line=_}) =
     "return " ^ (printExpression exp)
-  | printStatement (ST_INVOCATION {id=id, args=args}) =
+  | printStatement (ST_INVOCATION {id=id, args=args, line=_}) =
     id ^ "(" ^ (printArgs args) ^ ")"
-
-and printBody [] = ""
-  | printBody (stmt::stmts) =
-    (printStatement stmt) ^ ";\n" ^ (printBody stmts)
-
+                                      
 and printArgs [] = ""
   | printArgs (exp::[]) = printExpression exp
   | printArgs (exp::exps) =
     (printExpression exp) ^ ", " ^ (printArgs exps)
 ;
-  
+
 fun printParams [] = ""
   | printParams (decl::[]) = printVarDecl decl
   | printParams (decl::decls) =
     (printVarDecl decl) ^ ", " ^ (printParams decls)
 ;
 
+fun printBody body = foldr (fn (t, s) => (printStatement t) ^ ";\n") "" body;
+  
 fun printFunc (FUNCTION {id=id, params=params, returnType=rt, decls=decls,
-                         body=body}) =
+                         body=body, line=_}) =
     "fun " ^ id ^ " (" ^ (printParams params) ^ ") " ^ (printMiniType rt) ^
-    "\n{\n" ^ (printNestedVarDecls decls) ^ (printBody body) ^ "}\n"
-;
-  
-fun printFuncs [] = ""
-  | printFuncs (func::funcs) =
-    (printFunc func) ^ "\n" ^ (printFuncs funcs)
-;
-
-fun printVarDecls [] = ""
-  | printVarDecls (decl::decls) =
-    (printVarDecl decl) ^ ";\n" ^ (printVarDecls decls)
-;
-  
-fun printTypeDecls [] = ""
-  | printTypeDecls (decl::decls) =
-    (printTypeDecl decl) ^ "\n" ^ (printTypeDecls decls)
+    "\n{\n" ^ (printNestedDecls decls) ^ (printBody body) ^ "}\n"
 ;
 
 fun printAST (PROGRAM {types=types, decls=decls, funcs=funcs}) =
-    print ((printTypeDecls types) ^ "\n" ^
-           (printVarDecls decls) ^ "\n" ^
-           (printFuncs funcs))
+    print ((foldr (fn (t, s) => (printTypeDecl t) ^ "\n" ^ s) "" types) ^ "\n" ^
+           (foldr (fn (v, s) => (printVarDecl v) ^ "\n" ^ s) "" decls) ^ "\n" ^
+           (foldr (fn (f, s) => (printFunc f) ^ "\n" ^ s) "" funcs) ^ "\n")
 ;
 
 end;
-    
-printAST.printAST (json2Ast "tests/1.json");
