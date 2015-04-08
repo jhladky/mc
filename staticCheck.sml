@@ -80,9 +80,8 @@ fun checkLvalue ht (LV_ID {id=id, line=l}) =
         val r = case checkLvalue ht lft of
                     MT_STRUCT r => r
                   | t => raise NotAStructException (l, t);
-        val rVars = HashTable.lookup types r;
     in
-        case HashTable.find rVars prop of
+        case HashTable.find (HashTable.lookup types r) prop of
             SOME t => t
           | NONE => raise UndefException (l, prop)
     end
@@ -165,9 +164,8 @@ and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
         val r = case checkExpr ht lft of
                     MT_STRUCT r => r
                   | t => raise NotAStructException (l, t);
-        val rVars = HashTable.lookup types r;
     in
-        case HashTable.find rVars prop of
+        case HashTable.find (HashTable.lookup types r) prop of
             SOME t => t
           | NONE => raise UndefException (l, prop)
     end
@@ -242,14 +240,6 @@ fun addTypeDecl (TYPE_DECL {id=id, decls=ds, line=_}) =
                  HashTable.insert decls (s, t)) ds
         )
     end
-;
-
-fun checkForMain1 mainDetect [] = mainDetect
-  | checkForMain1 mainDetect ((s, FUNCTION {params=params,
-                                            returnType=rt, ...})::funcs) =
-    if s = "main" andalso length params = 0 andalso rt = MT_INT then
-        checkForMain1 true funcs
-    else checkForMain1 mainDetect funcs
 ;
 
 fun checkForMain () =

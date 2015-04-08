@@ -20,6 +20,10 @@ done
 cd ..
 
 mlton mc.mlb
-for f in tests/*.json; do
-    ./mc $f
-done
+if [ $? -ne 0 ]; then
+    exit 1
+else
+    for f in tests/*.json; do
+        ./mc $f
+    done
+fi
