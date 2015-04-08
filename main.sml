@@ -19,7 +19,7 @@ fun main () =
         val {printAST=printAST, file=file} = parseArgs ();
         val ins = TextIO.openIn file;
     in
-        (if printAST then printAST.printAST (json2AST ins)
+        (if printAST then (* printAST.printAST (json2AST ins *) ()
          else staticCheck.staticCheck file (json2AST ins);
          TextIO.closeIn ins)
     end

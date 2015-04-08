@@ -25,7 +25,7 @@ type json_data = carrier
 fun carrier2Ht L =
     let
         val ht = HashTable.mkTable (HashString.hashString, op =)
-                                   (10, Fail "Not Found");
+                                   (10, Fail "Not Found AST");
         fun carrier2Ht_ (s_c_pair p) = HashTable.insert ht p
           | carrier2Ht_ _ = raise Fail "Expected an `s_c_pair`."
         ;
@@ -67,6 +67,9 @@ fun carrier2MiniType (string "int") = MT_INT
 fun uwrStr (string s) = s | uwrStr _ = raise Fail "Expected a `string`.";
 
 fun uwrExpr (expression e) = e
+  (* | uwrExpr (statement _) = raise Fail "Expected an `expression`, got statement." *)
+  (* | uwrExpr (lvalue _) = raise Fail "Expected an `expression`, got lvalue." *)
+  (* | uwrExpr (function _) = raise Fail "Expected an `expression`, got function." *)
   | uwrExpr _ = raise Fail "Expected an `expression`."
 ;
 
@@ -121,7 +124,7 @@ fun expression2Ast ht =
           | "dot" =>
             EXP_DOT {
                 lft=uwrExpr (HashTable.lookup ht "left"),
-                prop=LVALUE (uwrStr (HashTable.lookup ht "id")),
+                prop=uwrStr (HashTable.lookup ht "id"),
                 line=line ht
             }
           | "new" =>
@@ -180,7 +183,7 @@ fun statement2Ast ht =
             }
           | "delete" =>
             ST_DELETE {
-                exp=uwrExpr (HashTable.lookup ht "exp"),
+                exp=uwrExpr (HashTable.lookup ht "guard"),
                 line=line ht
             }
           | "return" =>
@@ -235,7 +238,21 @@ fun function2Ast ht =
 ;
 
 fun lvalue2Ast ht =
-    lvalue (LVALUE (uwrStr (HashTable.lookup ht "id")))
+    lvalue (
+        case uwrStr (HashTable.lookup ht "lval") of
+            "id" =>
+            LV_ID {
+                id=uwrStr (HashTable.lookup ht "id"),
+                line=line ht
+            }
+          | "dot" =>
+            LV_DOT {
+                lft=uwrLvalue (HashTable.lookup ht "left"),
+                prop=uwrStr (HashTable.lookup ht "id"),
+                line=line ht
+            }
+          | s => raise Fail s
+    )
 ;
 
 fun program2Ast ht =

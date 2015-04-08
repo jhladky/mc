@@ -36,7 +36,8 @@ datatype typeDecl =
 ;
 
 datatype lvalue =
-     LVALUE of string
+     LV_ID of {id: string, line: int}
+   | LV_DOT of {lft: lvalue, prop:string, line:int}
 ;
   
 datatype expression =
@@ -48,7 +49,7 @@ datatype expression =
    | EXP_BINARY of {opr: binaryOperator, lft: expression,
                     rht: expression, line: int}
    | EXP_UNARY of {opr: unaryOperator, opnd: expression, line: int}
-   | EXP_DOT of {lft: expression, prop: lvalue, line: int}
+   | EXP_DOT of {lft: expression, prop: string, line: int}
    | EXP_NEW of {id: string, line: int}
    | EXP_INVOCATION of {id: string, args: expression list, line: int}
 ;

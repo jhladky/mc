@@ -63,6 +63,7 @@ fun typ2Str MT_INT = "integer"
 (* null can be assigned to any struct type*)
 fun checkType l (MT_INT, MT_INT) = ()
   | checkType l (MT_BOOL, MT_BOOL) = ()
+  | checkType l (MT_VOID, MT_VOID) = () (*This is not good...*)
   | checkType l (MT_STRUCT _, MT_VOID) = ()
   | checkType l (MT_VOID, t2) = raise TypeMatchException (l, MT_VOID, t2)
   | checkType l (t1 as MT_STRUCT s1, t2 as MT_STRUCT s2) =
@@ -70,10 +71,21 @@ fun checkType l (MT_INT, MT_INT) = ()
   | checkType l (t1, t2) = raise TypeMatchException (l, t1, t2)
 ;
 
-fun checkLvalue ht (LVALUE lval) =
-    case HashTable.find ht lval of
+fun checkLvalue ht (LV_ID {id=id, line=l}) =
+    (case HashTable.find ht id of
         SOME t => t
-      | NONE => raise UndefException (0, lval) (*Fix this later*)
+      | NONE => raise UndefException (l, id))
+  | checkLvalue ht (LV_DOT {lft=lft, prop=prop, line=l}) =
+    let
+        val r = case checkLvalue ht lft of
+                    MT_STRUCT r => r
+                  | t => raise NotAStructException (l, t);
+        val rVars = HashTable.lookup types r;
+    in
+        case HashTable.find rVars prop of
+            SOME t => t
+          | NONE => raise UndefException (l, prop)
+    end
 ;
 
 fun checkArgs l ht [] [] = ()
@@ -154,9 +166,10 @@ and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
                     MT_STRUCT r => r
                   | t => raise NotAStructException (l, t);
         val rVars = HashTable.lookup types r;
-        val tProp = checkLvalue rVars prop;
     in
-        tProp
+        case HashTable.find rVars prop of
+            SOME t => t
+          | NONE => raise UndefException (l, prop)
     end
   | checkExpr ht (EXP_NEW {id=s, line=l}) =
     (case HashTable.find types s of
