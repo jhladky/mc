@@ -43,7 +43,10 @@ fun printTypeDecl (TYPE_DECL {id=id, decls=decls, line=_}) =
     "struct " ^ id ^ "\n{\n" ^ (printNestedDecls decls) ^ "};"
 ;
 
-fun printLvalue (LVALUE l) = l;
+fun printLvalue (LV_ID {id=s, ...}) = s
+  | printLvalue  (LV_DOT {lft=lft, prop=prop, ...}) =
+    (printLvalue lft) ^ "." ^ prop
+;
 
 fun printExpression (EXP_NUM {value=n, line=_}) = Int.toString n
   | printExpression (EXP_ID {id=id, line=_}) = id
@@ -55,7 +58,7 @@ fun printExpression (EXP_NUM {value=n, line=_}) = Int.toString n
   | printExpression (EXP_UNARY {opr=opr, opnd=opnd, line=_}) =
     (printUnaryOpr opr) ^ (printExpression opnd)
   | printExpression (EXP_DOT {lft=lft, prop=prop, line=_}) =
-    (printExpression lft) ^ "." ^ (printLvalue prop)
+    (printExpression lft) ^ "." ^ prop
   | printExpression (EXP_NEW {id=s, line=_}) =
     "new " ^ s
   | printExpression (EXP_INVOCATION {id=id, args=args, line=_}) =
@@ -81,7 +84,7 @@ and printStatement (ST_BLOCK body) =
     "return " ^ (printExpression exp)
   | printStatement (ST_INVOCATION {id=id, args=args, line=_}) =
     id ^ "(" ^ (printArgs args) ^ ")"
-                                      
+
 and printArgs [] = ""
   | printArgs (exp::[]) = printExpression exp
   | printArgs (exp::exps) =
@@ -94,12 +97,16 @@ fun printParams [] = ""
     (printVarDecl decl) ^ ", " ^ (printParams decls)
 ;
 
-fun printBody body = foldr (fn (t, s) => (printStatement t) ^ ";\n") "" body;
-  
+fun printBody b = foldr (fn (t, s) => (printStatement t) ^ "\n" ^ s) "" b;
+
 fun printFunc (FUNCTION {id=id, params=params, returnType=rt, decls=decls,
                          body=body, line=_}) =
-    "fun " ^ id ^ " (" ^ (printParams params) ^ ") " ^ (printMiniType rt) ^
-    "\n{\n" ^ (printNestedDecls decls) ^ (printBody body) ^ "}\n"
+    let
+        val _ = print (id ^ "BODY LEN " ^ (Int.toString (length body)) ^ "\n");
+    in
+        ("fun " ^ id ^ " (" ^ (printParams params) ^ ") " ^ (printMiniType rt) ^
+         "\n{\n" ^ (printNestedDecls decls) ^ (printBody body) ^ "}\n")
+    end
 ;
 
 fun printAST (PROGRAM {types=types, decls=decls, funcs=funcs}) =
