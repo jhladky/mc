@@ -25,7 +25,7 @@ type json_data = carrier
 fun carrier2Ht L =
     let
         val ht = HashTable.mkTable (HashString.hashString, op =)
-                                   (10, Fail "Not Found AST");
+                                   (10, Fail "Not Found");
         fun carrier2Ht_ (s_c_pair p) = HashTable.insert ht p
           | carrier2Ht_ _ = raise Fail "Expected an `s_c_pair`."
         ;
@@ -67,9 +67,6 @@ fun carrier2MiniType (string "int") = MT_INT
 fun uwrStr (string s) = s | uwrStr _ = raise Fail "Expected a `string`.";
 
 fun uwrExpr (expression e) = e
-  (* | uwrExpr (statement _) = raise Fail "Expected an `expression`, got statement." *)
-  (* | uwrExpr (lvalue _) = raise Fail "Expected an `expression`, got lvalue." *)
-  (* | uwrExpr (function _) = raise Fail "Expected an `expression`, got function." *)
   | uwrExpr _ = raise Fail "Expected an `expression`."
 ;
 
