@@ -258,10 +258,10 @@ fun staticCheck file (PROGRAM {types=ts, decls=ds, funcs=fs}) =
      checkForMain ())
     handle BinOpException (line, opr, t) =>
            fail file line ("Operator " ^ (binOp2Str opr) ^ " requires an " ^
-                           (typ2Str t) ^ "type.\n")
+                           (typ2Str t) ^ " type.\n")
          | UnOpException (line, opr, t) =>
            fail file line ("Operator " ^ (unOp2Str opr) ^ " requires an " ^
-                           (typ2Str t) ^ "type.\n")
+                           (typ2Str t) ^ " type.\n")
          | TypeMatchException (line, t1, t2) =>
            fail file line ("Types " ^ (typ2Str t1) ^ " and " ^ (typ2Str t2) ^
                            " do not match.\n")

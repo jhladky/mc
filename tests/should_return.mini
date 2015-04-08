@@ -13,7 +13,7 @@ fun bar(int i) int      # control flow case
    {
       if (i < 0)
       {
-         return -1;
+         i = 2;
       }
       else
       {
