@@ -3,6 +3,7 @@ fun printUsage () =
      OS.Process.exit OS.Process.failure)
 ;
 
+(*This should use an array at some point*)
 fun parseArgs () =
     let
         val args = CommandLine.arguments ();
@@ -13,15 +14,22 @@ fun parseArgs () =
         else {printAST=false, file=hd args}
     end
 ;
-  
+
 fun main () =
     let
         val {printAST=printAST, file=file} = parseArgs ();
         val ins = TextIO.openIn file;
+        val ast = json2AST ins;
+        val _ = TextIO.closeIn ins;
     in
-        (if printAST then printAST.printAST (json2AST ins)
-         else staticCheck.staticCheck file (json2AST ins);
-         TextIO.closeIn ins)
+        if printAST then (
+            printAST.printAST ast;
+            OS.Process.exit OS.Process.success
+        ) else (
+            staticCheck.staticCheck file ast;
+            ast2Cfg ast;
+            OS.Process.exit OS.Process.success
+        )
     end
 ;
 
