@@ -1,7 +1,3 @@
-(*This is going to stay global for now until I figure out what to do with it*)
-fun makeHt () = HashTable.mkTable (HashString.hashString, op =)
-                                  (10, Fail "Not Found");
-
 structure staticCheck :
           sig
               val staticCheck : string -> program -> unit
@@ -20,6 +16,10 @@ exception NoReturnException of int;
 exception BadReturnException of int;
 exception InvocationException of int; (*I'll add arguments to this later.*)
 exception NoMainException of int
+
+(*This is duplicated in other files.... maybe create a "utils" file???*)
+fun makeHt () = HashTable.mkTable (HashString.hashString, op =)
+                                  (10, Fail "Not Found");
 
 (* Variables and functions are in the same namespace,
  * but structure names are in a DIFFERENT namespace.*)

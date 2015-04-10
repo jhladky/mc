@@ -29,8 +29,8 @@ datatype instruction =
 ;
 
 datatype basicBlock =
-     BB of {prev: basicBlock list, next: basicBlock list,
-            body: instruction list}
+     BB of {prev: basicBlock list ref, next: basicBlock list ref,
+            body: instruction list ref}
 ;
 
 datatype cfg =
