@@ -1,6 +1,6 @@
 open TextIO;
 
-structure printAST :
+structure PrintAST :
           sig
               val printAST : program -> unit
           end

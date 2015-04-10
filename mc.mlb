@@ -1,13 +1,15 @@
 $(SML_LIB)/basis/basis.mlb
 $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
+SML-JSON/sml-json.sml
 
 ast.sml
-SML-JSON/sml-json.sml
 json2AST.sml
 printAST.sml
+
 staticCheck.sml
 
 cfg.sml
 ast2Cfg.sml
+printCfg.sml
 
 main.sml

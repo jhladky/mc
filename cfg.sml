@@ -30,9 +30,9 @@ datatype instruction =
 
 datatype basicBlock =
      BB of {prev: basicBlock list ref, next: basicBlock list ref,
-            body: instruction list ref}
+            body: instruction list ref, label: string}
 ;
 
-datatype cfg =
-     CFG of {entry: basicBlock, exit: basicBlock}
-;
+(* datatype cfg = *)
+(*      CFG of {entry: basicBlock, exit: basicBlock} *)
+(* ; *)

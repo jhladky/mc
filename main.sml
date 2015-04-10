@@ -23,11 +23,11 @@ fun main () =
         val _ = TextIO.closeIn ins;
     in
         if printAST then (
-            printAST.printAST ast;
+            PrintAST.printAST ast;
             OS.Process.exit OS.Process.success
         ) else (
-            staticCheck.staticCheck file ast;
-            ast2Cfg ast;
+            StaticCheck.staticCheck file ast;
+            printCfg (Ast2Cfg.ast2Cfg ast);
             OS.Process.exit OS.Process.success
         )
     end

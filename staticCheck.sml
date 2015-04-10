@@ -1,4 +1,4 @@
-structure staticCheck :
+structure StaticCheck :
           sig
               val staticCheck : string -> program -> unit
           end
