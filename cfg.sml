@@ -64,3 +64,8 @@ datatype basicBlock =
      BB of {prev: basicBlock list ref, next: basicBlock list ref,
             body: instruction list ref, label: string}
 ;
+
+datatype cfg =
+     CFG of {locals: (string, miniType) HashTable.hash_table,
+             entry: basicBlock, exit: basicBlock}
+;

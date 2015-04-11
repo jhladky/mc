@@ -21,6 +21,6 @@ fun printBB (BB {prev=prev, next=next, label=label, ...}) =
 ;
 
 fun printCfg ht =
-    app printBB (List.rev (collectBBs (map (fn (entry, _) => entry)
-                                           (HashTable.listItems ht))))
+    app printBB ((List.rev o collectBBs) (map (fn (CFG {entry=e, ...}) => e)
+                                              (HashTable.listItems ht)))
 ;
