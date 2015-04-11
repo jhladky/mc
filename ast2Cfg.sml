@@ -29,11 +29,6 @@ fun prependBB bb dir source =
       | (BB {next=next, ...}, NEXT) => next := source::(!next)
 ;
 
-
-(*So the main function is going to be our entry point for the program...
-how to get this info to the function..
-we could just get it again I suppose.*)
-
 fun expr2BB bb (EXP_NUM {value=value, ...}) =
     bb
   | expr2BB bb (EXP_ID {id=id, ...}) =
@@ -128,13 +123,6 @@ fun func2Cfg (FUNCTION {id=id, params=params, decls=decls, body=body, ...}) =
 ;
 
 (*we're going to need to get the symbol table in here also*)
-fun ast2Cfg (PROGRAM {funcs=fs, ...}) =
-    let
-        val _ = app func2Cfg fs;
-    in
-        (print ("LENGTH " ^ (Int.toString (!nextLabel)) ^ "\n");
-         funcs)
-    end
-;
+fun ast2Cfg (PROGRAM {funcs=fs, ...}) = (app func2Cfg fs; funcs);
 
 end;

@@ -1,29 +1,16 @@
-fun collectBBs1 bb =
-    let
-        fun collectBB (bb as BB {prev=prev, next=next, label=label, ...}, L) =
-            if not (isSome (List.find (fn item => item = bb) L)) then
-                foldr collectBB (foldr collectBB (bb::L) (!prev)) (!next)
-            else L
-      ;
-    in
-        collectBB (bb, [])
-    end
-;
-(*THIS IS RIGHT... we just need some more info*)
-(* fun collectBBs L = *)
-(*     foldr (fn (bb, L) => L @ (collectBBs1 bb)) [] L *)
-  (* ; *)
+local
+    fun collectBB (bb as BB {prev=prev, next=next, label=label, ...}, L) =
+        if not (isSome (List.find (fn item => item = bb) L)) then
+            foldr collectBB (foldr collectBB (bb::L) (!prev)) (!next)
+        else L
+    ;
 
-fun collectBBs L =
-    foldr (fn (bb, L) =>
-              let
-                  val newL = collectBBs1 bb;
-              in
-                  (print ("Length newL:" ^ (Int.toString (length newL)) ^ "\n");
-                   L @ newL)
-              end
-          ) [] L
-;
+    fun collectBBs1 bb = collectBB (bb, []);
+in
+    fun collectBBs L =
+        foldr (fn (bb, L) => L @ (collectBBs1 bb)) [] L
+    ;
+end;
 
 fun printBB (BB {prev=prev, next=next, label=label, ...}) =
     (print (label ^ ":\nPrevious:");
@@ -34,10 +21,6 @@ fun printBB (BB {prev=prev, next=next, label=label, ...}) =
 ;
 
 fun printCfg ht =
-    let
-        val bbs = List.rev (collectBBs (map (fn (entry, _) => entry) (HashTable.listItems ht)));
-    in
-        (print ("LENGTH " ^ (Int.toString (length bbs)) ^ "\n");
-         app printBB bbs)
-    end
+    app printBB (List.rev (collectBBs (map (fn (entry, _) => entry)
+                                           (HashTable.listItems ht))))
 ;
