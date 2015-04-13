@@ -40,12 +40,14 @@ fun getReg regs bb id =
         SOME dest => dest
       | NONE => raise Fail "global"
 
+
 fun getNextReg f =
     let
         val {regs=_, nextReg=nextReg} = HashTable.lookup funcRegs f;
     in
         !nextReg before nextReg := 1 + (!nextReg)
     end
+
 
 fun binExpr2Ins f L opr lft rht =
     let
@@ -90,23 +92,42 @@ fun binExpr2Ins f L opr lft rht =
 and unExpr2Ins f L opr opnd =
     let
         val (dest1, L1) = expr2Ins f L opnd;
+        val newDest = getNextReg f;
     in
         case opr of
             UOP_NOT =>
-            (dest, L1)
+            (newDest, (INS_RIR {opcode=OP_XORI, immed=0xFFFF, r1=dest1, dest=newDest})::
+                       L1)
           | UOP_MINUS =>
-            (dest, L1)
+            let
+                val newDest1 = getNextReg f;
+            in
+                (newDest1, (INS_RRR {opcode=OP_SUB, r1=newDest, r2=dest1, dest=newDest1})::
+                           (INS_IR {opcode=OP_LOADI, immed=0, r1=newDest})::
+                           L1)
+            end
     end
 
-
 and expr2Ins f L (EXP_NUM {value=value, ...}) =
-    (1, L)
+    let
+        val dest = getNextReg f;
+    in
+        (dest, (INS_IR {opcode=OP_LOADI, immed=value, r1=dest})::L)
+    end
   | expr2Ins f L (EXP_ID {id=id, ...}) =
     (1, L)
   | expr2Ins f L (EXP_TRUE {...}) =
-    (1, L)
+    let
+        val dest = getNextReg f;
+    in
+        (dest, (INS_IR {opcode=OP_LOADI, immed=1, r1=dest})::L)
+    end
   | expr2Ins f L (EXP_FALSE {...}) =
-    (1, L)
+    let
+        val dest = getNextReg f;
+    in
+        (dest, (INS_IR {opcode=OP_LOADI, immed=0, r1=dest})::L)
+    end
   | expr2Ins f L EXP_UNDEFINED =
     (1, L)
   | expr2Ins f L (EXP_BINARY {opr=opr, lft=lft, rht=rht, ...}) =
