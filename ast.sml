@@ -3,7 +3,6 @@ datatype binaryOperator =
    | BOP_MINUS
    | BOP_TIMES
    | BOP_DIVIDE
-   | BOP_MOD
    | BOP_EQ
    | BOP_NE
    | BOP_LT
@@ -39,7 +38,7 @@ datatype lvalue =
      LV_ID of {id: string, line: int}
    | LV_DOT of {lft: lvalue, prop:string, line:int}
 ;
-  
+
 datatype expression =
      EXP_NUM of {value: int, line: int}
    | EXP_ID of {id: string, line: int}

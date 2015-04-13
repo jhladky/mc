@@ -39,7 +39,6 @@ fun str2BinaryOpr "+" = BOP_PLUS
   | str2BinaryOpr "-" = BOP_MINUS
   | str2BinaryOpr "*" = BOP_TIMES
   | str2BinaryOpr "/" = BOP_DIVIDE
-  | str2BinaryOpr "%" = BOP_MOD
   | str2BinaryOpr "==" = BOP_EQ
   | str2BinaryOpr "!=" = BOP_NE
   | str2BinaryOpr "<" = BOP_LT
@@ -302,5 +301,3 @@ fun json2AST ins =
         program p => p
       | _ => raise Fail ""
 ;
-            
-

@@ -20,7 +20,7 @@ fun printBB (BB {prev=prev, next=next, label=label, ...}) =
      print "\n\n")
 ;
 
-fun printCfg ht =
-    app printBB ((List.rev o collectBBs) (map (fn (CFG {entry=e, ...}) => e)
-                                              (HashTable.listItems ht)))
+  fun printCfg ht =
+      app printBB ((List.rev o collectBBs) (map (fn CFG {entry=e, ...} => e)
+                                                (HashTable.listItems ht)))
 ;

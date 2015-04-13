@@ -39,7 +39,6 @@ fun binOp2Str BOP_PLUS = "+"
   | binOp2Str BOP_MINUS = "-"
   | binOp2Str BOP_TIMES = "*"
   | binOp2Str BOP_DIVIDE = "/"
-  | binOp2Str BOP_MOD = "%"
   | binOp2Str BOP_EQ = "=="
   | binOp2Str BOP_NE = "!="
   | binOp2Str BOP_LT = "<"
@@ -121,12 +120,10 @@ and checkBinExpr ht opr lft rht l =
            | (BOP_MINUS, MT_INT) => MT_INT
            | (BOP_TIMES, MT_INT) => MT_INT
            | (BOP_DIVIDE, MT_INT) => MT_INT
-           | (BOP_MOD, MT_INT) => MT_INT
            | (BOP_PLUS, _) => raise BinOpException (l, opr, MT_INT)
            | (BOP_MINUS, _) => raise BinOpException (l, opr, MT_INT)
            | (BOP_TIMES, _) => raise BinOpException (l, opr, MT_INT)
            | (BOP_DIVIDE, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_MOD, _) => raise BinOpException (l, opr, MT_INT)
            | (BOP_LT, MT_INT) => MT_BOOL
            | (BOP_GT, MT_INT) => MT_BOOL
            | (BOP_LE, MT_INT) => MT_BOOL
