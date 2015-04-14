@@ -78,14 +78,21 @@ fun ins2Str (INS_RRR {opcode=opcode, r1=r1, r2=r2, dest=dest}) =
     (opcode2Str opcode) ^ " " ^ id ^ ", " ^ (Int.toString immed)
   | ins2Str (INS_X {opcode=opcode}) =
     (opcode2Str opcode)
+  | ins2Str (INS_NEW {opcode=opcode, id=id, fields=fields, dest=dest}) =
+    let
+        fun fs2Str [] = ""
+          | fs2Str (field::[]) = field
+          | fs2Str (field::fields) = field ^ ", " ^ (fs2Str fields)
+    in
+        (opcode2Str opcode) ^ " " ^ id ^ ", [" ^
+        (fs2Str fields) ^ "], " ^ (r2Str dest)
+    end
 
 
-fun printNode (label, L) =
-    (print (label ^ ":\n");
+fun printNode (l, L) =
+    (print ((if String.isPrefix "L" l then "" else "\n") ^ l ^ ":\n");
      app (fn ins => print ("\t" ^ (ins2Str ins) ^ "\n")) L)
 
 
 fun printCfg ht =
-    (app printNode (Cfg.toList (HashTable.lookup ht "main"));
-     HashTable.remove ht "main";
-     app printNode (List.concat (map Cfg.toList (HashTable.listItems ht))))
+    app printNode (List.concat (map Cfg.toList (HashTable.listItems ht)))

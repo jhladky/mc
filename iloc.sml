@@ -55,12 +55,13 @@ datatype instruction =
    | INS_RRC of {opcode: opcode, r1: int, r2: int}
    | INS_RIC of {opcode: opcode, r1: int, immed: int}
    | INS_CLL of {opcode: opcode, l1: string, l2: string}
-   | INS_L   of {opcode: opcode, l1: string}
+   | INS_SIR of {opcode: opcode, id: string, immed: int, r1: int}
+   | INS_NEW of {opcode: opcode, dest: int, id: string, fields: string list}
    | INS_IR  of {opcode: opcode, dest: int, immed: int}
    | INS_SR  of {opcode: opcode, id: string, r1: int}
-   | INS_SIR of {opcode: opcode, id: string, immed: int, r1: int}
-   | INS_R   of {opcode: opcode, r1: int}
    | INS_SI  of {opcode: opcode, id: string, immed: int}
+   | INS_L   of {opcode: opcode, l1: string}
+   | INS_R   of {opcode: opcode, r1: int}
    | INS_X   of {opcode: opcode}
 
 

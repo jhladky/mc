@@ -4,35 +4,26 @@ signature AST2CFG = sig
     val ast2Cfg : program -> (string, Cfg.cfg) HashTable.hash_table;
 end
 
-structure Ast2Cfg : AST2CFG = struct
+structure Ast2Cfg :> AST2CFG = struct
 
 fun mkHt () = HashTable.mkTable (HashString.hashString, op =)
                                 (10, Fail "Not Found");
 
-type funcEntry = {nextReg: int ref, regs: (string, int) HashTable.hash_table};
 
-val globals : (string, miniType) HashTable.hash_table = mkHt ();
+(* val globals : (string, miniType) HashTable.hash_table = mkHt (); *)
 val funcs : (string, Cfg.cfg) HashTable.hash_table = mkHt ();
-val funcRegs : (string, funcEntry) HashTable.hash_table = mkHt ();
-
-
-fun getNextReg f =
-    let
-        val {regs=_, nextReg=nextReg} = HashTable.lookup funcRegs f;
-    in
-        !nextReg before nextReg := 1 + (!nextReg)
-    end
+val types : (string, string list) HashTable.hash_table = mkHt ();
 
 
 fun idExpr2Ins f L id =
     let
-        val {nextReg=_, regs=regs} = HashTable.lookup funcRegs f;
+        val regs = Cfg.getRegs (HashTable.lookup funcs f);
     in
         case HashTable.find regs id of
             SOME dest => (dest, L)
           | NONE =>
             let
-                val dest = getNextReg f;
+                val dest = Cfg.nextReg (HashTable.lookup funcs f);
             in
                 (dest,
                  INS_SR {opcode=OP_LOADGLOBAL, id=id, r1=dest}::L)
@@ -58,7 +49,7 @@ fun binExpr2Ins f L opr lft rht =
     let
         val (rX, L1) = expr2Ins f L lft;
         val (rY, L2) = expr2Ins f L1 rht;
-        val dest = getNextReg f;
+        val dest = Cfg.nextReg (HashTable.lookup funcs f);
     in
         if opr = BOP_PLUS orelse
            opr = BOP_MINUS orelse
@@ -80,7 +71,7 @@ fun binExpr2Ins f L opr lft rht =
 and unExpr2Ins f L opnd UOP_NOT =
     let
         val (dest1, L1) = expr2Ins f L opnd;
-        val dest2 = getNextReg f;
+        val dest2 = Cfg.nextReg (HashTable.lookup funcs f);
     in
         (dest2,
          INS_RIR {opcode=OP_XORI, immed=0xFFFF, r1=dest1, dest=dest2}::L1)
@@ -88,8 +79,8 @@ and unExpr2Ins f L opnd UOP_NOT =
   | unExpr2Ins f L opnd UOP_MINUS =
     let
         val (dest1, L1) = expr2Ins f L opnd;
-        val dest2 = getNextReg f;
-        val dest3 = getNextReg f;
+        val dest2 = Cfg.nextReg (HashTable.lookup funcs f);;
+        val dest3 = Cfg.nextReg (HashTable.lookup funcs f);;
     in
         (dest3,
          INS_RRR {opcode=OP_SUB, r1=dest1, r2=dest2, dest=dest3}::
@@ -99,22 +90,22 @@ and unExpr2Ins f L opnd UOP_NOT =
 
 and expr2Ins f L (EXP_NUM {value=value, ...}) =
     let
-        val dest = getNextReg f;
+        val dest = Cfg.nextReg (HashTable.lookup funcs f);
     in
-        (dest, (INS_IR {opcode=OP_LOADI, immed=value, dest=dest})::L)
+        (dest, INS_IR {opcode=OP_LOADI, immed=value, dest=dest}::L)
     end
   | expr2Ins f L (EXP_ID {id=id, ...}) = idExpr2Ins f L id
   | expr2Ins f L (EXP_TRUE {...}) =
     let
-        val dest = getNextReg f;
+        val dest = Cfg.nextReg (HashTable.lookup funcs f);
     in
-        (dest, (INS_IR {opcode=OP_LOADI, immed=1, dest=dest})::L)
+        (dest, INS_IR {opcode=OP_LOADI, immed=1, dest=dest}::L)
     end
   | expr2Ins f L (EXP_FALSE {...}) =
     let
-        val dest = getNextReg f;
+        val dest = Cfg.nextReg (HashTable.lookup funcs f);
     in
-        (dest, (INS_IR {opcode=OP_LOADI, immed=0, dest=dest})::L)
+        (dest, INS_IR {opcode=OP_LOADI, immed=0, dest=dest}::L)
     end
   | expr2Ins f L EXP_UNDEFINED =
     (1, L)
@@ -125,7 +116,12 @@ and expr2Ins f L (EXP_NUM {value=value, ...}) =
   | expr2Ins f L (EXP_DOT {lft=lft, prop=prop, ...}) =
     (1, L)
   | expr2Ins f L (EXP_NEW {id=id, ...}) =
-    (1, L)
+    let
+        val dest = Cfg.nextReg (HashTable.lookup funcs f);
+        val fields = HashTable.lookup types id;
+    in
+        (dest, INS_NEW {opcode=OP_NEW, id=id, fields=fields, dest=dest}::L)
+    end
   | expr2Ins f L (EXP_INVOCATION {id=id, args=args, ...}) =
     (1, L)
 
@@ -186,22 +182,19 @@ fun stmt2BB f bb (ST_BLOCK stmts) =
     let
         val (dest, L) = expr2Ins f [] exp;
     in
-        Cfg.fill bb (List.rev L);
-        Cfg.fill bb [INS_R {opcode=OP_DEL, r1=dest}];
+        Cfg.fill bb ((List.rev L) @ [INS_R {opcode=OP_DEL, r1=dest}]);
         bb
     end
   | stmt2BB f bb (ST_RETURN {exp=exp, ...}) =
-    (Cfg.link bb (Cfg.getExit (HashTable.lookup funcs f)); Cfg.mkNode ())
+    let
+        val exit = Cfg.getExit (HashTable.lookup funcs f)
+    in
+        Cfg.fill bb [INS_L {opcode=OP_JUMPI, l1=Cfg.getLabel exit}];
+        Cfg.link bb exit;
+        Cfg.mkNode ()
+    end
   | stmt2BB _ bb (ST_INVOCATION {id=id, args=args, ...}) =
     bb
-
-
-fun assignRegs cfg =
-    let
-        val n = ref 0;
-    in
-        HashTable.map (fn _ => !n before n := 1 + (!n)) (Cfg.getLocals cfg)
-    end
 
 
 fun mkFuncEntry n regs [] = []
@@ -214,32 +207,23 @@ fun mkFuncEntry n regs [] = []
     end
 
 
-fun mkFuncExit () =
-    [INS_X {opcode=OP_RET}]
-
-
 fun func2Cfg (f as FUNCTION {id=id, body=body, params=params, ...}) =
     let
-        val entryBB = Cfg.mkNode ();
-        val exitBB = Cfg.mkNode ();
-        val bodyBB = Cfg.mkNode ();
-        val _ = HashTable.insert funcs (id, Cfg.mkCfg entryBB exitBB f);
-        val regs = assignRegs (HashTable.lookup funcs id);
-        val funcEntry = {regs=regs, nextReg=ref (HashTable.numItems regs)};
-        val _ = HashTable.insert funcRegs (id, funcEntry);
-        val resBB = foldl (fn (s, bb) => stmt2BB id bb s) bodyBB body;
+        val (entryBB, exitBB, cfg) = Cfg.mkCfg f;
+        val _ = HashTable.insert funcs (id, cfg);
+        val _ = Cfg.fill entryBB (mkFuncEntry 0 (Cfg.getRegs cfg) params);
+        val _ = Cfg.fill exitBB [INS_X {opcode=OP_RET}];
+        val resBB = foldl (fn (s, bb) => stmt2BB id bb s) entryBB body;
     in
-        Cfg.fill entryBB (mkFuncEntry 0 regs params);
-        Cfg.fill exitBB (mkFuncExit ());
-        Cfg.link entryBB bodyBB;
         Cfg.link resBB exitBB
     end
 
 
-fun ast2Cfg (PROGRAM {funcs=fs, decls=decls, ...}) =
-    (app (fn VAR_DECL {id=s, typ=t, ...} =>
-             HashTable.insert globals (s, t)) decls;
-     app func2Cfg fs;
-     funcs)
+fun addType (TYPE_DECL {id=id, decls=decls, ...}) =
+    HashTable.insert types (id, map (fn (VAR_DECL {id=s, ...}) => s) decls)
+
+
+fun ast2Cfg (PROGRAM {funcs=fs, types=ts, ...}) =
+    (app addType ts; app func2Cfg fs; funcs)
 
 end

@@ -33,7 +33,7 @@ val funcs : (string, function) HashTable.hash_table = makeHt ();
 fun fail file l msg =
     (TextIO.output (TextIO.stdErr, file ^ ":" ^ (Int.toString l) ^ ":" ^ msg);
      OS.Process.exit OS.Process.failure)
-;
+
 
 fun binOp2Str BOP_PLUS = "+"
   | binOp2Str BOP_MINUS = "-"
@@ -47,16 +47,17 @@ fun binOp2Str BOP_PLUS = "+"
   | binOp2Str BOP_GE = ">="
   | binOp2Str BOP_AND = "&&"
   | binOp2Str BOP_OR = "||"
-;
 
-fun unOp2Str UOP_NOT = "!" | unOp2Str UOP_MINUS = "-";
+
+fun unOp2Str UOP_NOT = "!" | unOp2Str UOP_MINUS = "-"
+
 
 fun typ2Str MT_INT = "integer"
   | typ2Str MT_VOID = "void"
   | typ2Str MT_BOOL = "boolean"
   | typ2Str MT_FUNC = "function"
   | typ2Str (MT_STRUCT s) = "struct " ^ s
-;
+
 
 (*AST FUNCTIONS*)
 (* null can be assigned to any struct type*)
@@ -68,7 +69,7 @@ fun checkType l (MT_INT, MT_INT) = ()
   | checkType l (t1 as MT_STRUCT s1, t2 as MT_STRUCT s2) =
     if s1 = s2 then () else raise TypeMatchException (l, t1, t2)
   | checkType l (t1, t2) = raise TypeMatchException (l, t1, t2)
-;
+
 
 fun checkLvalue ht (LV_ID {id=id, line=l}) =
     (case HashTable.find ht id of
@@ -84,14 +85,14 @@ fun checkLvalue ht (LV_ID {id=id, line=l}) =
             SOME t => t
           | NONE => raise UndefException (l, prop)
     end
-;
+
 
 fun checkArgs l ht [] [] = ()
   | checkArgs l ht (x::xs) [] = raise InvocationException l
   | checkArgs l ht [] (x::xs) = raise InvocationException l
   | checkArgs l ht (VAR_DECL {typ=tParam, ...}::params) (arg::args)  =
-    (checkType l (tParam, checkExpr ht arg);
-     checkArgs l ht params args)
+    (checkType l (tParam, checkExpr ht arg); checkArgs l ht params args)
+
 
 (*the type of the invocation expression is the RETURN TYPE of the function...*)
 and checkInvocation l ht id args =
@@ -105,40 +106,42 @@ and checkInvocation l ht id args =
         val (FUNCTION {params=params, returnType=rt, ...}) =
             HashTable.lookup funcs id;
     in
-        (checkArgs l ht params args;
-         rt)
+        checkArgs l ht params args;
+        rt
     end
+
 
 and checkBinExpr ht opr lft rht l =
     let
         val tLft = checkExpr ht lft;
         val tRht = checkExpr ht rht;
     in
-        (checkType l (tLft, tRht);
-         case (opr, tLft) of
-             (BOP_PLUS, MT_INT) => MT_INT
-           | (BOP_MINUS, MT_INT) => MT_INT
-           | (BOP_TIMES, MT_INT) => MT_INT
-           | (BOP_DIVIDE, MT_INT) => MT_INT
-           | (BOP_PLUS, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_MINUS, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_TIMES, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_DIVIDE, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_LT, MT_INT) => MT_BOOL
-           | (BOP_GT, MT_INT) => MT_BOOL
-           | (BOP_LE, MT_INT) => MT_BOOL
-           | (BOP_GE, MT_INT) => MT_BOOL
-           | (BOP_LT, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_GT, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_LE, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_GE, _) => raise BinOpException (l, opr, MT_INT)
-           | (BOP_AND, MT_BOOL) => MT_BOOL
-           | (BOP_OR, MT_BOOL) => MT_BOOL
-           | (BOP_AND, _) => raise BinOpException (l, opr, MT_BOOL)
-           | (BOP_OR, _) => raise BinOpException (l, opr, MT_BOOL)
-           | (BOP_EQ, _) => MT_BOOL
-           | (BOP_NE, _) => MT_BOOL)
+        checkType l (tLft, tRht);
+        case (opr, tLft) of
+            (BOP_PLUS, MT_INT) => MT_INT
+          | (BOP_MINUS, MT_INT) => MT_INT
+          | (BOP_TIMES, MT_INT) => MT_INT
+          | (BOP_DIVIDE, MT_INT) => MT_INT
+          | (BOP_PLUS, _) => raise BinOpException (l, opr, MT_INT)
+          | (BOP_MINUS, _) => raise BinOpException (l, opr, MT_INT)
+          | (BOP_TIMES, _) => raise BinOpException (l, opr, MT_INT)
+          | (BOP_DIVIDE, _) => raise BinOpException (l, opr, MT_INT)
+          | (BOP_LT, MT_INT) => MT_BOOL
+          | (BOP_GT, MT_INT) => MT_BOOL
+          | (BOP_LE, MT_INT) => MT_BOOL
+          | (BOP_GE, MT_INT) => MT_BOOL
+          | (BOP_LT, _) => raise BinOpException (l, opr, MT_INT)
+          | (BOP_GT, _) => raise BinOpException (l, opr, MT_INT)
+          | (BOP_LE, _) => raise BinOpException (l, opr, MT_INT)
+          | (BOP_GE, _) => raise BinOpException (l, opr, MT_INT)
+          | (BOP_AND, MT_BOOL) => MT_BOOL
+          | (BOP_OR, MT_BOOL) => MT_BOOL
+          | (BOP_AND, _) => raise BinOpException (l, opr, MT_BOOL)
+          | (BOP_OR, _) => raise BinOpException (l, opr, MT_BOOL)
+          | (BOP_EQ, _) => MT_BOOL
+          | (BOP_NE, _) => MT_BOOL
     end
+
 
 and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
   | checkExpr ht (EXP_ID {id=s, line=l}) =
@@ -172,7 +175,7 @@ and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
        | NONE => raise NotAStructException (l, MT_VOID))
   | checkExpr ht (EXP_INVOCATION {id=id, args=args, line=l}) =
     checkInvocation l ht id args
-;
+
 
 (*Returns a boolean indicating whether the statement returns on all paths*)
 fun checkStmt rt ht (ST_BLOCK stmts) =
@@ -203,14 +206,17 @@ fun checkStmt rt ht (ST_BLOCK stmts) =
     (checkInvocation l ht id args;
      false)
 
+
 and checkStmts1 retDetect rt ht [] = retDetect
   | checkStmts1 retDetect rt ht (stmt::stmts) =
-    if checkStmt rt ht stmt then checkStmts1 true rt ht stmts
+    if checkStmt rt ht stmt
+    then checkStmts1 true rt ht stmts
     else checkStmts1 retDetect rt ht stmts
+
 
 and checkStmts rt ht L =
     checkStmts1 false rt ht L
-;
+
 
 fun checkFunc (FUNCTION {id=id, params=params, returnType=rt,
                          decls=ds, body=body, line=l}) =
@@ -222,22 +228,21 @@ fun checkFunc (FUNCTION {id=id, params=params, returnType=rt,
                         HashTable.insert locals (s, t)) params;
         val retDetect = checkStmts rt locals body;
     in
-        if retDetect = false andalso rt <> MT_VOID then
-            raise NoReturnException l
+        if retDetect = false andalso rt <> MT_VOID
+        then raise NoReturnException l
         else ()
     end
-;
+
 
 fun addTypeDecl (TYPE_DECL {id=id, decls=ds, line=_}) =
     let
         val decls = makeHt ();
     in
-        (HashTable.insert types (id, decls);
-         app (fn (VAR_DECL {id=s, typ=t, ...}) =>
-                 HashTable.insert decls (s, t)) ds
-        )
+        HashTable.insert types (id, decls);
+        app (fn (VAR_DECL {id=s, typ=t, ...}) =>
+                HashTable.insert decls (s, t)) ds
     end
-;
+
 
 fun checkForMain () =
     case HashTable.find funcs "main" of
@@ -245,7 +250,7 @@ fun checkForMain () =
         if length params = 0 andalso rt = MT_INT then ()
         else raise NoMainException 1
       | NONE => raise NoMainException 1
-;
+
 
 fun staticCheck file (PROGRAM {types=ts, decls=ds, funcs=fs}) =
     (app addTypeDecl ts;
@@ -284,6 +289,5 @@ fun staticCheck file (PROGRAM {types=ts, decls=ds, funcs=fs}) =
            fail file line "Function does not return on all paths.\n"
          | NoMainException line =>
            fail file line "No function matching `main` signature.\n"
-;
 
-end;
+end

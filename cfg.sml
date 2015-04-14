@@ -4,15 +4,16 @@ signature CFG = sig
     type node;
     type cfg;
 
-    val mkCfg : node -> node -> function -> cfg;
+    val mkCfg : function -> node * node * cfg;
     val mkNode : unit -> node;
     val link : node -> node -> unit;
     val fill : node -> instruction list -> unit;
     val toList : cfg -> basicBlock list;
+    val nextReg : cfg -> int;
 
     (*Get rid of these later*)
     val getExit : cfg -> node;
-    val getLocals : cfg -> (string, miniType) HashTable.hash_table;
+    val getRegs : cfg -> (string, int) HashTable.hash_table;
     val getLabel : node -> string;
 end
 
@@ -23,10 +24,11 @@ datatype node =
               bb: instruction list ref, label: string}
 
 datatype cfg =
-     CFG of {locals: (string, miniType) HashTable.hash_table,
+         CFG of {regs: (string, int) HashTable.hash_table, nextReg: int ref,
              entry: node, exit: node}
 
 val nextLabel = ref 0;
+
 
 fun mkNode () =
     let
@@ -37,26 +39,50 @@ fun mkNode () =
     end
 
 
-fun mkCfg entry exit (FUNCTION {params=params, decls=decls, ...}) =
+fun mkNodeL l = NODE {prev=ref [], next=ref [], bb=ref [], label=l}
+
+
+fun assignRegs ht =
+    let
+        val n = ref 0;
+    in
+        HashTable.map (fn _ => !n before n := 1 + (!n)) ht
+    end
+
+
+fun mkCfg (FUNCTION {params=params, decls=decls, id=id, ...}) =
     let
         val ht = HashTable.mkTable (HashString.hashString, op =)
                                    (10, Fail "Not Found CFG");
         val addVD = (fn (VAR_DECL {id=s, typ=t, ...}) =>
                         HashTable.insert ht (s, t));
+        val entry = mkNodeL id;
+        val exit = mkNode ();
     in
         app addVD decls;
         app addVD params;
-        CFG {locals=ht, entry=entry, exit=exit}
+        (entry,
+         exit,
+         CFG {
+             regs=assignRegs ht,
+             nextReg=ref (HashTable.numItems ht),
+             entry=entry,
+             exit=exit
+        })
     end
+
+
+fun nextReg (CFG {nextReg=nextReg, ...}) =
+    !nextReg before nextReg := 1 + (!nextReg)
 
 
 fun getExit (CFG {exit=exit, ...}) = exit
 
 
-fun getLocals (CFG {locals=locals, ...}) = locals;
-
-
 fun getLabel (NODE {label=label, ...}) = label
+
+
+fun getRegs (CFG {regs=regs, ...}) = regs
 
 
 (*mmmm mutation... delicious*)
