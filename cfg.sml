@@ -1,71 +1,83 @@
-datatype opcode =
-     OP_ADD
-   | OP_ADDI
-   | OP_DIV
-   | OP_MULT
-   | OP_SUB
-   | OP_SUBI
-   | OP_AND
-   | OP_OR
-   | OP_XORI
-   | OP_COMP
-   | OP_COMPI
-   | OP_CBRGE
-   | OP_CBRGT
-   | OP_CBRLE
-   | OP_CBRLT
-   | OP_CBRNE
-   | OP_JUMPI
-   | OP_LOADI
-   | OP_LOADAI
-   | OP_LOADGLOBAL
-   | OP_LOADINARGUMENT
-   | OP_LOADRET
-   | OP_COMPUTEFORMALADDRESS
-   | OP_RESTOREFORMAL
-   | OP_COMPUTEGLOBALADDRESS
-   | OP_STOREAI
-   | OP_STOREGLOBAL
-   | OP_STOREINARGUMENT
-   | OP_STOREOUTARGUMENT
-   | OP_STORERET
-   | OP_CALL
-   | OP_RET
-   | OP_NEW
-   | OP_DEL
-   | OP_PRINT
-   | OP_PRINTLN
-   | OP_READ
-   | OP_MOV
-   | OP_MOVEQ
-   | OP_MOVGE
-   | OP_MOVGT
-   | OP_MOVLE
-   | OP_MOVLT
-   | OP_MOVNE
-;
+signature CFG = sig
+    type node;
+    type cfg;
 
-datatype instruction =
-     INS_RRR of {opcode: opcode, r1: int, r2: int, dest: int}
-   | INS_RIR of {opcode: opcode, r1: int, immed: int, dest: int}
-   | INS_RRC of {opcode: opcode, r1: int, r2: int}
-   | INS_RIC of {opcode: opcode, r1: int, immed: int}
-   | INS_CLL of {opcode: opcode, l1: string, l2: string}
-   | INS_L   of {opcode: opcode, l1: string}
-   | INS_IR  of {opcode: opcode, immed: int, r1: int}
-   | INS_SR  of {opcode: opcode, id: string, r1: int}
-   | INS_SIR of {opcode: opcode, id: string, immed: int, r1: int}
-   | INS_R   of {opcode: opcode, r1: int}
-   | INS_SI  of {opcode: opcode, id: string, immed: int}
-   | INS_X   of {opcode: opcode}
-;
+    val mkCfg : node -> node -> function -> cfg;
+    val mkNode : unit -> node;
+    val link : node -> node -> unit;
+    val fill : node -> instruction list -> unit;
+    val toList : cfg -> basicBlock list;
 
-datatype basicBlock =
-     BB of {prev: basicBlock list ref, next: basicBlock list ref,
-            body: instruction list ref, label: string}
-;
+    (*Get rid of these later*)
+    val getExit : cfg -> node;
+    val getLocals : cfg -> (string, miniType) HashTable.hash_table;
+end
+
+structure Cfg :> CFG = struct
+
+datatype node =
+     NODE of {prev: node list ref, next: node list ref,
+              bb: instruction list ref, label: string}
 
 datatype cfg =
      CFG of {locals: (string, miniType) HashTable.hash_table,
-             entry: basicBlock, exit: basicBlock}
-;
+             entry: node, exit: node}
+
+val nextLabel = ref 0;
+
+fun mkNode () =
+    let
+        val label = "L" ^ (Int.toString (!nextLabel));
+    in
+        nextLabel := 1 + (!nextLabel);
+        NODE {prev=ref [], next=ref [], bb=ref [], label=label}
+    end
+
+
+fun mkCfg entry exit (FUNCTION {params=params, decls=decls, ...}) =
+    let
+        val ht = HashTable.mkTable (HashString.hashString, op =)
+                                   (10, Fail "Not Found CFG");
+        val addVD = (fn (VAR_DECL {id=s, typ=t, ...}) =>
+                        HashTable.insert ht (s, t));
+    in
+        app addVD decls;
+        app addVD params;
+        CFG {locals=ht, entry=entry, exit=exit}
+    end
+
+
+fun getExit (CFG {exit=exit, ...}) = exit
+
+
+fun getLocals (CFG {locals=locals, ...}) = locals;
+
+
+(*mmmm mutation... delicious*)
+fun link nod1 nod2 =
+    let
+        val (NODE {next=next, ...}) = nod1;
+        val (NODE {prev=prev, ...}) = nod2;
+    in
+        next := nod2::(!next);
+        prev := nod1::(!prev)
+    end
+
+
+fun fill nod L =
+    let
+        val (NODE {bb=bb, ...}) = nod;
+    in
+        bb := (!bb) @ L
+    end
+
+local
+    fun toList1 (nod as NODE {prev=prev, next=next, bb=bb, label=label}, L) =
+        if not (isSome (List.find (fn item => item = (label, !bb)) L)) then
+            foldr toList1 (foldr toList1 (L @ [(label, !bb)]) (!prev)) (!next)
+        else L
+in
+    fun toList (CFG {entry=entry, ...}) = toList1 (entry, [])
+end
+
+end

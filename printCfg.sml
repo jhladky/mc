@@ -48,23 +48,27 @@ fun r2Str r = "r" ^ (Int.toString r)
 
 
 fun ins2Str (INS_RRR {opcode=opcode, r1=r1, r2=r2, dest=dest}) =
-    (opcode2Str opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2) ^ ", " ^ (r2Str dest)
+    (opcode2Str opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2) ^ ", " ^
+    (r2Str dest)
   | ins2Str (INS_RIR {opcode=opcode, r1=r1, immed=immed, dest=dest}) =
-    (opcode2Str opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str immed) ^ ", " ^ (r2Str dest)
+    (opcode2Str opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str immed) ^ ", " ^
+    (r2Str dest)
   | ins2Str (INS_RRC {opcode=opcode, r1=r1, r2=r2}) =
     (opcode2Str opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2) ^ ", ccr"
   | ins2Str (INS_RIC {opcode=opcode, r1=r1, immed=immed}) =
-    (opcode2Str opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (Int.toString immed) ^ ", ccr"
+    (opcode2Str opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (Int.toString immed) ^
+    ", ccr"
   | ins2Str (INS_CLL {opcode=opcode, l1=l1, l2=l2}) =
     (opcode2Str opcode) ^ " ccr, " ^ l1 ^ ", " ^ l2
   | ins2Str (INS_L {opcode=opcode, l1=l1}) =
     (opcode2Str opcode) ^ " " ^ l1
-  | ins2Str (INS_IR {opcode=opcode, immed=immed, r1=r1}) =
-    (opcode2Str opcode) ^ " " ^ (Int.toString immed) ^ ", " ^ (r2Str r1)
+  | ins2Str (INS_IR {opcode=opcode, immed=immed, dest=dest}) =
+    (opcode2Str opcode) ^ " " ^ (Int.toString immed) ^ ", " ^ (r2Str dest)
   | ins2Str (INS_SR {opcode=opcode, id=id, r1=r1}) =
     (opcode2Str opcode) ^ " " ^ id ^ ", " ^ (r2Str r1)
   | ins2Str (INS_SIR {opcode=opcode, id=id, immed=immed, r1=r1}) =
-    (opcode2Str opcode) ^ " " ^ id ^ ", " ^ (Int.toString immed) ^ (r2Str r1)
+    (opcode2Str opcode) ^ " " ^ id ^ ", " ^ (Int.toString immed) ^ ", " ^
+    (r2Str r1)
   | ins2Str (INS_R {opcode=opcode, r1=r1}) =
     (opcode2Str opcode) ^ " " ^ (r2Str r1)
   | ins2Str (INS_SI {opcode=opcode, id=id, immed=immed}) =
@@ -73,26 +77,20 @@ fun ins2Str (INS_RRR {opcode=opcode, r1=r1, r2=r2, dest=dest}) =
     (opcode2Str opcode)
 
 
-local
-    fun collectBB (bb as BB {prev=prev, next=next, label=label, ...}, L) =
-        if not (isSome (List.find (fn item => item = bb) L)) then
-            foldr collectBB (foldr collectBB (bb::L) (!prev)) (!next)
-        else L
-
-    fun collectBBs1 bb = collectBB (bb, [])
-in
-fun collectBBs L = foldr (fn (bb, L) => L @ (collectBBs1 bb)) [] L
-end
+(* fun printBBAsCFG (Cfg.NODE {prev=prev, next=next, label=label, ...}) = *)
+(*     (print (label ^ ":\nPrevious:"); *)
+(*      app (fn (Cfg.NODE {label=l, ...}) => print (" " ^ l)) (!prev); *)
+(*      print "\nNext:"; *)
+(*      app (fn (Cfg.NODE {label=l, ...}) => print (" " ^ l)) (!next); *)
+(*      print "\n\n") *)
 
 
-fun printBB (BB {prev=prev, next=next, label=label, ...}) =
-    (print (label ^ ":\nPrevious:");
-     app (fn (BB {label=l, ...}) => print (" " ^ l)) (!prev);
-     print "\nNext:";
-     app (fn (BB {label=l, ...}) => print (" " ^ l)) (!next);
-     print "\n\n")
+fun printBBAsILOC (label, L) =
+    (print (label ^ ":\n");
+     app (fn ins => print ("\t" ^ (ins2Str ins) ^ "\n")) L;
+     print "\n")
 
 
 fun printCfg ht =
-    app printBB ((List.rev o collectBBs) (map (fn CFG {entry=e, ...} => e)
-                                              (HashTable.listItems ht)))
+    app printBBAsILOC (foldl (fn (bbs, L) => L @ (Cfg.toList bbs)) []
+                             (HashTable.listItems ht))

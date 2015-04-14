@@ -8,6 +8,7 @@ printAST.sml
 
 staticCheck.sml
 
+iloc.sml
 cfg.sml
 ast2Cfg.sml
 printCfg.sml
