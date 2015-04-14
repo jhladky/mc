@@ -1,3 +1,5 @@
+open Iloc;
+
 fun opcode2Str OP_ADD = "add"
   | opcode2Str OP_ADDI = "addi"
   | opcode2Str OP_DIV = "div"
@@ -9,6 +11,7 @@ fun opcode2Str OP_ADD = "add"
   | opcode2Str OP_XORI = "xori"
   | opcode2Str OP_COMP = "comp"
   | opcode2Str OP_COMPI = "compi"
+  | opcode2Str OP_CBREQ = "cbreq"
   | opcode2Str OP_CBRGE = "cbrge"
   | opcode2Str OP_CBRGT = "cbrgt"
   | opcode2Str OP_CBRLE = "cbrle"
@@ -77,20 +80,12 @@ fun ins2Str (INS_RRR {opcode=opcode, r1=r1, r2=r2, dest=dest}) =
     (opcode2Str opcode)
 
 
-(* fun printBBAsCFG (Cfg.NODE {prev=prev, next=next, label=label, ...}) = *)
-(*     (print (label ^ ":\nPrevious:"); *)
-(*      app (fn (Cfg.NODE {label=l, ...}) => print (" " ^ l)) (!prev); *)
-(*      print "\nNext:"; *)
-(*      app (fn (Cfg.NODE {label=l, ...}) => print (" " ^ l)) (!next); *)
-(*      print "\n\n") *)
-
-
-fun printBBAsILOC (label, L) =
+fun printNode (label, L) =
     (print (label ^ ":\n");
-     app (fn ins => print ("\t" ^ (ins2Str ins) ^ "\n")) L;
-     print "\n")
+     app (fn ins => print ("\t" ^ (ins2Str ins) ^ "\n")) L)
 
 
 fun printCfg ht =
-    app printBBAsILOC (foldl (fn (bbs, L) => L @ (Cfg.toList bbs)) []
-                             (HashTable.listItems ht))
+    (app printNode (Cfg.toList (HashTable.lookup ht "main"));
+     HashTable.remove ht "main";
+     app printNode (List.concat (map Cfg.toList (HashTable.listItems ht))))

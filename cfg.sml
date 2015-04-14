@@ -1,3 +1,5 @@
+open Iloc;
+
 signature CFG = sig
     type node;
     type cfg;
@@ -11,6 +13,7 @@ signature CFG = sig
     (*Get rid of these later*)
     val getExit : cfg -> node;
     val getLocals : cfg -> (string, miniType) HashTable.hash_table;
+    val getLabel : node -> string;
 end
 
 structure Cfg :> CFG = struct
@@ -53,6 +56,9 @@ fun getExit (CFG {exit=exit, ...}) = exit
 fun getLocals (CFG {locals=locals, ...}) = locals;
 
 
+fun getLabel (NODE {label=label, ...}) = label
+
+
 (*mmmm mutation... delicious*)
 fun link nod1 nod2 =
     let
@@ -71,13 +77,23 @@ fun fill nod L =
         bb := (!bb) @ L
     end
 
+
 local
     fun toList1 (nod as NODE {prev=prev, next=next, bb=bb, label=label}, L) =
         if not (isSome (List.find (fn item => item = (label, !bb)) L)) then
             foldr toList1 (foldr toList1 (L @ [(label, !bb)]) (!prev)) (!next)
         else L
 in
-    fun toList (CFG {entry=entry, ...}) = toList1 (entry, [])
+    fun toList (CFG {entry=en as NODE {label=enL, bb=enBB, ...},
+                     exit=NODE {label=exL, bb=exBB, ...}, ...}) =
+        let
+            val enP = (enL, !enBB)
+            val exP = (exL, !exBB)
+            val L = List.filter (fn p => p <> enP andalso p <> exP)
+                                (toList1 (en, []))
+        in
+            [enP] @ L @ [exP]
+        end
 end
 
 end

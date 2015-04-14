@@ -1,3 +1,5 @@
+open Iloc;
+
 signature AST2CFG = sig
     val ast2Cfg : program -> (string, Cfg.cfg) HashTable.hash_table;
 end
@@ -37,6 +39,7 @@ fun idExpr2Ins f L id =
             end
     end
 
+
 fun bop2Op BOP_PLUS = OP_ADD
    | bop2Op BOP_MINUS = OP_SUB
    | bop2Op BOP_TIMES = OP_MULT
@@ -62,7 +65,8 @@ fun binExpr2Ins f L opr lft rht =
            opr = BOP_TIMES orelse
            opr = BOP_DIVIDE orelse
            opr = BOP_AND orelse
-           opr = BOP_OR then
+           opr = BOP_OR
+        then
             (dest,
              INS_RRR {opcode=bop2Op opr, r1=rX, r2=rY, dest=dest}::L)
         else
@@ -79,7 +83,7 @@ and unExpr2Ins f L opnd UOP_NOT =
         val dest2 = getNextReg f;
     in
         (dest2,
-         INS_RIR {opcode=OP_XORI, immed=0xFFFF,r1=dest1, dest=dest2}::L1)
+         INS_RIR {opcode=OP_XORI, immed=0xFFFF, r1=dest1, dest=dest2}::L1)
     end
   | unExpr2Ins f L opnd UOP_MINUS =
     let
@@ -144,20 +148,23 @@ fun stmt2BB f bb (ST_BLOCK stmts) =
   | stmt2BB _ bb (ST_READ {id=id, ...}) =
     bb
   | stmt2BB f bb (ST_IF {guard=guard, thenBlk=thenBlk,
-                              elseBlk=elseBlk, ...}) =
+                         elseBlk=elseBlk, ...}) =
     let
         val exitBB = Cfg.mkNode ();
         val thenBB = Cfg.mkNode ();
         val elseBB = Cfg.mkNode ();
         val thenResBB = stmt2BB f thenBB thenBlk;
         val elseResBB = stmt2BB f elseBB elseBlk;
-        val (_, L) = expr2Ins f [] guard;
+        val (dest, L) = expr2Ins f [] guard;
     in
-        Cfg.fill bb (List.rev L);
         Cfg.link bb elseBB;
         Cfg.link bb thenBB;
         Cfg.link elseResBB exitBB;
         Cfg.link thenResBB exitBB;
+        Cfg.fill bb (List.rev L);
+        Cfg.fill bb [INS_RIC {opcode=OP_COMP, r1=dest, immed=1},
+                     INS_CLL {opcode=OP_CBREQ, l1=Cfg.getLabel thenBB,
+                              l2=Cfg.getLabel elseBB}];
         exitBB
     end
   | stmt2BB f bb (ST_WHILE {guard=guard, body=body, ...}) =
@@ -184,12 +191,7 @@ fun stmt2BB f bb (ST_BLOCK stmts) =
         bb
     end
   | stmt2BB f bb (ST_RETURN {exp=exp, ...}) =
-    let
-        val funcExit = Cfg.getExit (HashTable.lookup funcs f);
-        val newBB = Cfg.mkNode ();
-    in
-        (Cfg.link bb funcExit; newBB)
-    end
+    (Cfg.link bb (Cfg.getExit (HashTable.lookup funcs f)); Cfg.mkNode ())
   | stmt2BB _ bb (ST_INVOCATION {id=id, args=args, ...}) =
     bb
 

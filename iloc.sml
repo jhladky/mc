@@ -1,3 +1,6 @@
+
+structure Iloc = struct
+
 datatype opcode =
      OP_ADD
    | OP_ADDI
@@ -10,6 +13,7 @@ datatype opcode =
    | OP_XORI
    | OP_COMP
    | OP_COMPI
+   | OP_CBREQ
    | OP_CBRGE
    | OP_CBRGT
    | OP_CBRLE
@@ -61,3 +65,5 @@ datatype instruction =
 
 
 type basicBlock = string * instruction list
+
+end
