@@ -5,14 +5,16 @@ signature CFG = sig
     type cfg;
 
     val mkCfg : function -> node * node * cfg;
-    val mkNode : unit -> node;
+    val mkIf : node -> node * node * node;
+    val mkWhile : node -> node * node * node;
+    val mkReturn : cfg -> node * node;
+
     val link : node -> node -> unit;
     val fill : node -> instruction list -> unit;
     val toList : cfg -> basicBlock list;
     val nextReg : cfg -> int;
 
     (*Get rid of these later*)
-    val getExit : cfg -> node;
     val getRegs : cfg -> (string, int) HashTable.hash_table;
     val getLabel : node -> string;
 end
@@ -24,7 +26,7 @@ datatype node =
               bb: instruction list ref, label: string}
 
 datatype cfg =
-         CFG of {regs: (string, int) HashTable.hash_table, nextReg: int ref,
+     CFG of {regs: (string, int) HashTable.hash_table, nextReg: int ref,
              entry: node, exit: node}
 
 val nextLabel = ref 0;
@@ -37,9 +39,6 @@ fun mkNode () =
         nextLabel := 1 + (!nextLabel);
         NODE {prev=ref [], next=ref [], bb=ref [], label=label}
     end
-
-
-fun mkNodeL l = NODE {prev=ref [], next=ref [], bb=ref [], label=l}
 
 
 fun assignRegs ht =
@@ -56,7 +55,7 @@ fun mkCfg (FUNCTION {params=params, decls=decls, id=id, ...}) =
                                    (10, Fail "Not Found CFG");
         val addVD = (fn (VAR_DECL {id=s, typ=t, ...}) =>
                         HashTable.insert ht (s, t));
-        val entry = mkNodeL id;
+        val entry = NODE {prev=ref [], next=ref [], bb=ref [], label=id};
         val exit = mkNode ();
     in
         app addVD decls;
@@ -76,9 +75,6 @@ fun nextReg (CFG {nextReg=nextReg, ...}) =
     !nextReg before nextReg := 1 + (!nextReg)
 
 
-fun getExit (CFG {exit=exit, ...}) = exit
-
-
 fun getLabel (NODE {label=label, ...}) = label
 
 
@@ -96,11 +92,43 @@ fun link nod1 nod2 =
     end
 
 
-fun fill nod L =
+fun fill node L =
     let
-        val (NODE {bb=bb, ...}) = nod;
+        val (NODE {bb=bb, ...}) = node;
     in
         bb := (!bb) @ L
+    end
+
+
+fun mkIf node =
+    let
+        val exitNode = mkNode ();
+        val thenNode = mkNode ();
+        val elseNode = mkNode ();
+    in
+        link node elseNode;
+        link node thenNode;
+        (thenNode, elseNode, exitNode)
+    end
+
+fun mkWhile node =
+    let
+        val guard = mkNode ();
+        val body = mkNode ();
+        val exit = mkNode ();
+    in
+        link node guard;
+        link guard body;
+        link guard exit;
+        (guard, body, exit)
+    end
+
+
+fun mkReturn (CFG {exit=exit, ...}) =
+    let
+        val node = mkNode ();
+    in
+        (exit, node)
     end
 
 

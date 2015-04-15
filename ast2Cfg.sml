@@ -87,6 +87,16 @@ and unExpr2Ins f L opnd UOP_NOT =
     end
 
 
+and args2Ins f n [] = []
+  | args2Ins f n (arg::args) =
+    let
+        val (dest, L) = expr2Ins f [] arg;
+    in
+        args2Ins f (n + 1) args @
+        INS_IR {opcode=OP_STOREOUTARGUMENT, immed=n, dest=dest}::L
+    end
+
+
 and expr2Ins f L (EXP_NUM {value=value, ...}) =
     let
         val dest = Cfg.nextReg (HashTable.lookup funcs f);
@@ -112,7 +122,7 @@ and expr2Ins f L (EXP_NUM {value=value, ...}) =
     binExpr2Ins f L opr lft rht
   | expr2Ins f L (EXP_UNARY {opr=opr, opnd=opnd, ...}) =
     unExpr2Ins f L opnd opr
-  | expr2Ins f L (EXP_DOT {lft=lft, prop=prop, ...}) = (*fix*)
+  | expr2Ins f L (EXP_DOT {lft=lft, prop=prop, ...}) =
     let
         val (rS, L) = expr2Ins f L lft;
         val dest = Cfg.nextReg (HashTable.lookup funcs f);
@@ -127,7 +137,16 @@ and expr2Ins f L (EXP_NUM {value=value, ...}) =
         (dest, INS_NEW {opcode=OP_NEW, id=id, fields=fields, dest=dest}::L)
     end
   | expr2Ins f L (EXP_INVOCATION {id=id, args=args, ...}) = (*fix*)
-    (~1, L)
+    (*so, this is closer to being right, but it's still going to
+     * have the problem with the nested calls*)
+    let
+        val args = args2Ins f 0 args;
+        val dest = Cfg.nextReg (HashTable.lookup funcs f);
+    in
+        (dest, INS_R {opcode=OP_LOADRET, r1=dest}::
+               INS_L {opcode=OP_CALL, l1=id}::
+               args)
+    end
 
 
 fun lvalue2Ins f reg L (LV_ID {id=id, ...}) =
@@ -147,80 +166,93 @@ fun genBrnIns reg yes no =
      INS_CLL {opcode=OP_CBREQ, l1=Cfg.getLabel yes, l2=Cfg.getLabel no}]
 
 
-fun stmt2BB f bb (ST_BLOCK stmts) =
-    foldl (fn (s, bb) => stmt2BB f bb s) bb stmts
-  | stmt2BB f bb (ST_ASSIGN {target=target, source=source, ...}) =
+fun genJump node = [INS_L {opcode=OP_JUMPI, l1=Cfg.getLabel node}];
+
+
+fun returnStmt2BB f node EXP_UNDEFINED =
+    let
+        val (exitNode, newNode) = Cfg.mkReturn (HashTable.lookup funcs f);
+    in
+        Cfg.fill node (genJump exitNode);
+        Cfg.link node exitNode;
+        newNode
+    end
+  | returnStmt2BB f node exp =
+    let
+        val (exitNode, newNode) = Cfg.mkReturn (HashTable.lookup funcs f);
+        val (dest, L) = expr2Ins f [] exp;
+    in
+        Cfg.fill node (List.rev L @ [INS_R {opcode=OP_STORERET, r1=dest}] @
+                     genJump exitNode);
+        Cfg.link node exitNode;
+        newNode
+    end
+
+
+and stmt2BB f node (ST_BLOCK stmts) =
+    foldl (fn (s, node) => stmt2BB f node s) node stmts
+  | stmt2BB f node (ST_ASSIGN {target=target, source=source, ...}) =
     let
         val (rX, L) = expr2Ins f [] source;
-        val (_, L) = lvalue2Ins f rX L target;
+        val (_, L) = lvalue2Ins f rX L target; (*should lvalue even be returning a dest???*)
     in
-        Cfg.fill bb (List.rev L);
-        bb
+        Cfg.fill node (List.rev L);
+        node
     end
-  | stmt2BB f bb (ST_PRINT {body=body, endl=endl, ...}) =
+  | stmt2BB f node (ST_PRINT {body=body, endl=endl, ...}) =
     let
         val (dest, L) = expr2Ins f [] body;
         val opcode = if endl then OP_PRINTLN else OP_PRINT;
     in
-        Cfg.fill bb (List.rev L);
-        Cfg.fill bb [INS_R {opcode=opcode, r1=dest}];
-        bb
+        Cfg.fill node (List.rev L);
+        Cfg.fill node [INS_R {opcode=opcode, r1=dest}];
+        node
     end
-  | stmt2BB _ bb (ST_READ {id=id, ...}) = (*fix*)
-    bb
-  | stmt2BB f bb (ST_IF {guard=guard, thenBlk=thenBlk,
+  | stmt2BB _ node (ST_READ {id=id, ...}) = (*fix*)
+    node
+  | stmt2BB f node (ST_IF {guard=guard, thenBlk=thenBlk,
                          elseBlk=elseBlk, ...}) =
     let
-        val exitBB = Cfg.mkNode ();
-        val thenBB = Cfg.mkNode ();
-        val elseBB = Cfg.mkNode ();
-        val thenResBB = stmt2BB f thenBB thenBlk;
-        val elseResBB = stmt2BB f elseBB elseBlk;
+        val (thenNode, elseNode, exitNode) = Cfg.mkIf node;
+        val thenResNode = stmt2BB f thenNode thenBlk;
+        val elseResNode = stmt2BB f elseNode elseBlk;
         val (dest, L) = expr2Ins f [] guard;
     in
-        Cfg.link bb elseBB;
-        Cfg.link bb thenBB;
-        Cfg.link elseResBB exitBB;
-        Cfg.link thenResBB exitBB;
-        Cfg.fill bb (List.rev L @ genBrnIns dest thenBB elseBB);
-        Cfg.fill thenResBB [INS_L {opcode=OP_JUMPI, l1=Cfg.getLabel exitBB}];
-        Cfg.fill elseResBB [INS_L {opcode=OP_JUMPI, l1=Cfg.getLabel exitBB}];
-        exitBB
+        Cfg.link elseResNode exitNode;
+        Cfg.link thenResNode exitNode;
+        Cfg.fill node (List.rev L @ genBrnIns dest thenNode elseNode);
+        Cfg.fill thenResNode (genJump exitNode);
+        Cfg.fill elseResNode (genJump exitNode);
+        exitNode
     end
-  | stmt2BB f bb (ST_WHILE {guard=guard, body=body, ...}) =
+  | stmt2BB f node (ST_WHILE {guard=guard, body=body, ...}) =
     let
-        val guardBB = Cfg.mkNode ();
-        val bodyBB = Cfg.mkNode ();
-        val exitBB = Cfg.mkNode ();
-        val bodyResBB = stmt2BB f bodyBB body;
+        val (guardNode, bodyNode, exitNode) = Cfg.mkWhile node;
+        val bodyResNode = stmt2BB f bodyNode body;
         val (dest, L) = expr2Ins f [] guard;
     in
-        Cfg.link bb guardBB;
-        Cfg.link guardBB bodyBB;
-        Cfg.link guardBB exitBB;
-        Cfg.link bodyResBB guardBB;
-        Cfg.fill guardBB (List.rev L @ genBrnIns dest bodyBB exitBB);
-        Cfg.fill bb [INS_L {opcode=OP_JUMPI, l1=Cfg.getLabel guardBB}];
-        Cfg.fill bodyBB [INS_L {opcode=OP_JUMPI, l1=Cfg.getLabel guardBB}];
-        exitBB
+        Cfg.link bodyResNode guardNode;
+        Cfg.fill guardNode (List.rev L @ genBrnIns dest bodyNode exitNode);
+        Cfg.fill node (genJump guardNode);
+        Cfg.fill bodyNode (genJump guardNode);
+        exitNode
     end
-  | stmt2BB f bb (ST_DELETE {exp=exp, ...}) =
+  | stmt2BB f node (ST_DELETE {exp=exp, ...}) =
     let
         val (dest, L) = expr2Ins f [] exp;
     in
-        Cfg.fill bb ((List.rev L) @ [INS_R {opcode=OP_DEL, r1=dest}]);
-        bb
+        Cfg.fill node (List.rev L @ [INS_R {opcode=OP_DEL, r1=dest}]);
+        node
     end
-  | stmt2BB f bb (ST_RETURN {exp=exp, ...}) =
+  | stmt2BB f node (ST_RETURN {exp=exp, ...}) =
+    returnStmt2BB f node exp
+  | stmt2BB f node (ST_INVOCATION {id=id, args=args, ...}) = (*fix*)
     let
-        val exit = Cfg.getExit (HashTable.lookup funcs f)
+        val args = args2Ins f 0 args;
     in
-        Cfg.fill bb [INS_L {opcode=OP_JUMPI, l1=Cfg.getLabel exit}];
-        Cfg.link bb exit;
-        Cfg.mkNode ()
+        Cfg.fill node (List.rev (INS_L {opcode=OP_CALL, l1=id}::args));
+        node
     end
-  | stmt2BB _ bb (ST_INVOCATION {id=id, args=args, ...}) = (*fix*)
-    bb
 
 
 fun mkFuncEntry n regs [] = []
@@ -239,7 +271,7 @@ fun func2Cfg (f as FUNCTION {id=id, body=body, params=params, ...}) =
         val _ = HashTable.insert funcs (id, cfg);
         val _ = Cfg.fill entry (mkFuncEntry 0 (Cfg.getRegs cfg) params);
         val _ = Cfg.fill exit [INS_X {opcode=OP_RET}];
-        val res = foldl (fn (s, bb) => stmt2BB id bb s) entry body;
+        val res = foldl (fn (s, node) => stmt2BB id node s) entry body;
     in
         Cfg.link res exit
     end
