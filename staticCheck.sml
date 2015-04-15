@@ -150,7 +150,7 @@ and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
       | NONE => raise UndefException (l, s))
   | checkExpr ht (EXP_TRUE {...}) = MT_BOOL
   | checkExpr ht (EXP_FALSE {...}) = MT_BOOL
-  | checkExpr ht EXP_UNDEFINED = MT_VOID (*Not sure about this...*)
+  | checkExpr ht EXP_NULL = MT_VOID (*Not sure about this...*)
   | checkExpr ht (EXP_BINARY {opr=opr, lft=lft, rht=rht, line=l}) =
     checkBinExpr ht opr lft rht l
   | checkExpr ht (EXP_UNARY {opr=opr, opnd=opnd, line=l}) =

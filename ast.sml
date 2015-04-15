@@ -44,7 +44,7 @@ datatype expression =
    | EXP_ID of {id: string, line: int}
    | EXP_TRUE of {line: int}
    | EXP_FALSE of {line: int}
-   | EXP_UNDEFINED
+   | EXP_NULL
    | EXP_BINARY of {opr: binaryOperator, lft: expression,
                     rht: expression, line: int}
    | EXP_UNARY of {opr: unaryOperator, opnd: expression, line: int}

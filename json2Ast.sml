@@ -103,7 +103,7 @@ fun expression2Ast ht =
             EXP_TRUE {line=line ht}
           | "false" =>
             EXP_FALSE {line=line ht}
-          | "null" => EXP_UNDEFINED
+          | "null" => EXP_NULL
           | "binary" =>
             EXP_BINARY {
                 opr=str2BinaryOpr (uwrStr (HashTable.lookup ht "operator")),
@@ -185,7 +185,7 @@ fun statement2Ast ht =
           | "return" =>
             ST_RETURN {
                 exp=case HashTable.find ht "exp" of
-                        NONE => EXP_UNDEFINED
+                        NONE => EXP_NULL
                       | SOME (expression e) => e
                       | SOME _ => raise Fail "Expected an `expression`.",
                 line=line ht

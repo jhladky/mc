@@ -14,20 +14,15 @@ val funcs : (string, Cfg.cfg) HashTable.hash_table = mkHt ();
 val types : (string, string list) HashTable.hash_table = mkHt ();
 
 
-fun idExpr2Ins f L id =
-    let
-        val regs = Cfg.getRegs (HashTable.lookup funcs f);
-    in
-        case HashTable.find regs id of
-            SOME dest => (dest, L)
-          | NONE =>
-            let
-                val dest = Cfg.nextReg (HashTable.lookup funcs f);
-            in
-                (dest,
-                 INS_SR {opcode=OP_LOADGLOBAL, id=id, r1=dest}::L)
-            end
-    end
+fun idExpr2Ins cfg id =
+    case HashTable.find (Cfg.getRegs cfg) id of
+        SOME dest => (dest, [])
+      | NONE =>
+        let
+            val dest = Cfg.nextReg cfg;
+        in
+            (dest, [INS_SR {opcode=OP_LOADGLOBAL, id=id, r1=dest}])
+        end
 
 
 fun bop2Op BOP_PLUS = OP_ADD
@@ -54,11 +49,14 @@ in
 end
 
 
-fun binExpr2Ins f L opr lft rht =
+fun genLoad n dest = (dest, [INS_IR {opcode=OP_LOADI, immed=n, dest=dest}])
+
+
+fun binExpr2Ins cfg opr lft rht =
     let
-        val (rX, L1) = expr2Ins f L lft;
-        val (rY, L2) = expr2Ins f L1 rht;
-        val dest = Cfg.nextReg (HashTable.lookup funcs f);
+        val (rLft, lLft) = expr2Ins cfg lft;
+        val (rRht, lRht) = expr2Ins cfg rht;
+        val dest = Cfg.nextReg cfg;
     in
         if opr = BOP_PLUS orelse
            opr = BOP_MINUS orelse
@@ -68,103 +66,88 @@ fun binExpr2Ins f L opr lft rht =
            opr = BOP_OR
         then
             (dest,
-             INS_RRR {opcode=bop2Op opr, r1=rX, r2=rY, dest=dest}::L)
+             [INS_RRR {opcode=bop2Op opr, r1=rLft, r2=rRht, dest=dest}]
+             @ lRht
+             @ lLft)
         else
             (dest,
-             INS_IR {opcode=bop2Op opr, immed=1, dest=dest}::
-             INS_RRC {opcode=OP_COMP, r1=rX, r2=rY}::
-             INS_IR {opcode=OP_LOADI, immed=0, dest=dest}::L)
+             [INS_IR {opcode=bop2Op opr, immed=1, dest=dest},
+              INS_RRC {opcode=OP_COMP, r1=rLft, r2=rRht},
+              INS_IR {opcode=OP_LOADI, immed=0, dest=dest}]
+             @ lRht
+             @ lLft)
     end
 
 
-and unExpr2Ins f L opnd UOP_NOT =
+and unExpr2Ins cfg opnd UOP_NOT =
     let
-        val (dest1, L1) = expr2Ins f L opnd;
-        val dest2 = Cfg.nextReg (HashTable.lookup funcs f);
+        val (r1, L) = expr2Ins cfg opnd;
+        val dest = Cfg.nextReg cfg;
+    in
+        (dest, INS_RIR {opcode=OP_XORI, immed=0xFFFF, r1=r1, dest=dest}::L)
+    end
+  | unExpr2Ins cfg opnd UOP_MINUS =
+    let
+        val (r1, L) = expr2Ins cfg opnd;
+        val dest1 = Cfg.nextReg cfg;
+        val dest2 = Cfg.nextReg cfg;
     in
         (dest2,
-         INS_RIR {opcode=OP_XORI, immed=0xFFFF, r1=dest1, dest=dest2}::L1)
-    end
-  | unExpr2Ins f L opnd UOP_MINUS =
-    let
-        val (dest1, L1) = expr2Ins f L opnd;
-        val dest2 = Cfg.nextReg (HashTable.lookup funcs f);
-        val dest3 = Cfg.nextReg (HashTable.lookup funcs f);
-    in
-        (dest3,
-         INS_RRR {opcode=OP_SUB, r1=dest1, r2=dest2, dest=dest3}::
-         INS_IR {opcode=OP_LOADI, immed=0, dest=dest2}::L1)
+         INS_RRR {opcode=OP_SUB, r1=dest1, r2=r1, dest=dest2}
+         ::INS_IR {opcode=OP_LOADI, immed=0, dest=dest1}
+         ::L)
     end
 
 
-and expr2Ins f L (EXP_NUM {value=value, ...}) =
+and expr2Ins cfg (EXP_NUM {value=value, ...}) = genLoad value (Cfg.nextReg cfg)
+  | expr2Ins cfg (EXP_ID {id=id, ...}) = idExpr2Ins cfg id
+  | expr2Ins cfg (EXP_TRUE {...}) = genLoad 1 (Cfg.nextReg cfg)
+  | expr2Ins cfg (EXP_FALSE {...}) = genLoad 0 (Cfg.nextReg cfg)
+  | expr2Ins cfg EXP_NULL = genLoad 0 (Cfg.nextReg cfg)
+  | expr2Ins cfg (EXP_UNARY {opr=opr, opnd=opd, ...}) = unExpr2Ins cfg opd opr
+  | expr2Ins cfg (EXP_BINARY {opr=opr, lft=lft, rht=rht, ...}) =
+    binExpr2Ins cfg opr lft rht
+  | expr2Ins cfg (EXP_DOT {lft=lft, prop=prop, ...}) =
     let
-        val dest = Cfg.nextReg (HashTable.lookup funcs f);
+        val (r1, L) = expr2Ins cfg lft;
+        val dest = Cfg.nextReg cfg;
     in
-        (dest, INS_IR {opcode=OP_LOADI, immed=value, dest=dest}::L)
+        (dest, INS_RSR {opcode=OP_LOADAI, r1=r1, field=prop, dest=dest}::L)
     end
-  | expr2Ins f L (EXP_ID {id=id, ...}) = idExpr2Ins f L id
-  | expr2Ins f L (EXP_TRUE {...}) =
+  | expr2Ins cfg (EXP_NEW {id=id, ...}) =
     let
-        val dest = Cfg.nextReg (HashTable.lookup funcs f);
-    in
-        (dest, INS_IR {opcode=OP_LOADI, immed=1, dest=dest}::L)
-    end
-  | expr2Ins f L (EXP_FALSE {...}) =
-    let
-        val dest = Cfg.nextReg (HashTable.lookup funcs f);
-    in
-        (dest, INS_IR {opcode=OP_LOADI, immed=0, dest=dest}::L)
-    end
-  | expr2Ins f L EXP_UNDEFINED = (*fix*)
-    (~1, L)
-  | expr2Ins f L (EXP_BINARY {opr=opr, lft=lft, rht=rht, ...}) =
-    binExpr2Ins f L opr lft rht
-  | expr2Ins f L (EXP_UNARY {opr=opr, opnd=opnd, ...}) =
-    unExpr2Ins f L opnd opr
-  | expr2Ins f L (EXP_DOT {lft=lft, prop=prop, ...}) =
-    let
-        val (rS, L) = expr2Ins f L lft;
-        val dest = Cfg.nextReg (HashTable.lookup funcs f);
-    in
-        (dest, INS_RSR {opcode=OP_LOADAI, r1=rS, field=prop, dest=dest}::L)
-    end
-  | expr2Ins f L (EXP_NEW {id=id, ...}) =
-    let
-        val dest = Cfg.nextReg (HashTable.lookup funcs f);
         val fields = HashTable.lookup types id;
+        val dest = Cfg.nextReg cfg;
     in
-        (dest, INS_NEW {opcode=OP_NEW, id=id, fields=fields, dest=dest}::L)
+        (dest, [INS_NEW {opcode=OP_NEW, id=id, fields=fields, dest=dest}])
     end
-  | expr2Ins f L (EXP_INVOCATION {id=id, args=args, ...}) =
+  | expr2Ins cfg (EXP_INVOCATION {id=id, args=args, ...}) =
     let
-        val (dests, Ls) = ListPair.unzip (map (fn a => expr2Ins f [] a) args);
-        val dest = Cfg.nextReg (HashTable.lookup funcs f);
+        val (dests, Ls) = ListPair.unzip (map (fn a => expr2Ins cfg a) args);
+        val dest = Cfg.nextReg cfg;
     in
         (dest,
          [INS_R {opcode=OP_LOADRET, r1=dest}, INS_L {opcode=OP_CALL, l1=id}]
          @ dests2Stores dests
-         @ List.concat (List.rev Ls)
-         @ L)
+         @ List.concat (List.rev Ls))
     end
 
 (*split this into two
-the one called handles the store
+the one called at the top handles the store
 the one it calls handles the loads
 
 the last thing (top of the tree) is always a store
 the first does the store
-
 *)
-fun lvalue2Ins f reg L (LV_ID {id=id, ...}) =
-    (case HashTable.find (Cfg.getRegs (HashTable.lookup funcs f)) id of
-        SOME dest => INS_RR {opcode=OP_MOV, r1=reg, dest=dest}
-      | NONE => INS_SR {opcode=OP_STOREGLOBAL, r1=reg, id=id})::L
-  | lvalue2Ins f reg L (LV_DOT {lft=lft, prop=prop, ...}) = (*fix*)
+fun lvalue2Ins cfg reg (LV_ID {id=id, ...}) =
+    (case HashTable.find (Cfg.getRegs cfg) id of
+         SOME dest => [INS_RR {opcode=OP_MOV, r1=reg, dest=dest}]
+       | NONE => [INS_SR {opcode=OP_STOREGLOBAL, r1=reg, id=id}])
+  | lvalue2Ins _ reg (LV_DOT {lft=lft, prop=prop, ...}) = (*fix*)
     let
 
     in
-        L
+        []
     end
 
 
@@ -176,18 +159,18 @@ fun genBrnIns reg yes no =
 fun genJump node = [INS_L {opcode=OP_JUMPI, l1=Cfg.getLabel node}];
 
 
-fun returnStmt2BB f node EXP_UNDEFINED =
+fun returnStmt2BB cfg node EXP_NULL =
     let
-        val (exitNode, newNode) = Cfg.mkReturn (HashTable.lookup funcs f);
+        val (exitNode, newNode) = Cfg.mkReturn cfg;
     in
         Cfg.fill node (genJump exitNode);
         Cfg.link node exitNode;
         newNode
     end
-  | returnStmt2BB f node exp =
+  | returnStmt2BB cfg node exp =
     let
-        val (exitNode, newNode) = Cfg.mkReturn (HashTable.lookup funcs f);
-        val (dest, L) = expr2Ins f [] exp;
+        val (exitNode, newNode) = Cfg.mkReturn cfg;
+        val (dest, L) = expr2Ins cfg exp;
     in
         Cfg.fill node (List.rev L @ [INS_R {opcode=OP_STORERET, r1=dest}] @
                        genJump exitNode);
@@ -196,19 +179,19 @@ fun returnStmt2BB f node EXP_UNDEFINED =
     end
 
 
-and stmt2BB f node (ST_BLOCK stmts) =
-    foldl (fn (s, node) => stmt2BB f node s) node stmts
-  | stmt2BB f node (ST_ASSIGN {target=target, source=source, ...}) =
+and stmt2BB cfg node (ST_BLOCK stmts) =
+    foldl (fn (s, node) => stmt2BB cfg node s) node stmts
+  | stmt2BB cfg node (ST_ASSIGN {target=target, source=source, ...}) =
     let
-        val (rX, L) = expr2Ins f [] source;
-        val L = lvalue2Ins f rX L target;
+        val (rX, L) = expr2Ins cfg source;
+        val L = (lvalue2Ins cfg rX target) @ L;
     in
         Cfg.fill node (List.rev L);
         node
     end
-  | stmt2BB f node (ST_PRINT {body=body, endl=endl, ...}) =
+  | stmt2BB cfg node (ST_PRINT {body=body, endl=endl, ...}) =
     let
-        val (dest, L) = expr2Ins f [] body;
+        val (dest, L) = expr2Ins cfg body;
         val opcode = if endl then OP_PRINTLN else OP_PRINT;
     in
         Cfg.fill node (List.rev L);
@@ -217,13 +200,13 @@ and stmt2BB f node (ST_BLOCK stmts) =
     end
   | stmt2BB _ node (ST_READ {id=id, ...}) = (*fix*)
     node
-  | stmt2BB f node (ST_IF {guard=guard, thenBlk=thenBlk,
-                         elseBlk=elseBlk, ...}) =
+  | stmt2BB cfg node (ST_IF {guard=guard, thenBlk=thenBlk,
+                             elseBlk=elseBlk, ...}) =
     let
         val (thenNode, elseNode, exitNode) = Cfg.mkIf node;
-        val thenResNode = stmt2BB f thenNode thenBlk;
-        val elseResNode = stmt2BB f elseNode elseBlk;
-        val (dest, L) = expr2Ins f [] guard;
+        val thenResNode = stmt2BB cfg thenNode thenBlk;
+        val elseResNode = stmt2BB cfg elseNode elseBlk;
+        val (dest, L) = expr2Ins cfg guard;
     in
         Cfg.link elseResNode exitNode;
         Cfg.link thenResNode exitNode;
@@ -232,11 +215,11 @@ and stmt2BB f node (ST_BLOCK stmts) =
         Cfg.fill elseResNode (genJump exitNode);
         exitNode
     end
-  | stmt2BB f node (ST_WHILE {guard=guard, body=body, ...}) =
+  | stmt2BB cfg node (ST_WHILE {guard=guard, body=body, ...}) =
     let
         val (guardNode, bodyNode, exitNode) = Cfg.mkWhile node;
-        val bodyResNode = stmt2BB f bodyNode body;
-        val (dest, L) = expr2Ins f [] guard;
+        val bodyResNode = stmt2BB cfg bodyNode body;
+        val (dest, L) = expr2Ins cfg guard;
     in
         Cfg.link bodyResNode guardNode;
         Cfg.fill guardNode (List.rev L @ genBrnIns dest bodyNode exitNode);
@@ -244,18 +227,18 @@ and stmt2BB f node (ST_BLOCK stmts) =
         Cfg.fill bodyNode (genJump guardNode);
         exitNode
     end
-  | stmt2BB f node (ST_DELETE {exp=exp, ...}) =
+  | stmt2BB cfg node (ST_DELETE {exp=exp, ...}) =
     let
-        val (dest, L) = expr2Ins f [] exp;
+        val (dest, L) = expr2Ins cfg exp;
     in
         Cfg.fill node (List.rev L @ [INS_R {opcode=OP_DEL, r1=dest}]);
         node
     end
-  | stmt2BB f node (ST_RETURN {exp=exp, ...}) =
-    returnStmt2BB f node exp
-  | stmt2BB f node (ST_INVOCATION {id=id, args=args, ...}) =
+  | stmt2BB cfg node (ST_RETURN {exp=exp, ...}) =
+    returnStmt2BB cfg node exp
+  | stmt2BB cfg node (ST_INVOCATION {id=id, args=args, ...}) =
     let
-        val (dests, Ls) = ListPair.unzip (map (fn a => expr2Ins f [] a) args);
+        val (dests, Ls) = ListPair.unzip (map (fn a => expr2Ins cfg a) args);
     in
         Cfg.fill node (List.concat (map List.rev Ls)
                        @ List.rev (dests2Stores dests)
@@ -266,23 +249,20 @@ and stmt2BB f node (ST_BLOCK stmts) =
 
 fun mkFuncEntry n regs [] = []
   | mkFuncEntry n regs (VAR_DECL {id=id, ...}::xs) =
-    let
-        val reg = HashTable.lookup regs id
-    in
-        INS_SIR {opcode=OP_LOADINARGUMENT, id=id, immed=n, r1=reg}::
-        mkFuncEntry (n + 1) regs xs
-    end
+    INS_SIR {opcode=OP_LOADINARGUMENT, id=id,
+             immed=n, r1=HashTable.lookup regs id}
+    ::mkFuncEntry (n + 1) regs xs
 
 
 fun func2Cfg (f as FUNCTION {id=id, body=body, params=params, ...}) =
     let
         val (entry, exit, cfg) = Cfg.mkCfg f;
-        val _ = HashTable.insert funcs (id, cfg);
         val _ = Cfg.fill entry (mkFuncEntry 0 (Cfg.getRegs cfg) params);
         val _ = Cfg.fill exit [INS_X {opcode=OP_RET}];
-        val res = foldl (fn (s, node) => stmt2BB id node s) entry body;
+        val res = foldl (fn (s, node) => stmt2BB cfg node s) entry body;
     in
-        Cfg.link res exit
+        Cfg.link res exit;
+        HashTable.insert funcs (id, cfg)
     end
 
 

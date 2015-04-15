@@ -52,7 +52,7 @@ fun printExpression (EXP_NUM {value=n, line=_}) = Int.toString n
   | printExpression (EXP_ID {id=id, line=_}) = id
   | printExpression (EXP_TRUE {...}) = "true"
   | printExpression (EXP_FALSE {...}) = "false"
-  | printExpression EXP_UNDEFINED = "null"
+  | printExpression EXP_NULL = "null"
   | printExpression (EXP_BINARY {opr=opr, lft=lft, rht=rht, line=_}) =
     (printExpression lft) ^ (printBinaryOpr opr) ^ (printExpression rht)
   | printExpression (EXP_UNARY {opr=opr, opnd=opnd, line=_}) =
