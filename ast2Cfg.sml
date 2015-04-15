@@ -44,6 +44,16 @@ fun bop2Op BOP_PLUS = OP_ADD
    | bop2Op BOP_GE = OP_MOVGE
 
 
+local
+    fun dests2Stores1 n [] = []
+      | dests2Stores1 n (dest::dests) =
+        (dests2Stores1 (n + 1) dests) @
+        [INS_RI {opcode=OP_STOREOUTARGUMENT, immed=n, dest=dest}]
+in
+    fun dests2Stores L = dests2Stores1 0 L
+end
+
+
 fun binExpr2Ins f L opr lft rht =
     let
         val (rX, L1) = expr2Ins f L lft;
@@ -87,16 +97,6 @@ and unExpr2Ins f L opnd UOP_NOT =
     end
 
 
-and args2Ins f n [] = []
-  | args2Ins f n (arg::args) =
-    let
-        val (dest, L) = expr2Ins f [] arg;
-    in
-        args2Ins f (n + 1) args @
-        INS_RI {opcode=OP_STOREOUTARGUMENT, immed=n, dest=dest}::L
-    end
-
-
 and expr2Ins f L (EXP_NUM {value=value, ...}) =
     let
         val dest = Cfg.nextReg (HashTable.lookup funcs f);
@@ -136,29 +136,36 @@ and expr2Ins f L (EXP_NUM {value=value, ...}) =
     in
         (dest, INS_NEW {opcode=OP_NEW, id=id, fields=fields, dest=dest}::L)
     end
-  | expr2Ins f L (EXP_INVOCATION {id=id, args=args, ...}) = (*fix*)
-    (*so, this is closer to being right, but it's still going to
-     * have the problem with the nested calls*)
+  | expr2Ins f L (EXP_INVOCATION {id=id, args=args, ...}) =
     let
-        val args = args2Ins f 0 args;
+        val (dests, Ls) = ListPair.unzip (map (fn a => expr2Ins f [] a) args);
         val dest = Cfg.nextReg (HashTable.lookup funcs f);
     in
-        (dest, INS_R {opcode=OP_LOADRET, r1=dest}::
-               INS_L {opcode=OP_CALL, l1=id}::
-               args)
+        (dest,
+         [INS_R {opcode=OP_LOADRET, r1=dest}, INS_L {opcode=OP_CALL, l1=id}]
+         @ dests2Stores dests
+         @ List.concat (List.rev Ls)
+         @ L)
     end
 
+(*split this into two
+the one called handles the store
+the one it calls handles the loads
 
+the last thing (top of the tree) is always a store
+the first does the store
+
+*)
 fun lvalue2Ins f reg L (LV_ID {id=id, ...}) =
-    let
-        val regs = Cfg.getRegs (HashTable.lookup funcs f);
-    in
-        case HashTable.find regs id of
-            SOME dest => (dest, INS_RR {opcode=OP_MOV, r1=reg, dest=dest}::L)
-          | NONE => (~1, INS_SR {opcode=OP_STOREGLOBAL, r1=reg, id=id}::L)
-    end
+    (case HashTable.find (Cfg.getRegs (HashTable.lookup funcs f)) id of
+        SOME dest => INS_RR {opcode=OP_MOV, r1=reg, dest=dest}
+      | NONE => INS_SR {opcode=OP_STOREGLOBAL, r1=reg, id=id})::L
   | lvalue2Ins f reg L (LV_DOT {lft=lft, prop=prop, ...}) = (*fix*)
-    (~1, L)
+    let
+
+    in
+        L
+    end
 
 
 fun genBrnIns reg yes no =
@@ -194,7 +201,7 @@ and stmt2BB f node (ST_BLOCK stmts) =
   | stmt2BB f node (ST_ASSIGN {target=target, source=source, ...}) =
     let
         val (rX, L) = expr2Ins f [] source;
-        val (_, L) = lvalue2Ins f rX L target; (*should lvalue even be returning a dest???*)
+        val L = lvalue2Ins f rX L target;
     in
         Cfg.fill node (List.rev L);
         node
@@ -246,11 +253,13 @@ and stmt2BB f node (ST_BLOCK stmts) =
     end
   | stmt2BB f node (ST_RETURN {exp=exp, ...}) =
     returnStmt2BB f node exp
-  | stmt2BB f node (ST_INVOCATION {id=id, args=args, ...}) = (*fix*)
+  | stmt2BB f node (ST_INVOCATION {id=id, args=args, ...}) =
     let
-        val args = args2Ins f 0 args;
+        val (dests, Ls) = ListPair.unzip (map (fn a => expr2Ins f [] a) args);
     in
-        Cfg.fill node (List.rev (INS_L {opcode=OP_CALL, l1=id}::args));
+        Cfg.fill node (List.concat (map List.rev Ls)
+                       @ List.rev (dests2Stores dests)
+                       @ [INS_L {opcode=OP_CALL, l1=id}]);
         node
     end
 
