@@ -59,7 +59,7 @@ fun main() int
       {
          print 3 endl;
       }
-      while (true)
+      while (false)
       {
          print 7;
       }

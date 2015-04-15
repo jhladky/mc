@@ -1,10 +1,11 @@
 open TextIO;
 
-structure PrintAST :
+structure PrintAst :
           sig
-              val printAST : program -> unit
+              val printAst : program -> unit
           end
 = struct
+
 
 fun printBinaryOpr BOP_PLUS = " + "
   | printBinaryOpr BOP_MINUS = " - "
@@ -18,34 +19,34 @@ fun printBinaryOpr BOP_PLUS = " + "
   | printBinaryOpr BOP_GE = " >= "
   | printBinaryOpr BOP_AND = " && "
   | printBinaryOpr BOP_OR = " || "
-;
+
 
 fun printUnaryOpr UOP_NOT = "!"
   | printUnaryOpr UOP_MINUS = "-"
-;
+
 
 fun printMiniType MT_VOID = "void"
   | printMiniType MT_INT = "int"
   | printMiniType MT_BOOL = "bool"
   | printMiniType MT_FUNC = ""
   | printMiniType (MT_STRUCT s) = "struct " ^ s
-;
 
-fun printVarDecl (VAR_DECL {id=s, typ=t, line=_}) =
-    (printMiniType t) ^ " " ^ s;
-;
+
+fun printVarDecl (VAR_DECL {id=s, typ=t, line=_}) = (printMiniType t) ^ " " ^ s
+
 
 fun printNestedDecls ds = foldr (fn (d, s) => (printVarDecl d) ^ ";\n" ^ s)
-                                "" ds;
+                                "" ds
+
 
 fun printTypeDecl (TYPE_DECL {id=id, decls=decls, line=_}) =
     "struct " ^ id ^ "\n{\n" ^ (printNestedDecls decls) ^ "};"
-;
+
 
 fun printLvalue (LV_ID {id=s, ...}) = s
   | printLvalue  (LV_DOT {lft=lft, prop=prop, ...}) =
     (printLvalue lft) ^ "." ^ prop
-;
+
 
 fun printExpression (EXP_NUM {value=n, line=_}) = Int.toString n
   | printExpression (EXP_ID {id=id, line=_}) = id
@@ -62,6 +63,7 @@ fun printExpression (EXP_NUM {value=n, line=_}) = Int.toString n
     "new " ^ s
   | printExpression (EXP_INVOCATION {id=id, args=args, line=_}) =
     id ^ "(" ^ (printArgs args) ^ ")"
+
 
 and printStatement (ST_BLOCK body) =
     "{\n" ^ (foldr (fn (t, s) => (printStatement t) ^ ";\n") "" body) ^ "}"
@@ -84,34 +86,31 @@ and printStatement (ST_BLOCK body) =
   | printStatement (ST_INVOCATION {id=id, args=args, line=_}) =
     id ^ "(" ^ (printArgs args) ^ ")"
 
+
 and printArgs [] = ""
   | printArgs (exp::[]) = printExpression exp
   | printArgs (exp::exps) =
     (printExpression exp) ^ ", " ^ (printArgs exps)
-;
+
 
 fun printParams [] = ""
   | printParams (decl::[]) = printVarDecl decl
   | printParams (decl::decls) =
     (printVarDecl decl) ^ ", " ^ (printParams decls)
-;
 
-fun printBody b = foldr (fn (t, s) => (printStatement t) ^ "\n" ^ s) "" b;
+
+fun printBody b = foldr (fn (t, s) => (printStatement t) ^ "\n" ^ s) "" b
+
 
 fun printFunc (FUNCTION {id=id, params=params, returnType=rt, decls=decls,
                          body=body, line=_}) =
-    let
-        val _ = print (id ^ "BODY LEN " ^ (Int.toString (length body)) ^ "\n");
-    in
-        ("fun " ^ id ^ " (" ^ (printParams params) ^ ") " ^ (printMiniType rt) ^
-         "\n{\n" ^ (printNestedDecls decls) ^ (printBody body) ^ "}\n")
-    end
-;
+    "fun " ^ id ^ " (" ^ (printParams params) ^ ") " ^ (printMiniType rt) ^
+    "\n{\n" ^ (printNestedDecls decls) ^ (printBody body) ^ "}\n"
 
-fun printAST (PROGRAM {types=types, decls=decls, funcs=funcs}) =
+
+fun printAst (PROGRAM {types=types, decls=decls, funcs=funcs}) =
     print ((foldr (fn (t, s) => (printTypeDecl t) ^ "\n" ^ s) "" types) ^ "\n" ^
            (foldr (fn (v, s) => (printVarDecl v) ^ "\n" ^ s) "" decls) ^ "\n" ^
            (foldr (fn (f, s) => (printFunc f) ^ "\n" ^ s) "" funcs) ^ "\n")
-;
 
-end;
+end

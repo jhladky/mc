@@ -4,22 +4,22 @@ structure StaticCheck :
           end
 = struct
 
-exception UndefException of int * string;
-exception BinOpException of int * binaryOperator * miniType;
-exception UnOpException of int * unaryOperator * miniType;
-exception TypeMatchException of int * miniType * miniType;
-exception NotAFunctionException of int * miniType;
-exception NotAStructException of int * miniType;
-exception PrintException of int * miniType;
-exception BooleanGuardException of int * miniType;
-exception NoReturnException of int;
-exception BadReturnException of int;
-exception InvocationException of int; (*I'll add arguments to this later.*)
+exception UndefException of int * string
+exception BinOpException of int * binaryOperator * miniType
+exception UnOpException of int * unaryOperator * miniType
+exception TypeMatchException of int * miniType * miniType
+exception NotAFunctionException of int * miniType
+exception NotAStructException of int * miniType
+exception PrintException of int * miniType
+exception BooleanGuardException of int * miniType
+exception NoReturnException of int
+exception BadReturnException of int
+exception InvocationException of int (*I'll add arguments to this later.*)
 exception NoMainException of int
 
 (*This is duplicated in other files.... maybe create a "utils" file???*)
 fun makeHt () = HashTable.mkTable (HashString.hashString, op =)
-                                  (10, Fail "Not Found");
+                                  (10, Fail "Not Found")
 
 (* Variables and functions are in the same namespace,
  * but structure names are in a DIFFERENT namespace.*)
@@ -247,7 +247,8 @@ fun addTypeDecl (TYPE_DECL {id=id, decls=ds, line=_}) =
 fun checkForMain () =
     case HashTable.find funcs "main" of
         SOME (FUNCTION {params=params, returnType=rt, ...}) =>
-        if length params = 0 andalso rt = MT_INT then ()
+        if length params = 0 andalso rt = MT_INT
+        then ()
         else raise NoMainException 1
       | NONE => raise NoMainException 1
 

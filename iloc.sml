@@ -60,6 +60,7 @@ datatype instruction =
    | INS_NEW of {opcode: opcode, dest: int, id: string, fields: string list}
    | INS_RR  of {opcode: opcode, dest: int, r1: int}
    | INS_IR  of {opcode: opcode, dest: int, immed: int}
+   | INS_RI  of {opcode: opcode, dest: int, immed: int}
    | INS_SR  of {opcode: opcode, id: string, r1: int}
    | INS_SI  of {opcode: opcode, id: string, immed: int}
    | INS_L   of {opcode: opcode, l1: string}
@@ -123,17 +124,19 @@ fun r2Str r = "r" ^ (Int.toString r)
 fun toString (INS_RRR {opcode=opcode, r1=r1, r2=r2, dest=d}) =
     (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2) ^ ", " ^ (r2Str d)
   | toString (INS_RIR {opcode=opcode, r1=r1, immed=immed, dest=d}) =
-    (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str immed) ^ ", " ^ (r2Str d)
+    (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (Int.toString immed) ^ ", " ^ (r2Str d)
   | toString (INS_RRC {opcode=opcode, r1=r1, r2=r2}) =
-    (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2) ^ ", ccr"
+    (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2)
   | toString (INS_RIC {opcode=opcode, r1=r1, immed=immed}) =
-    (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (Int.toString immed) ^ ", ccr"
+    (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (Int.toString immed)
   | toString (INS_CLL {opcode=opcode, l1=l1, l2=l2}) =
-    (opToStr opcode) ^ " ccr, " ^ l1 ^ ", " ^ l2
+    (opToStr opcode) ^ " " ^ l1 ^ ", " ^ l2
   | toString (INS_L {opcode=opcode, l1=l1}) =
     (opToStr opcode) ^ " " ^ l1
   | toString (INS_IR {opcode=opcode, immed=immed, dest=dest}) =
-    (opToStr opcode) ^ " " ^ (Int.toString immed) ^ ", " ^ (r2Str dest)
+    (opToStr opcode) ^ " " ^  (Int.toString immed) ^ ", " ^ (r2Str dest)
+  | toString (INS_RI {opcode=opcode, immed=immed, dest=dest}) =
+    (opToStr opcode) ^ " " ^ (r2Str dest) ^ ", " ^ (Int.toString immed)
   | toString (INS_SR {opcode=opcode, id=id, r1=r1}) =
     (opToStr opcode) ^ " " ^ id ^ ", " ^ (r2Str r1)
   | toString (INS_SIR {opcode=opcode, id=id, immed=i, r1=r1}) =

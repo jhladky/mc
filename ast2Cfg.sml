@@ -93,7 +93,7 @@ and args2Ins f n [] = []
         val (dest, L) = expr2Ins f [] arg;
     in
         args2Ins f (n + 1) args @
-        INS_IR {opcode=OP_STOREOUTARGUMENT, immed=n, dest=dest}::L
+        INS_RI {opcode=OP_STOREOUTARGUMENT, immed=n, dest=dest}::L
     end
 
 
@@ -162,7 +162,7 @@ fun lvalue2Ins f reg L (LV_ID {id=id, ...}) =
 
 
 fun genBrnIns reg yes no =
-    [INS_RIC {opcode=OP_COMP, r1=reg, immed=1},
+    [INS_RIC {opcode=OP_COMPI, r1=reg, immed=1},
      INS_CLL {opcode=OP_CBREQ, l1=Cfg.getLabel yes, l2=Cfg.getLabel no}]
 
 
@@ -183,7 +183,7 @@ fun returnStmt2BB f node EXP_UNDEFINED =
         val (dest, L) = expr2Ins f [] exp;
     in
         Cfg.fill node (List.rev L @ [INS_R {opcode=OP_STORERET, r1=dest}] @
-                     genJump exitNode);
+                       genJump exitNode);
         Cfg.link node exitNode;
         newNode
     end
