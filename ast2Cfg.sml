@@ -135,25 +135,16 @@ and expr2Ins cfg (EXP_NUM {value=value, ...}) = genLoad value (Cfg.nextReg cfg)
          @ List.concat (List.rev Ls))
     end
 
-(*split this into two
-the one called at the top handles the store
-the one it calls handles the loads
 
-the last thing (top of the tree) is always a store
-the first does the store
- *)
-(*left gives the register (base address)*)
-(*prop determines the offset*)
-(*return the address in a register*)
-(*do loadai in here and return the result of it*)
 fun loadLvalue cfg (LV_ID {id=id, ...}) =
     (case HashTable.find (Cfg.getRegs cfg) id of
          SOME dest => (dest, [])
-       | NONE => let
-           val dest = Cfg.nextReg cfg;
-       in
-           (dest, [INS_SR {opcode=OP_LOADGLOBAL, r1=dest, id=id}])
-       end)
+       | NONE =>
+         let
+             val dest = Cfg.nextReg cfg;
+         in
+             (dest, [INS_SR {opcode=OP_LOADGLOBAL, r1=dest, id=id}])
+         end)
   | loadLvalue cfg (LV_DOT {lft=lft, prop=prop, ...}) =
     let
         val (r1, L) = loadLvalue cfg lft;
@@ -200,13 +191,13 @@ fun returnStmt2BB cfg node EXP_NULL =
     end
 
 
-and stmt2BB cfg node (ST_BLOCK stmts) =
+fun stmt2BB cfg node (ST_BLOCK stmts) =
     foldl (fn (s, node) => stmt2BB cfg node s) node stmts
   | stmt2BB cfg node (ST_ASSIGN {target=target, source=source, ...}) =
     let
         val (rX, L) = expr2Ins cfg source;
     in
-        Cfg.fill node ((List.rev L) @ (lvalue2Ins cfg rX target));
+        Cfg.fill node (List.rev L @ lvalue2Ins cfg rX target);
         node
     end
   | stmt2BB cfg node (ST_PRINT {body=body, endl=endl, ...}) =
@@ -214,11 +205,11 @@ and stmt2BB cfg node (ST_BLOCK stmts) =
         val (dest, L) = expr2Ins cfg body;
         val opcode = if endl then OP_PRINTLN else OP_PRINT;
     in
-        Cfg.fill node (List.rev L);
-        Cfg.fill node [INS_R {opcode=opcode, r1=dest}];
+        Cfg.fill node (List.rev (INS_R {opcode=opcode, r1=dest}::L));
         node
     end
   | stmt2BB _ node (ST_READ {id=id, ...}) = (*fix*)
+    (*lookup the identifier*)
     node
   | stmt2BB cfg node (ST_IF {guard=guard, thenBlk=thenBlk,
                              elseBlk=elseBlk, ...}) =

@@ -214,8 +214,7 @@ and checkStmts1 retDetect rt ht [] = retDetect
     else checkStmts1 retDetect rt ht stmts
 
 
-and checkStmts rt ht L =
-    checkStmts1 false rt ht L
+and checkStmts rt ht L = checkStmts1 false rt ht L
 
 
 fun checkFunc (FUNCTION {id=id, params=params, returnType=rt,

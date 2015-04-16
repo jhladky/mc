@@ -35,3 +35,4 @@
 mc
 # Test JSON files
 tests/*.json
+tests/*.il
