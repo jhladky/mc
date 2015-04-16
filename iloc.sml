@@ -55,6 +55,7 @@ datatype instruction =
    | INS_RRC of {opcode: opcode, r1: int, r2: int}
    | INS_RIC of {opcode: opcode, r1: int, immed: int}
    | INS_RSR of {opcode: opcode, dest: int, r1: int, field: string}
+   | INS_RRS of {opcode: opcode, r1: int, r2: int, field: string}
    | INS_CLL of {opcode: opcode, l1: string, l2: string}
    | INS_SIR of {opcode: opcode, id: string, immed: int, r1: int}
    | INS_NEW of {opcode: opcode, dest: int, id: string, fields: string list}
@@ -160,5 +161,7 @@ fun toString (INS_RRR {opcode=opcode, r1=r1, r2=r2, dest=d}) =
     (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str dest)
   | toString (INS_RSR {opcode=opcode, r1=r1, field=field, dest=dest}) =
     (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ field ^ ", " ^ (r2Str dest)
+  | toString (INS_RRS {opcode: opcode, r1: int, r2: int, field: string}) =
+    (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2) ^ ", " ^ field
 
 end

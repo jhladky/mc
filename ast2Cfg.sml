@@ -7,7 +7,7 @@ end
 structure Ast2Cfg :> AST2CFG = struct
 
 fun mkHt () = HashTable.mkTable (HashString.hashString, op =)
-                                (10, Fail "Not Found");
+                                (10, Fail "Not Found")
 
 
 val funcs : (string, Cfg.cfg) HashTable.hash_table = mkHt ();
@@ -50,6 +50,9 @@ end
 
 
 fun genLoad n dest = (dest, [INS_IR {opcode=OP_LOADI, immed=n, dest=dest}])
+
+
+fun genJump node = [INS_L {opcode=OP_JUMPI, l1=Cfg.getLabel node}]
 
 
 fun binExpr2Ins cfg opr lft rht =
@@ -138,25 +141,43 @@ the one it calls handles the loads
 
 the last thing (top of the tree) is always a store
 the first does the store
-*)
+ *)
+(*left gives the register (base address)*)
+(*prop determines the offset*)
+(*return the address in a register*)
+(*do loadai in here and return the result of it*)
+fun loadLvalue cfg (LV_ID {id=id, ...}) =
+    (case HashTable.find (Cfg.getRegs cfg) id of
+         SOME dest => (dest, [])
+       | NONE => let
+           val dest = Cfg.nextReg cfg;
+       in
+           (dest, [INS_SR {opcode=OP_LOADGLOBAL, r1=dest, id=id}])
+       end)
+  | loadLvalue cfg (LV_DOT {lft=lft, prop=prop, ...}) =
+    let
+        val (r1, L) = loadLvalue cfg lft;
+        val dest = Cfg.nextReg cfg;
+    in
+        (dest, L @ [INS_RSR {opcode=OP_LOADAI, r1=r1, field=prop, dest=dest}])
+    end
+
+
 fun lvalue2Ins cfg reg (LV_ID {id=id, ...}) =
     (case HashTable.find (Cfg.getRegs cfg) id of
          SOME dest => [INS_RR {opcode=OP_MOV, r1=reg, dest=dest}]
        | NONE => [INS_SR {opcode=OP_STOREGLOBAL, r1=reg, id=id}])
-  | lvalue2Ins _ reg (LV_DOT {lft=lft, prop=prop, ...}) = (*fix*)
+  | lvalue2Ins cfg reg  (LV_DOT {lft=lft, prop=prop, ...}) =
     let
-
+        val (r2, L) = loadLvalue cfg lft;
     in
-        []
+        L @ [INS_RRS {opcode=OP_STOREAI, r1=reg, r2=r2, field=prop}]
     end
 
 
 fun genBrnIns reg yes no =
     [INS_RIC {opcode=OP_COMPI, r1=reg, immed=1},
      INS_CLL {opcode=OP_CBREQ, l1=Cfg.getLabel yes, l2=Cfg.getLabel no}]
-
-
-fun genJump node = [INS_L {opcode=OP_JUMPI, l1=Cfg.getLabel node}];
 
 
 fun returnStmt2BB cfg node EXP_NULL =
@@ -184,9 +205,8 @@ and stmt2BB cfg node (ST_BLOCK stmts) =
   | stmt2BB cfg node (ST_ASSIGN {target=target, source=source, ...}) =
     let
         val (rX, L) = expr2Ins cfg source;
-        val L = (lvalue2Ins cfg rX target) @ L;
     in
-        Cfg.fill node (List.rev L);
+        Cfg.fill node ((List.rev L) @ (lvalue2Ins cfg rX target));
         node
     end
   | stmt2BB cfg node (ST_PRINT {body=body, endl=endl, ...}) =
