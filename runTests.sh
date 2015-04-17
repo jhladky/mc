@@ -2,6 +2,9 @@
 
 NAME=""
 
+rm tests/*.json
+rm tests/*.il
+
 get_file_name () {
     local IFS='/'
     arr=($1)
@@ -24,6 +27,6 @@ if [ $? -ne 0 ]; then
     exit 1
 else
     for f in tests/*.json; do
-        ./mc $f
+        ./mc -dumpIL $f
     done
 fi

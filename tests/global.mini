@@ -1,0 +1,7 @@
+int foo;
+
+fun main () int {
+   foo = 2;
+   print 2 endl;
+   return 0;
+}

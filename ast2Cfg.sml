@@ -87,7 +87,7 @@ and unExpr2Ins cfg opnd UOP_NOT =
         val (r1, L) = expr2Ins cfg opnd;
         val dest = Cfg.nextReg cfg;
     in
-        (dest, INS_RIR {opcode=OP_XORI, immed=0xFFFF, r1=r1, dest=dest}::L)
+        (dest, INS_RIR {opcode=OP_XORI, immed=1, r1=r1, dest=dest}::L)
     end
   | unExpr2Ins cfg opnd UOP_MINUS =
     let
@@ -157,7 +157,7 @@ fun loadLvalue cfg (LV_ID {id=id, ...}) =
 fun lvalue2Ins cfg reg (LV_ID {id=id, ...}) =
     (case HashTable.find (Cfg.getRegs cfg) id of
          SOME dest => [INS_RR {opcode=OP_MOV, r1=reg, dest=dest}]
-       | NONE => [INS_SR {opcode=OP_STOREGLOBAL, r1=reg, id=id}])
+       | NONE => [INS_RS {opcode=OP_STOREGLOBAL, r1=reg, id=id}])
   | lvalue2Ins cfg reg  (LV_DOT {lft=lft, prop=prop, ...}) =
     let
         val (r2, L) = loadLvalue cfg lft;
@@ -209,6 +209,11 @@ fun stmt2BB cfg node (ST_BLOCK stmts) =
         node
     end
   | stmt2BB _ node (ST_READ {id=id, ...}) = (*fix*)
+    (* (case HashTable.find (Cfg.getRegs cfg) id of *)
+    (*    | NONE =>  *)
+
+    (*      SOME dest => [INS_RR {opcode=OP_MOV, r1=reg, dest=dest}] *)
+    (*    | NONE => [INS_RS {opcode=OP_STOREGLOBAL, r1=reg, id=id}]) *)
     (*lookup the identifier*)
     node
   | stmt2BB cfg node (ST_IF {guard=guard, thenBlk=thenBlk,
@@ -235,7 +240,7 @@ fun stmt2BB cfg node (ST_BLOCK stmts) =
         Cfg.link bodyResNode guardNode;
         Cfg.fill guardNode (List.rev L @ genBrnIns dest bodyNode exitNode);
         Cfg.fill node (genJump guardNode);
-        Cfg.fill bodyNode (genJump guardNode);
+        Cfg.fill bodyResNode (genJump guardNode);
         exitNode
     end
   | stmt2BB cfg node (ST_DELETE {exp=exp, ...}) =
@@ -251,7 +256,7 @@ fun stmt2BB cfg node (ST_BLOCK stmts) =
     let
         val (dests, Ls) = ListPair.unzip (map (fn a => expr2Ins cfg a) args);
     in
-        Cfg.fill node (List.concat (map List.rev Ls)
+        Cfg.fill node ((List.concat (map List.rev Ls))
                        @ List.rev (dests2Stores dests)
                        @ [INS_L {opcode=OP_CALL, l1=id}]);
         node
@@ -273,6 +278,7 @@ fun func2Cfg (f as FUNCTION {id=id, body=body, params=params, ...}) =
         val res = foldl (fn (s, node) => stmt2BB cfg node s) entry body;
     in
         Cfg.link res exit;
+        Cfg.fill res (genJump exit);
         HashTable.insert funcs (id, cfg)
     end
 

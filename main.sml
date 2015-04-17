@@ -18,23 +18,29 @@ fun parseArgs () =
     end
 
 
-fun main () =
+fun dumpIL file ast =
     let
-        val {printAst=printAst, dumpIL=dumpIL, file=file} = parseArgs ();
-        val ins = TextIO.openIn file;
         val ots = TextIO.openOut ((hd (String.tokens (fn c => c = #".")
                                                      file)) ^ ".il");
+    in
+        printCfg ots (Ast2Cfg.ast2Cfg ast);
+        TextIO.closeOut ots
+    end
+
+
+fun main () =
+    let
+        val {printAst=p, dumpIL=d, file=f} = parseArgs ();
+        val ins = TextIO.openIn f;
         val ast = json2AST ins;
         val _ = TextIO.closeIn ins;
-        val exit = fn () => OS.Process.exit OS.Process.success;
     in
-        if printAst
-        then (PrintAst.printAst ast; exit ())
-        else if dumpIL
-        then (StaticCheck.staticCheck file ast;
-              printCfg ots (Ast2Cfg.ast2Cfg ast);
-              exit ())
-        else (StaticCheck.staticCheck file ast; exit ())
+        if p then PrintAst.printAst ast
+        else (
+            StaticCheck.staticCheck f ast;
+            if d then dumpIL f ast else ()
+        );
+        OS.Process.exit OS.Process.success
     end
 
 val _ = main ();
