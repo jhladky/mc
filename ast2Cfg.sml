@@ -26,17 +26,17 @@ fun idExpr2Ins cfg id =
 
 
 fun bop2Op BOP_PLUS = OP_ADD
-   | bop2Op BOP_MINUS = OP_SUB
-   | bop2Op BOP_TIMES = OP_MULT
-   | bop2Op BOP_DIVIDE = OP_DIV
-   | bop2Op BOP_AND = OP_AND
-   | bop2Op BOP_OR = OP_OR
-   | bop2Op BOP_EQ = OP_MOVEQ
-   | bop2Op BOP_NE = OP_MOVNE
-   | bop2Op BOP_LT = OP_MOVLT
-   | bop2Op BOP_GT = OP_MOVGT
-   | bop2Op BOP_LE = OP_MOVLE
-   | bop2Op BOP_GE = OP_MOVGE
+  | bop2Op BOP_MINUS = OP_SUB
+  | bop2Op BOP_TIMES = OP_MULT
+  | bop2Op BOP_DIVIDE = OP_DIV
+  | bop2Op BOP_AND = OP_AND
+  | bop2Op BOP_OR = OP_OR
+  | bop2Op BOP_EQ = OP_MOVEQ
+  | bop2Op BOP_NE = OP_MOVNE
+  | bop2Op BOP_LT = OP_MOVLT
+  | bop2Op BOP_GT = OP_MOVGT
+  | bop2Op BOP_LE = OP_MOVLE
+  | bop2Op BOP_GE = OP_MOVGE
 
 
 local
@@ -132,7 +132,7 @@ and expr2Ins cfg (EXP_NUM {value=value, ...}) = genLoad value (Cfg.nextReg cfg)
         (dest,
          [INS_R {opcode=OP_LOADRET, r1=dest}, INS_L {opcode=OP_CALL, l1=id}]
          @ dests2Stores dests
-         @ List.concat (List.rev Ls))
+         @ (List.concat o List.rev) Ls)
     end
 
 
@@ -158,7 +158,7 @@ fun lvalue2Ins cfg reg (LV_ID {id=id, ...}) =
     (case HashTable.find (Cfg.getRegs cfg) id of
          SOME dest => [INS_RR {opcode=OP_MOV, r1=reg, dest=dest}]
        | NONE => [INS_RS {opcode=OP_STOREGLOBAL, r1=reg, id=id}])
-  | lvalue2Ins cfg reg  (LV_DOT {lft=lft, prop=prop, ...}) =
+  | lvalue2Ins cfg reg (LV_DOT {lft=lft, prop=prop, ...}) =
     let
         val (r2, L) = loadLvalue cfg lft;
     in
@@ -208,14 +208,17 @@ fun stmt2BB cfg node (ST_BLOCK stmts) =
         Cfg.fill node (List.rev (INS_R {opcode=opcode, r1=dest}::L));
         node
     end
-  | stmt2BB _ node (ST_READ {id=id, ...}) = (*fix*)
-    (* (case HashTable.find (Cfg.getRegs cfg) id of *)
-    (*    | NONE =>  *)
-
-    (*      SOME dest => [INS_RR {opcode=OP_MOV, r1=reg, dest=dest}] *)
-    (*    | NONE => [INS_RS {opcode=OP_STOREGLOBAL, r1=reg, id=id}]) *)
-    (*lookup the identifier*)
-    node
+  | stmt2BB cfg node (ST_READ {id=id, ...}) = (*fix*)
+    let
+        val dest = Cfg.nextReg cfg;
+        val L = [INS_SR {opcode=OP_COMPUTEGLOBALADDRESS, id="__rd__", r1=dest},
+                 INS_R {opcode=OP_READ, r1=dest},
+                 INS_SR {opcode=OP_LOADGLOBAL, id="__rd__", r1=dest}]
+                @ lvalue2Ins cfg dest id;
+    in
+        Cfg.fill node L;
+        node
+    end
   | stmt2BB cfg node (ST_IF {guard=guard, thenBlk=thenBlk,
                              elseBlk=elseBlk, ...}) =
     let
@@ -256,7 +259,7 @@ fun stmt2BB cfg node (ST_BLOCK stmts) =
     let
         val (dests, Ls) = ListPair.unzip (map (fn a => expr2Ins cfg a) args);
     in
-        Cfg.fill node ((List.concat (map List.rev Ls))
+        Cfg.fill node (List.concat (map List.rev Ls)
                        @ List.rev (dests2Stores dests)
                        @ [INS_L {opcode=OP_CALL, l1=id}]);
         node

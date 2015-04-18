@@ -22,7 +22,7 @@ for f in ../tests/*.mini; do
 done
 cd ..
 
-mlton mc.mlb
+make
 if [ $? -ne 0 ]; then
     exit 1
 else
