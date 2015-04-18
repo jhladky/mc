@@ -1,4 +1,4 @@
-FILES=ast.sml ast2Cfg.sml cfg.sml iloc.sml json2Ast.sml main.sml printAst.sml printCfg.sml staticCheck.sml
+FILES=ast.sml ast2Cfg.sml cfg.sml iloc.sml json2Ast.sml main.sml printAst.sml printCfg.sml staticCheck.sml targetAmd64.sml cfg2Amd64.sml
 
 all: mc
 

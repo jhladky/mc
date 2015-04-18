@@ -13,4 +13,7 @@ cfg.sml
 ast2Cfg.sml
 printCfg.sml
 
+targetAmd64.sml
+cfg2Amd64.sml
+
 main.sml
