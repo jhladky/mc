@@ -1,3 +1,4 @@
+open Ast;
 open Iloc;
 
 signature AST2CFG = sig
@@ -171,7 +172,7 @@ fun genBrnIns reg yes no =
      INS_CLL {opcode=OP_CBREQ, l1=Cfg.getLabel yes, l2=Cfg.getLabel no}]
 
 
-fun returnStmt2BB cfg node EXP_NULL =
+fun returnStmt2BB cfg node NONE =
     let
         val (exitNode, newNode) = Cfg.mkReturn cfg;
     in
@@ -179,7 +180,7 @@ fun returnStmt2BB cfg node EXP_NULL =
         Cfg.link node exitNode;
         newNode
     end
-  | returnStmt2BB cfg node exp =
+  | returnStmt2BB cfg node (SOME exp) =
     let
         val (exitNode, newNode) = Cfg.mkReturn cfg;
         val (dest, L) = expr2Ins cfg exp;

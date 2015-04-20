@@ -2,8 +2,8 @@
 
 NAME=""
 
-rm tests/*.json
-rm tests/*.il
+rm -f tests/*.json
+rm -f tests/*.il
 
 get_file_name () {
     local IFS='/'
@@ -20,6 +20,13 @@ for f in ../tests/*.mini; do
     get_file_name $f
     java Mini $f > "../tests/$NAME.json"
 done
+
+for dir in ../benchmarks/*; do
+    for f in $dir/*.mini; do
+        get_file_name $f
+        java Mini $f > "../benchmarks/$dir/$NAME.json"
+    done
+done
 cd ..
 
 make
@@ -28,5 +35,11 @@ if [ $? -ne 0 ]; then
 else
     for f in tests/*.json; do
         ./mc -dumpIL $f
+    done
+
+    for dir in benchmarks/*; do
+        for f in $dir/*.json; do
+            ./mc -dumpIL $f
+        done
     done
 fi

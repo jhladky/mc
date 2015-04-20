@@ -1,3 +1,5 @@
+open Ast;
+
 structure StaticCheck :
           sig
               val staticCheck : string -> program -> unit
@@ -146,8 +148,8 @@ and checkBinExpr ht opr lft rht l =
 and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
   | checkExpr ht (EXP_ID {id=s, line=l}) =
     (case HashTable.find ht s of
-        SOME t => t
-      | NONE => raise UndefException (l, s))
+         SOME t => t
+       | NONE => raise UndefException (l, s))
   | checkExpr ht (EXP_TRUE {...}) = MT_BOOL
   | checkExpr ht (EXP_FALSE {...}) = MT_BOOL
   | checkExpr ht EXP_NULL = MT_VOID (*Not sure about this...*)
@@ -181,17 +183,15 @@ and checkExpr ht (EXP_NUM {value=n, ...}) = MT_INT
 fun checkStmt rt ht (ST_BLOCK stmts) =
     checkStmts rt ht stmts
   | checkStmt rt ht (ST_ASSIGN {target=target, source=source, line=l}) =
-    (checkType l (checkLvalue ht target, checkExpr ht source);
-     false)
+    (checkType l (checkLvalue ht target, checkExpr ht source); false)
   | checkStmt rt ht (ST_PRINT {body=body, line=l, ...}) =
     (case checkExpr ht body of
          MT_INT => false
        | t => raise PrintException (l, t))
   | checkStmt rt ht (ST_READ lval) = false
-  | checkStmt rt ht (ST_IF {guard=guard, thenBlk=thenBlk,
-                            elseBlk=elseBlk, line=l}) =
+  | checkStmt rt ht (ST_IF {guard=guard, thenBlk=tB, elseBlk=eB, line=l}) =
     (case checkExpr ht guard of
-         MT_BOOL => (checkStmt rt ht thenBlk) andalso (checkStmt rt ht elseBlk)
+         MT_BOOL => (checkStmt rt ht tB) andalso (checkStmt rt ht eB)
        | t => raise BooleanGuardException (l, t))
   | checkStmt rt ht (ST_WHILE {guard=guard, body=body, line=l}) =
     (checkStmt rt ht body;
@@ -200,11 +200,12 @@ fun checkStmt rt ht (ST_BLOCK stmts) =
        | t => raise BooleanGuardException (l, t))
   | checkStmt rt ht (ST_DELETE {exp=exp, line=_}) = false
   | checkStmt rt ht (ST_RETURN {exp=exp, line=l}) =
-    (checkType l (rt, checkExpr ht exp);
+    (case exp of
+         SOME e => checkType l (rt, checkExpr ht e)
+       | NONE => checkType l (rt, checkExpr ht EXP_NULL);
      true)
   | checkStmt rt ht (ST_INVOCATION {id=id, args=args, line=l}) =
-    (checkInvocation l ht id args;
-     false)
+    (checkInvocation l ht id args; false)
 
 
 and checkStmts1 retDetect rt ht [] = retDetect

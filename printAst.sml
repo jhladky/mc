@@ -1,3 +1,4 @@
+open Ast;
 open TextIO;
 
 structure PrintAst :
@@ -82,7 +83,7 @@ and printStatement (ST_BLOCK body) =
   | printStatement (ST_DELETE {exp=exp, line=_}) =
     "delete " ^ (printExpression exp)
   | printStatement (ST_RETURN {exp=exp, line=_}) =
-    "return " ^ (printExpression exp)
+    "return" ^ (case exp of SOME e => printExpression e | NONE => "")
   | printStatement (ST_INVOCATION {id=id, args=args, line=_}) =
     id ^ "(" ^ (printArgs args) ^ ")"
 

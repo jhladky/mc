@@ -1,3 +1,5 @@
+structure Ast = struct
+
 datatype binaryOperator =
      BOP_PLUS
    | BOP_MINUS
@@ -11,12 +13,12 @@ datatype binaryOperator =
    | BOP_GE
    | BOP_AND
    | BOP_OR
-;
+
 
 datatype unaryOperator =
      UOP_NOT
    | UOP_MINUS
-;
+
 
 datatype miniType =
      MT_VOID
@@ -24,20 +26,20 @@ datatype miniType =
    | MT_BOOL
    | MT_FUNC
    | MT_STRUCT of string
-;
+
 
 datatype varDecl =
      VAR_DECL of {id: string, typ: miniType, line: int}
-;
+
 
 datatype typeDecl =
      TYPE_DECL of {id: string, decls: varDecl list, line: int}
-;
+
 
 datatype lvalue =
      LV_ID of {id: string, line: int}
    | LV_DOT of {lft: lvalue, prop:string, line:int}
-;
+
 
 datatype expression =
      EXP_NUM of {value: int, line: int}
@@ -51,7 +53,7 @@ datatype expression =
    | EXP_DOT of {lft: expression, prop: string, line: int}
    | EXP_NEW of {id: string, line: int}
    | EXP_INVOCATION of {id: string, args: expression list, line: int}
-;
+
 
 datatype statement =
      ST_BLOCK of statement list
@@ -61,15 +63,16 @@ datatype statement =
    | ST_IF of {guard: expression, thenBlk: statement, elseBlk: statement, line: int}
    | ST_WHILE of {guard: expression, body: statement, line: int}
    | ST_DELETE of {exp: expression, line: int}
-   | ST_RETURN of {exp: expression, line: int} (* expression can be undefined*)
+   | ST_RETURN of {exp: expression option, line: int}
    | ST_INVOCATION of {id: string, args: expression list, line: int}
-;
+
 
 datatype function =
      FUNCTION of {id: string, params: varDecl list, returnType: miniType,
                   decls: varDecl list, body: statement list, line: int}
-;
+
 
 datatype program =
      PROGRAM of {types: typeDecl list, decls: varDecl list, funcs: function list}
-;
+
+end

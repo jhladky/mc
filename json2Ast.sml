@@ -1,3 +1,5 @@
+open Ast;
+
 (* All of the sml-json callbacks have to return data of the same type.
  * So `carrier` acts as a sort-of 'superclass' for the various parts
  * of the AST.*)
@@ -185,8 +187,8 @@ fun statement2Ast ht =
           | "return" =>
             ST_RETURN {
                 exp=case HashTable.find ht "exp" of
-                        NONE => EXP_NULL
-                      | SOME (expression e) => e
+                        NONE => NONE
+                      | SOME (expression e) => SOME e
                       | SOME _ => raise Fail "Expected an `expression`.",
                 line=line ht
             }
