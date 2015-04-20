@@ -50,6 +50,7 @@ datatype register =
 
 datatype instruction =
      INS_DVE of {dve: directive, arg: string}
+   | INS_LABEL of string
    | INS_RR of {opcode: opcode, r1: register, r2: register}
    | INS_IR of {opcode: opcode, immed: int, r2: register}
    | INS_IRR of {opcode: opcode, immed: int, r1: register, r2: register}
@@ -107,6 +108,8 @@ fun regToStr REG_RAX = "%rax"
 
 fun toString (INS_DVE {dve=dve, arg=arg}) =
     (dveToStr dve) ^ arg
+  | toString (INS_LABEL l) =
+    l ^ ":"
   | toString (INS_RR {opcode=opcode, r1=r1, r2=r2}) =
     (opToStr opcode) ^ " " ^ (regToStr r1) ^ ", " ^ (regToStr r2)
   | toString (INS_IR {opcode=opcode, immed=immed, r2=r2}) =
