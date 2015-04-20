@@ -63,7 +63,6 @@ datatype instruction =
    | INS_RI  of {opcode: opcode, dest: int, immed: int}
    | INS_SR  of {opcode: opcode, id: string, r1: int}
    | INS_RS  of {opcode: opcode, id: string, r1: int}
-   | INS_SI  of {opcode: opcode, id: string, immed: int}
    | INS_L   of {opcode: opcode, l1: string}
    | INS_R   of {opcode: opcode, r1: int}
    | INS_X   of {opcode: opcode}
@@ -146,8 +145,6 @@ fun toString (INS_RRR {opcode=opcode, r1=r1, r2=r2, dest=d}) =
     (opToStr opcode) ^ " " ^ id ^ ", " ^ (Int.toString i) ^ ", " ^ (r2Str r1)
   | toString (INS_R {opcode=opcode, r1=r1}) =
     (opToStr opcode) ^ " " ^ (r2Str r1)
-  | toString (INS_SI {opcode=opcode, id=id, immed=immed}) =
-    (opToStr opcode) ^ " " ^ id ^ ", " ^ (Int.toString immed)
   | toString (INS_X {opcode=opcode}) =
     (opToStr opcode)
   | toString (INS_NEW {opcode=opcode, id=id, fields=fields, dest=d}) =
