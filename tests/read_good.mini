@@ -1,0 +1,6 @@
+fun main() int {
+   int n;
+   read n;
+   print n endl;
+   return 0;
+}

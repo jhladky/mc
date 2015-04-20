@@ -208,12 +208,12 @@ fun stmt2BB cfg node (ST_BLOCK stmts) =
         Cfg.fill node (List.rev (INS_R {opcode=opcode, r1=dest}::L));
         node
     end
-  | stmt2BB cfg node (ST_READ {id=id, ...}) = (*fix*)
+  | stmt2BB cfg node (ST_READ {id=id, ...}) =
     let
         val dest = Cfg.nextReg cfg;
-        val L = [INS_SR {opcode=OP_COMPUTEGLOBALADDRESS, id="__rd__", r1=dest},
+        val L = [INS_SR {opcode=OP_COMPUTEGLOBALADDRESS, id="rdest", r1=dest},
                  INS_R {opcode=OP_READ, r1=dest},
-                 INS_SR {opcode=OP_LOADGLOBAL, id="__rd__", r1=dest}]
+                 INS_SR {opcode=OP_LOADGLOBAL, id="rdest", r1=dest}]
                 @ lvalue2Ins cfg dest id;
     in
         Cfg.fill node L;
