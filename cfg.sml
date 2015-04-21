@@ -135,7 +135,8 @@ fun mkReturn (CFG {exit=exit, ...}) =
 local
     fun toList1 (nod as NODE {prev=prev, next=next, bb=bb, label=label}, L) =
         if not (isSome (List.find (fn item => item = (label, !bb)) L)) then
-            foldr toList1 (foldr toList1 (L @ [(label, !bb)]) (!prev)) (!next)
+            (* foldr toList1 (foldr toList1 (L @ [(label, !bb)]) (!prev)) (!next) *)
+            foldr toList1 (L @ [(label, !bb)]) (!next)
         else L
 in
     fun toList (CFG {entry=en as NODE {label=enL, bb=enBB, ...},

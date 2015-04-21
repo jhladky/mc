@@ -38,3 +38,5 @@ tests/*.json
 tests/*.il
 benchmarks/**/*.json
 benchmarks/**/*.il
+benchmarks/**/*.myout
+.tmp

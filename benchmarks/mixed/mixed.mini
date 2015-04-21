@@ -23,7 +23,7 @@ fun tailrecursive(int num) void
     tailrecursive(num-1);
 }
 
-fun add(int x, int y) int
+fun addd(int x, int y) int
 {
     return x + y;
 }
@@ -48,7 +48,7 @@ fun domath(int num) void
     {
         tmp = math1.bar * math2.bar;
         tmp = (tmp * math1.simp.one) / math2.bar;
-        tmp = add(math2.simp.one, math1.bar);
+        tmp = addd(math2.simp.one, math1.bar);
         tmp = math2.bar - math1.bar;
         num = num - 1;
     }

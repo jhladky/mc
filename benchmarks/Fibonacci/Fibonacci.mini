@@ -1,11 +1,12 @@
 fun computeFib(int input) int {
+   print input endl;
    if (input == 0) {
       return 0;
-   } 
-   else { 
+   }
+   else {
       if (input <= 2) {
          return 1;
-      } 
+      }
       else {
          return (computeFib(input - 1) + computeFib(input - 2));
       }
@@ -17,6 +18,6 @@ fun main() int {
 
    read input;
    print computeFib(input) endl;
-   
+
    return 0;
 }

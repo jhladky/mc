@@ -31,7 +31,7 @@ fun buildList() struct node {
    n3.next = n4;
    n4.next = n5;
    n5.next = null;
-   
+
    return n0;
 }
 
@@ -54,7 +54,7 @@ fun multiple(struct node list) int {
    return product;
 }
 
-fun add(struct node list) int {
+fun addd(struct node list) int {
    int i, sum;
    struct node cur;
    i = 0;
@@ -90,10 +90,10 @@ fun main() int {
 
    i = 0;
    bigProduct = 0;
-   
+
    list = buildList();
    product = multiple(list);
-   sum = add(list);
+   sum = addd(list);
    result = product - sum / 2;
 
    while (i < 10) {

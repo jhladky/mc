@@ -45,7 +45,7 @@ fun concatLists(struct node first, struct node second) struct node
    return first;
 }
 
-fun add(struct node list, int toAdd) struct node
+fun addd(struct node list, int toAdd) struct node
 {
    struct node newNode;
 
@@ -72,7 +72,7 @@ fun get(struct node list, int index) int
    {
       return list.data;
    }
-   
+
    return get(list.next, (index - 1));
 }
 
@@ -186,11 +186,11 @@ fun quickSort(struct node list) struct node
    {
       if (get(list, i) > pivot)
       {
-         greater = add(greater, get(list, i));
+         greater = addd(greater, get(list, i));
       }
       else
       {
-         less = add(less, get(list, i));
+         less = addd(less, get(list, i));
       }
 
       temp = temp.next;
@@ -206,14 +206,14 @@ fun quickSortMain(struct node list) struct node
    #unsorted
    printList(list);
    print -999 endl;
-   
+
    #sort plz
    #list = quickSort(list);
 
    #sorted
    printList(list);
    print -999 endl;
-   
+
    #sort plz
    #list = quickSort(list);
 
@@ -318,7 +318,7 @@ fun treeMain(struct node list) void
    struct node postList;
 
    root = buildTree(list);
-  
+
    treeprint(root);
    print -999 endl;
 
@@ -346,7 +346,7 @@ fun treeMain(struct node list) void
    print -999 endl;
    print treesearch(root, 1) endl;
    print -999 endl;
-  
+
    print bintreesearch(root, 0) endl;
    print -999 endl;
    print bintreesearch(root, 10) endl;
@@ -371,7 +371,7 @@ fun myCopy(struct node src) struct node
    {
       return null;
    }
-   return concatLists(add(null, src.data), myCopy(src.next));
+   return concatLists(addd(null, src.data), myCopy(src.next));
 }
 
 fun main() int
@@ -384,7 +384,7 @@ fun main() int
    while(i < 10)
    {
       read element;
-      myList = add(myList, element);
+      myList = addd(myList, element);
       copyList1 = myCopy(myList);
       copyList2 = myCopy(myList);
       sortedList = quickSortMain(copyList1);
