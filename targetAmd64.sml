@@ -29,11 +29,11 @@ datatype opcode =
 
 
 datatype directive =
-     DVE_GLOBAL
-   | DVE_TEXT
-   | DVE_SIZE
-   | DVE_STRING
-   | DVE_SECTION
+     DVE_GLOBAL of string
+   | DVE_TEXT of string
+   | DVE_SIZE of string
+   | DVE_STRING of string
+   | DVE_SECTION of string
 
 
 datatype register =
@@ -49,9 +49,7 @@ datatype register =
 
 
 datatype instruction =
-     INS_DVE of {dve: directive, arg: string}
-   | INS_LABEL of string
-   | INS_RR of {opcode: opcode, r1: register, r2: register}
+     INS_RR of {opcode: opcode, r1: register, r2: register}
    | INS_IR of {opcode: opcode, immed: int, r2: register}
    | INS_IRR of {opcode: opcode, immed: int, r1: register, r2: register}
    | INS_L of {opcode: opcode, label: string}
@@ -59,6 +57,18 @@ datatype instruction =
    | INS_RDBOS of {opcode: opcode}
    | INS_IDBOS of {opcode: opcode}
    | INS_X of {opcode: opcode}
+
+
+type basicBlock = string * instruction list
+
+
+datatype function =
+     FUNC of {
+         preamble: directive list,
+         epilogue: directive list,
+         body: basicBlock list,
+         id: string
+     }
 
 
 fun opToStr OP_ADDQ = "addq"
@@ -88,11 +98,11 @@ fun opToStr OP_ADDQ = "addq"
    | opToStr OP_SHRQ = "shrq"
 
 
-fun dveToStr DVE_GLOBAL = ".global"
-  | dveToStr DVE_TEXT = ".text"
-  | dveToStr DVE_SIZE = ".size"
-  | dveToStr DVE_STRING  = ".string"
-  | dveToStr DVE_SECTION = ".section"
+fun dveToStr (DVE_GLOBAL arg) = ".globl" ^ arg
+  | dveToStr (DVE_TEXT arg) = ".text" ^ arg
+  | dveToStr (DVE_SIZE arg) = ".size" ^ arg
+  | dveToStr (DVE_STRING arg)  = ".string" ^ arg
+  | dveToStr (DVE_SECTION arg) = ".section" ^ arg
 
 
 fun regToStr REG_RAX = "%rax"
@@ -106,26 +116,22 @@ fun regToStr REG_RAX = "%rax"
   | regToStr (REG_N n) = "%r" ^ (Int.toString n)
 
 
-fun toString (INS_DVE {dve=dve, arg=arg}) =
-    (dveToStr dve) ^ arg
-  | toString (INS_LABEL l) =
-    l ^ ":"
-  | toString (INS_RR {opcode=opcode, r1=r1, r2=r2}) =
+fun insToStr (INS_RR {opcode=opcode, r1=r1, r2=r2}) =
     (opToStr opcode) ^ " " ^ (regToStr r1) ^ ", " ^ (regToStr r2)
-  | toString (INS_IR {opcode=opcode, immed=immed, r2=r2}) =
+  | insToStr (INS_IR {opcode=opcode, immed=immed, r2=r2}) =
     (opToStr opcode) ^ " $" ^ (Int.toString immed) ^ ", " ^ (regToStr r2)
-  | toString (INS_IRR {opcode=opcode, immed=immed, r1=r1, r2=r2}) =
+  | insToStr (INS_IRR {opcode=opcode, immed=immed, r1=r1, r2=r2}) =
     (opToStr opcode) ^ " $" ^ (Int.toString immed) ^ ", " ^ (regToStr r1) ^
     ", " ^ (regToStr r2)
-  | toString (INS_L {opcode=opcode, label=label}) =
+  | insToStr (INS_L {opcode=opcode, label=label}) =
     (opToStr opcode) ^ " " ^ label
-  | toString (INS_DBOSR {opcode=opcode}) =
+  | insToStr (INS_DBOSR {opcode=opcode}) =
     (opToStr opcode) ^ " "
-  | toString (INS_RDBOS {opcode=opcode}) =
+  | insToStr (INS_RDBOS {opcode=opcode}) =
     (opToStr opcode) ^ " "
-  | toString (INS_IDBOS {opcode=opcode}) =
+  | insToStr (INS_IDBOS {opcode=opcode}) =
     (opToStr opcode) ^ " "
-  | toString (INS_X {opcode=opcode}) =
+  | insToStr (INS_X {opcode=opcode}) =
     opToStr opcode
 
 end

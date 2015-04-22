@@ -16,7 +16,7 @@ datatype carrier =
    | string of string
    | int of int
    | bool of bool
-;
+
 
 structure Json2Ast : JSON_CALLBACKS = struct
 
@@ -30,12 +30,10 @@ fun carrier2Ht L =
                                    (10, Fail "Not Found");
         fun carrier2Ht_ (s_c_pair p) = HashTable.insert ht p
           | carrier2Ht_ _ = raise Fail "Expected an `s_c_pair`."
-        ;
     in
-        (app carrier2Ht_ L;
-         ht)
+        (app carrier2Ht_ L; ht)
     end
-;
+
 
 fun str2BinaryOpr "+" = BOP_PLUS
   | str2BinaryOpr "-" = BOP_MINUS
@@ -50,47 +48,55 @@ fun str2BinaryOpr "+" = BOP_PLUS
   | str2BinaryOpr "&&" = BOP_AND
   | str2BinaryOpr "||" = BOP_OR
   | str2BinaryOpr s = raise Fail s
-;
+
 
 fun str2UnaryOpr "!" = UOP_NOT
   | str2UnaryOpr "-" = UOP_MINUS
   | str2UnaryOpr s = raise Fail s
-;
+
 
 fun carrier2MiniType (string "int") = MT_INT
   | carrier2MiniType (string "bool") = MT_BOOL
   | carrier2MiniType (string "void") = MT_VOID
   | carrier2MiniType (string s) = MT_STRUCT s
   | carrier2MiniType _ = raise Fail "Expected a `string`."
-;
+
 
 (*'uwr' stands for 'unwrap'*)
-fun uwrStr (string s) = s | uwrStr _ = raise Fail "Expected a `string`.";
+fun uwrStr (string s) = s | uwrStr _ = raise Fail "Expected a `string`."
+
 
 fun uwrExpr (expression e) = e
   | uwrExpr _ = raise Fail "Expected an `expression`."
-;
+
 
 fun uwrStmt (statement s) = s
   | uwrStmt _ = raise Fail "Expected a `statement`."
-;
+
 
 fun uwrLvalue (lvalue l) = l
   | uwrLvalue _ = raise Fail "Expected a `lvalue`."
-;
 
-fun uwrBool (bool b) = b | uwrBool _ = raise Fail "Expected a `bool`.";
+
+fun uwrBool (bool b) = b | uwrBool _ = raise Fail "Expected a `bool`."
+
 
 fun uwrCL f (carrier_list L) = map f L
   | uwrCL _ _ = raise Fail "Expected a `carrier_list`"
-;
 
-fun uwrVds c = uwrCL (fn (varDecl vd) => vd | _ => raise Fail "") c;
-fun uwrExprs c = uwrCL uwrExpr c;
-fun uwrStmts c = uwrCL uwrStmt c;
+
+fun uwrVds c = uwrCL (fn (varDecl vd) => vd | _ => raise Fail "") c
+
+
+fun uwrExprs c = uwrCL uwrExpr c
+
+
+fun uwrStmts c = uwrCL uwrStmt c
+
 
 fun line ht = (fn (int n) => n | _ => raise Fail "Expected an `int`.")
-                  (HashTable.lookup ht "line");
+                  (HashTable.lookup ht "line")
+
 
 fun expression2Ast ht =
     expression (
@@ -138,7 +144,7 @@ fun expression2Ast ht =
             }
           | s => raise Fail s
     )
-;
+
 
 (*Note there's some crap in here to make the compiler shut up about
  * non-exhaustive matches.*)
@@ -200,7 +206,7 @@ fun statement2Ast ht =
             }
           | s => raise Fail s
     )
-;
+
 
 fun varDecl2Ast ht =
     varDecl (
@@ -210,7 +216,7 @@ fun varDecl2Ast ht =
             line=line ht
         }
     )
-;
+
 
 fun typeDecl2Ast ht =
     typeDecl (
@@ -220,7 +226,7 @@ fun typeDecl2Ast ht =
             line=line ht
         }
     )
-;
+
 
 fun function2Ast ht =
     function (
@@ -233,7 +239,7 @@ fun function2Ast ht =
             line=line ht
         }
     )
-;
+
 
 fun lvalue2Ast ht =
     lvalue (
@@ -251,7 +257,7 @@ fun lvalue2Ast ht =
             }
           | s => raise Fail s
     )
-;
+
 
 fun program2Ast ht =
     program (
@@ -263,7 +269,7 @@ fun program2Ast ht =
                         (HashTable.lookup ht "functions")
         }
     )
-;
+
 
 fun json_object L =
     let
@@ -279,7 +285,7 @@ fun json_object L =
           | "program" => program2Ast ht
           | s => raise Fail s
     end
-;
+
 
 fun json_pair p = s_c_pair p;
 fun json_array L = carrier_list L;
@@ -293,8 +299,8 @@ fun json_null () = raise Fail "Unexpected `null`.";
 fun error_handle (msg, pos, data) =
     raise Fail ("Error: " ^ msg ^ " near " ^ Int.toString pos ^ " data: " ^
                 data)
-;
-end;
+
+end
 
 structure parser = JSONParser (Json2Ast);
 
@@ -302,4 +308,3 @@ fun json2AST ins =
     case parser.parse (TextIO.inputAll ins) of
         program p => p
       | _ => raise Fail ""
-;

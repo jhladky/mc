@@ -3,15 +3,22 @@ open Iloc;
 signature CFG = sig
     type node;
     type cfg;
+    datatype function = FUNCTION of {id: string, body: cfg};
+    datatype program =
+        PROGRAM of {
+            types: Ast.typeDecl list,
+            decls: Ast.varDecl list,
+            funcs: function list
+        };
 
-    val mkCfg : function -> node * node * cfg;
+    val mkCfg : Ast.function -> node * node * cfg;
     val mkIf : node -> node * node * node;
     val mkWhile : node -> node * node * node;
     val mkReturn : cfg -> node * node;
 
     val link : node -> node -> unit;
     val fill : node -> instruction list -> unit;
-    val toList : cfg -> basicBlock list;
+    val toList : function -> basicBlock list;
     val nextReg : cfg -> int;
 
     (*Get rid of these later*)
@@ -22,12 +29,29 @@ end
 structure Cfg :> CFG = struct
 
 datatype node =
-     NODE of {prev: node list ref, next: node list ref,
-              bb: instruction list ref, label: string}
+    NODE of {
+        label: string,
+        prev: node list ref,
+        next: node list ref,
+        bb: instruction list ref
+    }
 
 datatype cfg =
-     CFG of {regs: (string, int) HashTable.hash_table, nextReg: int ref,
-             entry: node, exit: node}
+    CFG of {
+        regs: (string, int) HashTable.hash_table,
+        nextReg: int ref,
+        entry: node, exit: node
+    }
+
+datatype function = FUNCTION of {id: string, body: cfg};
+
+datatype program =
+    PROGRAM of {
+        types: Ast.typeDecl list,
+        decls: Ast.varDecl list,
+        funcs: function list
+    }
+
 
 val nextLabel = ref 0;
 
@@ -49,7 +73,7 @@ fun assignRegs ht =
     end
 
 
-fun mkCfg (FUNCTION {params=params, decls=decls, id=id, ...}) =
+fun mkCfg (Ast.FUNCTION {params=params, decls=decls, id=id, ...}) =
     let
         val ht = HashTable.mkTable (HashString.hashString, op =)
                                    (10, Fail "Not Found CFG");
@@ -139,8 +163,8 @@ local
             foldr toList1 (L @ [(label, !bb)]) (!next)
         else L
 in
-    fun toList (CFG {entry=en as NODE {label=enL, bb=enBB, ...},
-                     exit=NODE {label=exL, bb=exBB, ...}, ...}) =
+    fun toList (FUNCTION {id=_, body=CFG {entry=en as NODE {label=enL, bb=enBB, ...},
+                                          exit=NODE {label=exL, bb=exBB, ...}, ...}}) =
         let
             val enP = (enL, !enBB)
             val exP = (exL, !exBB)

@@ -2,7 +2,7 @@ open Ast;
 open Iloc;
 
 signature AST2CFG = sig
-    val ast2Cfg : program -> (string, Cfg.cfg) HashTable.hash_table;
+    val ast2Cfg : Ast.program -> Cfg.program
 end
 
 structure Ast2Cfg :> AST2CFG = struct
@@ -283,7 +283,8 @@ fun func2Cfg (f as FUNCTION {id=id, body=body, params=params, ...}) =
     in
         Cfg.link res exit;
         Cfg.fill res (genJump exit);
-        HashTable.insert funcs (id, cfg)
+        HashTable.insert funcs (id, cfg);
+        Cfg.FUNCTION {id=id, body=cfg}
     end
 
 
@@ -291,7 +292,7 @@ fun addType (TYPE_DECL {id=id, decls=decls, ...}) =
     HashTable.insert types (id, map (fn (VAR_DECL {id=s, ...}) => s) decls)
 
 
-fun ast2Cfg (PROGRAM {funcs=fs, types=ts, ...}) =
-    (app addType ts; app func2Cfg fs; funcs)
+fun ast2Cfg (PROGRAM {funcs=fs, types=ts, decls=ds}) =
+    (app addType ts; Cfg.PROGRAM {types=ts, decls=ds, funcs=map func2Cfg fs})
 
 end
