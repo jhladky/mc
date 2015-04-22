@@ -121,33 +121,33 @@ fun opToStr OP_ADD = "add"
 fun r2Str r = "r" ^ (Int.toString r)
 
 
-fun toString (INS_RRR {opcode=opcode, r1=r1, r2=r2, dest=d}) =
+fun insToStr (INS_RRR {opcode=opcode, r1=r1, r2=r2, dest=d}) =
     (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2) ^ ", " ^ (r2Str d)
-  | toString (INS_RIR {opcode=opcode, r1=r1, immed=immed, dest=d}) =
+  | insToStr (INS_RIR {opcode=opcode, r1=r1, immed=immed, dest=d}) =
     (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (Int.toString immed) ^ ", " ^ (r2Str d)
-  | toString (INS_RRC {opcode=opcode, r1=r1, r2=r2}) =
+  | insToStr (INS_RRC {opcode=opcode, r1=r1, r2=r2}) =
     (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2)
-  | toString (INS_RIC {opcode=opcode, r1=r1, immed=immed}) =
+  | insToStr (INS_RIC {opcode=opcode, r1=r1, immed=immed}) =
     (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (Int.toString immed)
-  | toString (INS_CLL {opcode=opcode, l1=l1, l2=l2}) =
+  | insToStr (INS_CLL {opcode=opcode, l1=l1, l2=l2}) =
     (opToStr opcode) ^ " " ^ l1 ^ ", " ^ l2
-  | toString (INS_L {opcode=opcode, l1=l1}) =
+  | insToStr (INS_L {opcode=opcode, l1=l1}) =
     (opToStr opcode) ^ " " ^ l1
-  | toString (INS_IR {opcode=opcode, immed=immed, dest=dest}) =
+  | insToStr (INS_IR {opcode=opcode, immed=immed, dest=dest}) =
     (opToStr opcode) ^ " " ^  (Int.toString immed) ^ ", " ^ (r2Str dest)
-  | toString (INS_RI {opcode=opcode, immed=immed, dest=dest}) =
+  | insToStr (INS_RI {opcode=opcode, immed=immed, dest=dest}) =
     (opToStr opcode) ^ " " ^ (r2Str dest) ^ ", " ^ (Int.toString immed)
-  | toString (INS_SR {opcode=opcode, id=id, r1=r1}) =
+  | insToStr (INS_SR {opcode=opcode, id=id, r1=r1}) =
     (opToStr opcode) ^ " " ^ id ^ ", " ^ (r2Str r1)
-  | toString (INS_RS {opcode=opcode, id=id, r1=r1}) =
+  | insToStr (INS_RS {opcode=opcode, id=id, r1=r1}) =
     (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ id
-  | toString (INS_SIR {opcode=opcode, id=id, immed=i, r1=r1}) =
+  | insToStr (INS_SIR {opcode=opcode, id=id, immed=i, r1=r1}) =
     (opToStr opcode) ^ " " ^ id ^ ", " ^ (Int.toString i) ^ ", " ^ (r2Str r1)
-  | toString (INS_R {opcode=opcode, r1=r1}) =
+  | insToStr (INS_R {opcode=opcode, r1=r1}) =
     (opToStr opcode) ^ " " ^ (r2Str r1)
-  | toString (INS_X {opcode=opcode}) =
+  | insToStr (INS_X {opcode=opcode}) =
     (opToStr opcode)
-  | toString (INS_NEW {opcode=opcode, id=id, fields=fields, dest=d}) =
+  | insToStr (INS_NEW {opcode=opcode, id=id, fields=fields, dest=d}) =
     let
         fun fs2Str [] = ""
           | fs2Str (field::[]) = field
@@ -156,11 +156,15 @@ fun toString (INS_RRR {opcode=opcode, r1=r1, r2=r2, dest=d}) =
         (opToStr opcode) ^ " " ^ id ^ ", [" ^
         (fs2Str fields) ^ "], " ^ (r2Str d)
     end
-  | toString (INS_RR {opcode=opcode, r1=r1, dest=dest}) =
+  | insToStr (INS_RR {opcode=opcode, r1=r1, dest=dest}) =
     (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str dest)
-  | toString (INS_RSR {opcode=opcode, r1=r1, field=field, dest=dest}) =
+  | insToStr (INS_RSR {opcode=opcode, r1=r1, field=field, dest=dest}) =
     (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ field ^ ", " ^ (r2Str dest)
-  | toString (INS_RRS {opcode: opcode, r1: int, r2: int, field: string}) =
+  | insToStr (INS_RRS {opcode: opcode, r1: int, r2: int, field: string}) =
     (opToStr opcode) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2) ^ ", " ^ field
+
+
+fun bbToStr (l, L) =
+    l ^ ":\n" ^ (foldr (fn (ins, s) => "\t" ^ (insToStr ins) ^ "\n" ^ s) "" L)
 
 end

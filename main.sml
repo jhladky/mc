@@ -18,48 +18,29 @@ fun parseArgs () =
     end
 
 
-local
-    fun printDecl ots (Cfg.FUNCTION {id=id, ...}) =
-        output (ots, "@function " ^ id ^ "\n")
-
-    fun printNode ots (l, L) =
-        (output (ots, l ^ ":\n");
-         app (fn ins => output (ots, "\t" ^ (Iloc.toString ins) ^ "\n")) L)
-in
-    fun dumpIL file ast =
-        let
-            val ots = TextIO.openOut (file ^ ".il");
-            val Cfg.PROGRAM {funcs=funcs, ...} = Ast2Cfg.ast2Cfg ast;
-        in
-            app (printDecl ots) funcs;
-            output (ots, "\n");
-            app (printNode ots) (List.concat (map Cfg.toList funcs));
-            TextIO.closeOut ots
-        end
-end
+fun dumpIL file ast =
+    let
+        val ots = TextIO.openOut (file ^ ".il");
+        val printDecl = fn Cfg.FUNCTION {id=id, ...} =>
+                           output (ots, "@function " ^ id ^ "\n");
+        val Cfg.PROGRAM {funcs=funcs, ...} = Ast2Cfg.ast2Cfg ast;
+    in
+        app printDecl funcs;
+        output (ots, "\n");
+        app (fn bb => output (ots, Iloc.bbToStr bb))
+            (List.concat (map Cfg.toList funcs));
+        TextIO.closeOut ots
+    end
 
 
-local
-    fun printIns ots i = output (ots, "\t" ^ (TargetAmd64.insToStr i) ^ "\n")
-
-    fun printNode ots (l, L) = (output (ots, l ^ ":\n"); app (printIns ots) L)
-
-    fun printFunc ots (TargetAmd64.FUNC {id=id, preamble=pre,
-                                         epilogue=epi, body=body}) =
-        (output (ots, id ^ ":\n");
-         app (fn dve => output (ots, (TargetAmd64.dveToStr dve) ^ "\n")) pre;
-         app (printNode ots) body;
-         app (fn dve => output (ots, (TargetAmd64.dveToStr dve) ^ "\n")) epi)
-in
-    fun printAsm file ast =
-        let
-            (* val ots = TextIO.openOut (file ^ ".s") *)
-            val ots = TextIO.stdOut;
-        in
-            app (printFunc ots) (Cfg2Amd64.cfg2Amd64 (Ast2Cfg.ast2Cfg ast));
-            TextIO.closeOut ots
-        end
-end
+fun printAsm file ast =
+    let
+        (* val ots = TextIO.openOut (file ^ ".s") *) val ots = TextIO.stdOut;
+    in
+        output (ots, TargetAmd64.programToStr
+                         (Cfg2Amd64.cfg2Amd64 (Ast2Cfg.ast2Cfg ast)));
+        TextIO.closeOut ots
+    end
 
 
 fun main () =

@@ -28,14 +28,6 @@ datatype opcode =
    | OP_SHRQ
 
 
-datatype directive =
-     DVE_GLOBAL of string
-   | DVE_TEXT of string
-   | DVE_SIZE of string
-   | DVE_STRING of string
-   | DVE_SECTION of string
-
-
 datatype register =
      REG_RAX
    | REG_RBX
@@ -62,13 +54,10 @@ datatype instruction =
 type basicBlock = string * instruction list
 
 
-datatype function =
-     FUNC of {
-         preamble: directive list,
-         epilogue: directive list,
-         body: basicBlock list,
-         id: string
-     }
+type function = string * basicBlock list
+
+
+datatype program = PROGRAM of {text: function list, data: string list}
 
 
 fun opToStr OP_ADDQ = "addq"
@@ -96,13 +85,6 @@ fun opToStr OP_ADDQ = "addq"
    | opToStr OP_CMOVLEQ = "cmovleq"
    | opToStr OP_CMOVNEQ = "cmovneq"
    | opToStr OP_SHRQ = "shrq"
-
-
-fun dveToStr (DVE_GLOBAL arg) = ".globl" ^ arg
-  | dveToStr (DVE_TEXT arg) = ".text" ^ arg
-  | dveToStr (DVE_SIZE arg) = ".size" ^ arg
-  | dveToStr (DVE_STRING arg)  = ".string" ^ arg
-  | dveToStr (DVE_SECTION arg) = ".section" ^ arg
 
 
 fun regToStr REG_RAX = "%rax"
@@ -133,5 +115,24 @@ fun insToStr (INS_RR {opcode=opcode, r1=r1, r2=r2}) =
     (opToStr opcode) ^ " "
   | insToStr (INS_X {opcode=opcode}) =
     opToStr opcode
+
+
+fun bbToStr (l, L) =
+    l ^ ":\n" ^ (foldr (fn (ins, s) => "\t" ^ (insToStr ins) ^ "\n" ^ s) "" L)
+
+
+fun funcToStr (id, body) =
+    ".globl " ^ id ^ "\n.type " ^ id ^ ", @function\n" ^
+    (foldr (fn (bb, s) => (bbToStr bb) ^ s) "" body) ^
+    ".size " ^ id ^ ", .-" ^ id ^ "\n\n"
+
+
+(*text is the functions, data is the globals*)
+fun programToStr (PROGRAM {text=text, data=data}) =
+    ".section text\n" ^
+    (foldr (fn (func, s) => (funcToStr func) ^ s) "" text) ^
+    ".section data\n" ^
+    (foldr (fn (id, s) => ".globl " ^ id ^ "\n" ^ s) "" data)
+
 
 end
