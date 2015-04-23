@@ -3,7 +3,6 @@ structure TargetAmd64 = struct
 datatype opcode =
      OP_ADDQ
    | OP_SUBQ
-   | OP_MULQ
    | OP_IMULQ
    | OP_IDIVQ
    | OP_ANDQ
@@ -62,7 +61,6 @@ datatype program = PROGRAM of {text: function list, data: string list}
 
 fun opToStr OP_ADDQ = "addq"
    | opToStr OP_SUBQ = "subq"
-   | opToStr OP_MULQ = "mulq"
    | opToStr OP_IMULQ = "imulq"
    | opToStr OP_IDIVQ = "idivq"
    | opToStr OP_ANDQ = "andq"
@@ -122,17 +120,19 @@ fun bbToStr (l, L) =
 
 
 fun funcToStr (id, body) =
-    ".globl " ^ id ^ "\n.type " ^ id ^ ", @function\n" ^
+    "\t.globl " ^ id ^ "\n\t.type " ^ id ^ ", @function\n" ^
     (foldr (fn (bb, s) => (bbToStr bb) ^ s) "" body) ^
-    ".size " ^ id ^ ", .-" ^ id ^ "\n\n"
+    "\t.size " ^ id ^ ", .-" ^ id ^ "\n\n"
 
 
 (*text is the functions, data is the globals*)
 fun programToStr (PROGRAM {text=text, data=data}) =
-    ".section text\n" ^
+    "\t.section text\n" ^
     (foldr (fn (func, s) => (funcToStr func) ^ s) "" text) ^
-    ".section data\n" ^
-    (foldr (fn (id, s) => ".globl " ^ id ^ "\n" ^ s) "" data)
+    "\t.section data\n" ^
+    (foldr (fn (id, s) => "\t.comm " ^ id ^ ", 8, 8\n" ^ s) "" data) ^
+    "\t.section rodata\nL__pstr__:\n\t.asciz \"%s\"\n" ^
+    "L__pstre__:\n\t.asciz \"%s\\n\"\n"
 
 
 end

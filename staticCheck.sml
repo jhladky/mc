@@ -1,10 +1,9 @@
-open Ast;
-
 structure StaticCheck :
           sig
-              val staticCheck : string -> program -> unit
+              val staticCheck : string -> Ast.program -> unit
           end
 = struct
+open Ast;
 
 exception UndefException of int * string
 exception BinOpException of int * binaryOperator * miniType

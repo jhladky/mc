@@ -1,6 +1,12 @@
+signature MAIN = sig
+    val main : unit -> unit
+end
+
+structure Main :> MAIN = struct
+open TextIO;
+
 fun printUsage () =
-    (TextIO.output (TextIO.stdErr,
-                    "Usage: mc [-printAST|-dumpIL] <filename>\n");
+    (output (stdErr, "Usage: mc [-printAST|-dumpIL] <filename>\n");
      OS.Process.exit OS.Process.failure)
 
 
@@ -20,7 +26,7 @@ fun parseArgs () =
 
 fun dumpIL file ast =
     let
-        val ots = TextIO.openOut (file ^ ".il");
+        val ots = openOut (file ^ ".il");
         val printDecl = fn Cfg.FUNCTION {id=id, ...} =>
                            output (ots, "@function " ^ id ^ "\n");
         val Cfg.PROGRAM {funcs=funcs, ...} = Ast2Cfg.ast2Cfg ast;
@@ -29,17 +35,17 @@ fun dumpIL file ast =
         output (ots, "\n");
         app (fn bb => output (ots, Iloc.bbToStr bb))
             (List.concat (map Cfg.toList funcs));
-        TextIO.closeOut ots
+        closeOut ots
     end
 
 
 fun printAsm file ast =
     let
-        (* val ots = TextIO.openOut (file ^ ".s") *) val ots = TextIO.stdOut;
+        (* val ots = openOut (file ^ ".s") *) val ots = stdOut;
     in
         output (ots, TargetAmd64.programToStr
                          (Cfg2Amd64.cfg2Amd64 (Ast2Cfg.ast2Cfg ast)));
-        TextIO.closeOut ots
+        closeOut ots
     end
 
 
@@ -47,10 +53,10 @@ fun main () =
     let
         val {printAst=p, dumpIL=d, file=f} = parseArgs ();
         val fname = (hd (String.tokens (fn c => c = #".") f));
-        val ins = TextIO.openIn f;
+        val ins = openIn f;
         val ast = json2AST ins;
     in
-        TextIO.closeIn ins;
+        closeIn ins;
         if p
         then PrintAst.printAst ast
         else (
@@ -62,4 +68,6 @@ fun main () =
         OS.Process.exit OS.Process.success
     end
 
-val _ = main ();
+end
+
+val _ = Main.main ();

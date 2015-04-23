@@ -1,24 +1,23 @@
-open Ast;
-
 (* All of the sml-json callbacks have to return data of the same type.
  * So `carrier` acts as a sort-of 'superclass' for the various parts
  * of the AST.*)
 datatype carrier =
      carrier_list of carrier list
    | s_c_pair of string * carrier
-   | varDecl of varDecl
-   | typeDecl of typeDecl
-   | lvalue of lvalue
-   | expression of expression
-   | statement of statement
-   | function of function
-   | program of program
+   | varDecl of Ast.varDecl
+   | typeDecl of Ast.typeDecl
+   | lvalue of Ast.lvalue
+   | expression of Ast.expression
+   | statement of Ast.statement
+   | function of Ast.function
+   | program of Ast.program
    | string of string
    | int of int
    | bool of bool
 
 
 structure Json2Ast : JSON_CALLBACKS = struct
+open Ast;
 
 type json_data = carrier
 

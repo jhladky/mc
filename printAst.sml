@@ -1,12 +1,10 @@
-open Ast;
-open TextIO;
-
 structure PrintAst :
           sig
-              val printAst : program -> unit
+              val printAst : Ast.program -> unit
           end
 = struct
-
+open Ast;
+open TextIO;
 
 fun printBinaryOpr BOP_PLUS = " + "
   | printBinaryOpr BOP_MINUS = " - "

@@ -1,11 +1,10 @@
-open Ast;
-open Iloc;
-
 signature AST2CFG = sig
     val ast2Cfg : Ast.program -> Cfg.program
 end
 
 structure Ast2Cfg :> AST2CFG = struct
+open Ast;
+open Iloc;
 
 fun mkHt () = HashTable.mkTable (HashString.hashString, op =)
                                 (10, Fail "Not Found")

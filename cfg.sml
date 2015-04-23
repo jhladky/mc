@@ -1,4 +1,4 @@
-open Iloc;
+
 
 signature CFG = sig
     type node;
@@ -17,8 +17,8 @@ signature CFG = sig
     val mkReturn : cfg -> node * node;
 
     val link : node -> node -> unit;
-    val fill : node -> instruction list -> unit;
-    val toList : function -> basicBlock list;
+    val fill : node -> Iloc.instruction list -> unit;
+    val toList : function -> Iloc.basicBlock list;
     val nextReg : cfg -> int;
 
     (*Get rid of these later*)
@@ -27,6 +27,7 @@ signature CFG = sig
 end
 
 structure Cfg :> CFG = struct
+open Iloc;
 
 datatype node =
     NODE of {
@@ -77,7 +78,7 @@ fun mkCfg (Ast.FUNCTION {params=params, decls=decls, id=id, ...}) =
     let
         val ht = HashTable.mkTable (HashString.hashString, op =)
                                    (10, Fail "Not Found CFG");
-        val addVD = (fn (VAR_DECL {id=s, typ=t, ...}) =>
+        val addVD = (fn (Ast.VAR_DECL {id=s, typ=t, ...}) =>
                         HashTable.insert ht (s, t));
         val entry = NODE {prev=ref [], next=ref [], bb=ref [], label=id};
         val exit = mkNode ();
