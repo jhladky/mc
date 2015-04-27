@@ -4,7 +4,6 @@ SML-JSON/sml-json.sml
 
 ast.sml
 json2Ast.sml
-printAst.sml
 
 staticCheck.sml
 

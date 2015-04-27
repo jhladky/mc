@@ -24,6 +24,14 @@ fun parseArgs () =
     end
 
 
+fun printAst file ast =
+    let
+        val ots = stdOut;
+    in
+        output (ots, Ast.programToStr ast)
+    end
+
+
 fun dumpIL file ast =
     let
         val ots = openOut (file ^ ".il");
@@ -58,7 +66,7 @@ fun main () =
     in
         closeIn ins;
         if p
-        then PrintAst.printAst ast
+        then printAst fname ast
         else (
             StaticCheck.staticCheck f ast;
             if d

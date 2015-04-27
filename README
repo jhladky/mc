@@ -1,0 +1,10 @@
+
+ooo. .oo.  .oo.    .ooooo.
+`888P"Y88bP"Y88b  d88' `"Y8
+ 888   888   888  888
+ 888   888   888  888   .o8
+o888o o888o o888o `Y8bod8P'
+
+* A compiler for the "mini" toy language
+* Uses an ANTLR parser
+* Targets amd64
