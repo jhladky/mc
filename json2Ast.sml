@@ -16,13 +16,14 @@ datatype carrier =
    | bool of bool
 
 
+(*Note there's some crap in here to make the compiler shut up about
+ * non-exhaustive matches.*)
 structure Json2Ast : JSON_CALLBACKS = struct
 open Ast;
 
 type json_data = carrier
 
 (* HELPER FUNCTIONS *)
-
 fun carrier2Ht L =
     let
         val ht = HashTable.mkTable (HashString.hashString, op =)
@@ -93,181 +94,140 @@ fun uwrExprs c = uwrCL uwrExpr c
 fun uwrStmts c = uwrCL uwrStmt c
 
 
-fun line ht = (fn (int n) => n | _ => raise Fail "Expected an `int`.")
-                  (HashTable.lookup ht "line")
+fun line get = (fn (int n) => n | _ => raise Fail "Expected an `int`.")
+                   (get "line")
 
 
-fun expression2Ast ht =
-    expression (
-        case uwrStr (HashTable.lookup ht "exp") of
-            "num" =>
-            (case Int.fromString (uwrStr (HashTable.lookup ht "value")) of
-                 SOME n => EXP_NUM {value=n, line=line ht}
-               | NONE => raise Fail "Bad integer conversion.")
-          | "id" =>
-            EXP_ID {id=uwrStr (HashTable.lookup ht "id"), line=line ht}
-          | "true" =>
-            EXP_TRUE {line=line ht}
-          | "false" =>
-            EXP_FALSE {line=line ht}
-          | "null" => EXP_NULL
-          | "binary" =>
-            EXP_BINARY {
-                opr=str2BinaryOpr (uwrStr (HashTable.lookup ht "operator")),
-                lft=uwrExpr (HashTable.lookup ht "lft"),
-                rht=uwrExpr (HashTable.lookup ht "rht"),
-                line=line ht
-            }
-          | "unary" =>
-            EXP_UNARY {
-                opr=str2UnaryOpr (uwrStr (HashTable.lookup ht "operator")),
-                opnd=uwrExpr (HashTable.lookup ht "operand"),
-                line=line ht
-            }
-          | "dot" =>
-            EXP_DOT {
-                lft=uwrExpr (HashTable.lookup ht "left"),
-                prop=uwrStr (HashTable.lookup ht "id"),
-                line=line ht
-            }
-          | "new" =>
-            EXP_NEW {
-                id=uwrStr (HashTable.lookup ht "id"),
-                line=line ht
-            }
-          | "invocation" =>
-            EXP_INVOCATION {
-                id=uwrStr (HashTable.lookup ht "id"),
-                args=uwrExprs (HashTable.lookup ht "args"),
-                line=line ht
-            }
-          | s => raise Fail s
-    )
-
-
-(*Note there's some crap in here to make the compiler shut up about
- * non-exhaustive matches.*)
-fun statement2Ast ht =
-    statement (
-        case uwrStr (HashTable.lookup ht "stmt") of
-            "block" => ST_BLOCK (uwrStmts (HashTable.lookup ht "list"))
-          | "assign" =>
-            ST_ASSIGN {
-                target=uwrLvalue (HashTable.lookup ht "target"),
-                source=uwrExpr (HashTable.lookup ht "source"),
-                line=line ht
-            }
-          | "print" =>
-            ST_PRINT {
-                body=uwrExpr (HashTable.lookup ht "exp"),
-                endl=uwrBool (HashTable.lookup ht "endl"),
-                line=line ht
-            }
-          | "read" =>
-            ST_READ {
-                id=uwrLvalue (HashTable.lookup ht "target"),
-                line=line ht
-            }
-          | "if" =>
-            ST_IF {
-                guard=uwrExpr (HashTable.lookup ht "guard"),
-                thenBlk=uwrStmt (HashTable.lookup ht "then"),
-                elseBlk=(case HashTable.find ht "else" of
-                             NONE => ST_BLOCK []
-                           | SOME (statement s) => s
-                           | SOME _ => raise Fail "Expected a `statament`."),
-                line=line ht
-            }
-          | "while" =>
-            ST_WHILE {
-                guard=uwrExpr (HashTable.lookup ht "guard"),
-                body=uwrStmt (HashTable.lookup ht "body"),
-                line=line ht
-            }
-          | "delete" =>
-            ST_DELETE {
-                exp=uwrExpr (HashTable.lookup ht "guard"),
-                line=line ht
-            }
-          | "return" =>
-            ST_RETURN {
-                exp=case HashTable.find ht "exp" of
-                        NONE => NONE
-                      | SOME (expression e) => SOME e
-                      | SOME _ => raise Fail "Expected an `expression`.",
-                line=line ht
-            }
-          | "invocation" =>
-            ST_INVOCATION {
-                id=uwrStr (HashTable.lookup ht "id"),
-                args=uwrExprs (HashTable.lookup ht "args"),
-                line=line ht
-            }
-          | s => raise Fail s
-    )
-
-
-fun varDecl2Ast ht =
-    varDecl (
-        VAR_DECL {
-            typ=carrier2MiniType (HashTable.lookup ht "type"),
-            id=uwrStr (HashTable.lookup ht "id"),
-            line=line ht
+fun expression2Ast get =
+    case uwrStr (get "exp") of
+        "num" =>
+        (case Int.fromString (uwrStr (get "value")) of
+             SOME n => EXP_NUM {value=n, line=line get}
+           | NONE => raise Fail "Bad integer conversion.")
+      | "id" => EXP_ID {id=uwrStr (get "id"), line=line get}
+      | "true" => EXP_TRUE {line=line get}
+      | "false" => EXP_FALSE {line=line get}
+      | "null" => EXP_NULL
+      | "binary" =>
+        EXP_BINARY {
+            opr=str2BinaryOpr (uwrStr (get "operator")),
+            lft=uwrExpr (get "lft"),
+            rht=uwrExpr (get "rht"),
+            line=line get
         }
-    )
-
-
-fun typeDecl2Ast ht =
-    typeDecl (
-        TYPE_DECL {
-            id=uwrStr (HashTable.lookup ht "id"),
-            decls=uwrVds (HashTable.lookup ht "fields"),
-            line=line ht
+      | "unary" =>
+        EXP_UNARY {
+            opr=str2UnaryOpr (uwrStr (get "operator")),
+            opnd=uwrExpr (get "operand"),
+            line=line get
         }
-    )
-
-
-fun function2Ast ht =
-    function (
-        FUNCTION {
-            id=uwrStr (HashTable.lookup ht "id"),
-            returnType=carrier2MiniType (HashTable.lookup ht "return_type"),
-            params=uwrVds (HashTable.lookup ht "parameters"),
-            decls=uwrVds (HashTable.lookup ht "declarations"),
-            body=uwrStmts (HashTable.lookup ht "body"),
-            line=line ht
+      | "dot" =>
+        EXP_DOT {
+            lft=uwrExpr (get "left"),
+            prop=uwrStr (get "id"),
+            line=line get
         }
-    )
-
-
-fun lvalue2Ast ht =
-    lvalue (
-        case uwrStr (HashTable.lookup ht "lval") of
-            "id" =>
-            LV_ID {
-                id=uwrStr (HashTable.lookup ht "id"),
-                line=line ht
-            }
-          | "dot" =>
-            LV_DOT {
-                lft=uwrLvalue (HashTable.lookup ht "left"),
-                prop=uwrStr (HashTable.lookup ht "id"),
-                line=line ht
-            }
-          | s => raise Fail s
-    )
-
-
-fun program2Ast ht =
-    program (
-        PROGRAM {
-            types=uwrCL (fn (typeDecl td) => td | _ => raise Fail "")
-                        (HashTable.lookup ht "types"),
-            decls=uwrVds (HashTable.lookup ht "declarations"),
-            funcs=uwrCL (fn (function f) => f | _ => raise Fail "")
-                        (HashTable.lookup ht "functions")
+      | "new" => EXP_NEW {id=uwrStr (get "id"), line=line get}
+      | "invocation" =>
+        EXP_INVOCATION {
+            id=uwrStr (get "id"),
+            args=uwrExprs (get "args"),
+            line=line get
         }
-    )
+      | s => raise Fail s
+
+
+fun statement2Ast get =
+    case uwrStr (get "stmt") of
+        "block" => ST_BLOCK (uwrStmts (get "list"))
+      | "assign" =>
+        ST_ASSIGN {
+            target=uwrLvalue (get "target"),
+            source=uwrExpr (get "source"),
+            line=line get
+        }
+      | "print" =>
+        ST_PRINT {
+            body=uwrExpr (get "exp"),
+            endl=uwrBool (get "endl"),
+            line=line get
+        }
+      | "read" => ST_READ {id=uwrLvalue (get "target"), line=line get}
+      | "if" =>
+        ST_IF {
+            guard=uwrExpr (get "guard"),
+            thenBlk=uwrStmt (get "then"),
+            elseBlk=(uwrStmt (get "else") handle Fail _ => ST_BLOCK []),
+            line=line get
+        }
+      | "while" =>
+        ST_WHILE {
+            guard=uwrExpr (get "guard"),
+            body=uwrStmt (get "body"),
+            line=line get
+        }
+      | "delete" => ST_DELETE {exp=uwrExpr (get "guard"), line=line get}
+      | "return" =>
+        ST_RETURN {
+            exp=(SOME (uwrExpr (get "exp")) handle Fail _ => NONE),
+            line=line get
+        }
+      | "invocation" =>
+        ST_INVOCATION {
+            id=uwrStr (get "id"),
+            args=uwrExprs (get "args"),
+            line=line get
+        }
+      | s => raise Fail s
+
+
+fun varDecl2Ast get =
+    VAR_DECL {
+        typ=carrier2MiniType (get "type"),
+        id=uwrStr (get "id"),
+        line=line get
+    }
+
+
+fun typeDecl2Ast get =
+    TYPE_DECL {
+        id=uwrStr (get "id"),
+        decls=uwrVds (get "fields"),
+        line=line get
+    }
+
+
+fun function2Ast get =
+    FUNCTION {
+        id=uwrStr (get "id"),
+        returnType=carrier2MiniType (get "return_type"),
+        params=uwrVds (get "parameters"),
+        decls=uwrVds (get "declarations"),
+        body=uwrStmts (get "body"),
+        line=line get
+    }
+
+
+fun lvalue2Ast get =
+    case uwrStr (get "lval") of
+        "id" => LV_ID {id=uwrStr (get "id"), line=line get}
+      | "dot" =>
+        LV_DOT {
+            lft=uwrLvalue (get "left"),
+            prop=uwrStr (get "id"),
+            line=line get
+        }
+      | s => raise Fail s
+
+
+fun program2Ast get =
+    PROGRAM {
+        types=uwrCL (fn (typeDecl td) => td | _ => raise Fail "")
+                    (get "types"),
+        decls=uwrVds (get "declarations"),
+        funcs=uwrCL (fn (function f) => f | _ => raise Fail "")
+                    (get "functions")
+    }
 
 
 fun json_object L =
@@ -275,13 +235,13 @@ fun json_object L =
         val ht = carrier2Ht L;
     in
         case uwrStr (HashTable.lookup ht "ast_node") of
-            "expression" => expression2Ast ht
-          | "statement" => statement2Ast ht
-          | "varDecl" => varDecl2Ast ht
-          | "typeDecl" => typeDecl2Ast ht
-          | "function" => function2Ast ht
-          | "lvalue" => lvalue2Ast ht
-          | "program" => program2Ast ht
+            "expression" => expression (expression2Ast (HashTable.lookup ht))
+          | "statement" => statement (statement2Ast (HashTable.lookup ht))
+          | "varDecl" => varDecl (varDecl2Ast (HashTable.lookup ht))
+          | "typeDecl" => typeDecl (typeDecl2Ast (HashTable.lookup ht))
+          | "function" => function (function2Ast (HashTable.lookup ht))
+          | "lvalue" => lvalue (lvalue2Ast (HashTable.lookup ht))
+          | "program" => program (program2Ast (HashTable.lookup ht))
           | s => raise Fail s
     end
 
@@ -295,9 +255,9 @@ fun json_string s = string s;
 fun json_real _ = raise Fail "Unexpected `real`.";
 fun json_null () = raise Fail "Unexpected `null`.";
 
+
 fun error_handle (msg, pos, data) =
-    raise Fail ("Error: " ^ msg ^ " near " ^ Int.toString pos ^ " data: " ^
-                data)
+    raise Fail ("Error: " ^ msg ^ " near " ^ Int.toString pos)
 
 end
 
