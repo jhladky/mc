@@ -1,11 +1,11 @@
 signature SYMBOL_TABLE = sig
 datatype symbolTable =
     ST of {
-        types : (string, (string, Ast.typ) HashTable.hash_table)
+        types: (string, (string, Ast.typ) HashTable.hash_table)
                     HashTable.hash_table,
-        globals : (string, Ast.typ) HashTable.hash_table,
-        funcs : (string, Ast.function) HashTable.hash_table,
-        locals : (string, (string, Ast.typ) HashTable.hash_table)
+        globals: (string, Ast.typ) HashTable.hash_table,
+        funcs: (string, Ast.function) HashTable.hash_table,
+        locals: (string, (string, Ast.typ) HashTable.hash_table)
                      HashTable.hash_table
    }
 
@@ -14,10 +14,10 @@ datatype symbolTableLocal =
     STL of {
         types: (string, (string, Ast.typ) HashTable.hash_table)
                    HashTable.hash_table,
-        globals : (string, Ast.typ) HashTable.hash_table,
-        locals : (string, Ast.typ) HashTable.hash_table,
-        funcs : (string, Ast.function) HashTable.hash_table,
-        returnType : Ast.typ
+        globals: (string, Ast.typ) HashTable.hash_table,
+        locals: (string, Ast.typ) HashTable.hash_table,
+        funcs: (string, Ast.function) HashTable.hash_table,
+        returnType: Ast.typ
     }
 
 val mkSymbolTable : string -> Ast.program -> symbolTable
@@ -35,20 +35,20 @@ exception BadTypeException of int * typ
  * but structure names are in a DIFFERENT namespace.*)
 datatype symbolTable =
     ST of {
-        types : (string, (string, Ast.typ) hash_table) hash_table,
-        globals : (string, Ast.typ) hash_table,
-        funcs : (string, Ast.function) hash_table,
-        locals : (string, (string, Ast.typ) hash_table) hash_table
+        types: (string, (string, Ast.typ) hash_table) hash_table,
+        globals: (string, Ast.typ) hash_table,
+        funcs: (string, Ast.function) hash_table,
+        locals: (string, (string, Ast.typ) hash_table) hash_table
    }
 
 
 datatype symbolTableLocal =
     STL of {
         types: (string, (string, typ) hash_table) hash_table,
-        globals : (string, typ) hash_table,
-        locals : (string, typ) hash_table,
-        funcs : (string, function) hash_table,
-        returnType : typ
+        globals: (string, typ) hash_table,
+        locals: (string, typ) hash_table,
+        funcs: (string, function) hash_table,
+        returnType: typ
     }
 
 

@@ -182,6 +182,7 @@ and checkStmts1 retDetect stl [] = retDetect
 and checkStmts stl L = checkStmts1 false stl L
 
 
+(*move to SymbolTable struct later*)
 fun st2Stl id rt (ST {types=ts, globals=gs, funcs=fs, locals=ls}) =
     STL {types=ts, globals=gs, locals=lookup ls id, funcs=fs, returnType=rt}
 
@@ -211,8 +212,7 @@ fun staticCheck file st (prog as PROGRAM {funcs=funcs, ...}) =
     let
         val fail = Util.fail file
     in
-        checkForMain st;
-        List.app (checkFunc st) funcs
+        (checkForMain st; List.app (checkFunc st) funcs)
         handle BinOpException (ln, opr, t) =>
                fail ln ("Operator " ^ (binOpToStr opr) ^ " requires an " ^
                         (typeToStr t) ^ " type.\n")

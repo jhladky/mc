@@ -11,7 +11,7 @@ signature CFG = sig
             funcs: function list
         };
 
-    val mkCfg : Ast.function -> node * node * cfg;
+    val mkCfg : SymbolTable.symbolTable -> Ast.function -> node * node * cfg;
     val mkIf : node -> node * node * node;
     val mkWhile : node -> node * node * node;
     val mkReturn : cfg -> node * node;
@@ -21,10 +21,9 @@ signature CFG = sig
     val toList : function -> Iloc.basicBlock list;
     val nextReg : cfg -> int;
 
-    (*Get rid of these later*)
     val getRegs : cfg -> (string, int) HashTable.hash_table;
     val getLabel : node -> string;
-    val getName : cfg -> string;
+    val getSTInfo : cfg -> string * SymbolTable.symbolTable;
 end
 
 structure Cfg :> CFG = struct
@@ -40,9 +39,11 @@ datatype node =
 
 datatype cfg =
     CFG of {
+        st: SymbolTable.symbolTable,
         regs: (string, int) HashTable.hash_table,
         nextReg: int ref,
-        entry: node, exit: node
+        entry: node,
+        exit: node
     }
 
 datatype function = FUNCTION of {id: string, body: cfg};
@@ -75,7 +76,7 @@ fun assignRegs ht =
     end
 
 
-fun mkCfg (Ast.FUNCTION {params=params, decls=decls, id=id, ...}) =
+fun mkCfg st (Ast.FUNCTION {params=params, decls=decls, id=id, ...}) =
     let
         val ht = HashTable.mkTable (HashString.hashString, op =)
                                    (10, Fail "Not Found CFG");
@@ -89,6 +90,7 @@ fun mkCfg (Ast.FUNCTION {params=params, decls=decls, id=id, ...}) =
         (entry,
          exit,
          CFG {
+             st=st,
              regs=assignRegs ht,
              nextReg=ref (HashTable.numItems ht),
              entry=entry,
@@ -107,7 +109,7 @@ fun getLabel (NODE {label=label, ...}) = label
 fun getRegs (CFG {regs=regs, ...}) = regs
 
 
-fun getName (CFG {entry=NODE {label=label, ...}, ...}) = label
+fun getSTInfo (CFG {entry=NODE {label=label, ...}, st=st, ...}) = (label, st)
 
 
 (*mmmm mutation... delicious*)

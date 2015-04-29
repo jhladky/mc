@@ -6,14 +6,12 @@ structure Ast2Cfg :> AST2CFG = struct
 open Ast
 open Iloc
 
-val funcs : (string, function) HashTable.hash_table = Util.mkHt ()
 val types : (string, string list) HashTable.hash_table = Util.mkHt ()
 val offsets : (string, (string, int) HashTable.hash_table)
                   HashTable.hash_table = Util.mkHt ()
 
 
-fun getOffset (typ, field) =
-    HashTable.lookup (HashTable.lookup offsets typ) field * Util.WORD_SIZE
+fun getOffset (typ, p) = HashTable.lookup (HashTable.lookup offsets typ) p
 
 
 fun idExpr2Ins cfg id =
@@ -114,12 +112,15 @@ and expr2Ins cfg (EXP_NUM {value=value, ...}) = genLoad value (Cfg.nextReg cfg)
     binExpr2Ins cfg opr lft rht
   | expr2Ins cfg (EXP_DOT {lft=lft, prop=prop, ...}) =
     let
-        val (r1, L) = expr2Ins cfg lft;
-        val dest = Cfg.nextReg cfg;
-        (* val offset = StaticCheck.getExprType program func prop; *)
+        val (r1, L) = expr2Ins cfg lft
+        val dest = Cfg.nextReg cfg
+        val (id, st) = Cfg.getSTInfo cfg
+        val r = (case Static.getExprType id st lft of
+                     MT_STRUCT r => r
+                   | _ => raise Fail "")
+        val offset = getOffset (r, prop)
     in
-        (* (dest, INS_RIR {opcode=OP_LOADAI, r1=r1, immed=___, dest=dest}::L) *)
-        (dest, INS_RSR {opcode=OP_LOADAI, r1=r1, field=prop, dest=dest}::L)
+        (dest, INS_RIR {opcode=OP_LOADAI, r1=r1, immed=offset, dest=dest}::L)
     end
   | expr2Ins cfg (EXP_NEW {id=id, ...}) =
     let
@@ -277,16 +278,15 @@ fun mkFuncEntry n regs [] = []
     ::mkFuncEntry (n + 1) regs xs
 
 
-fun func2Cfg (f as FUNCTION {id=id, body=body, params=params, ...}) =
+fun func2Cfg st (f as FUNCTION {id=id, body=body, params=params, ...}) =
     let
-        val (entry, exit, cfg) = Cfg.mkCfg f;
+        val (entry, exit, cfg) = Cfg.mkCfg st f;
         val _ = Cfg.fill entry (mkFuncEntry 0 (Cfg.getRegs cfg) params);
         val _ = Cfg.fill exit [INS_X {opcode=OP_RET}];
         val res = foldl (fn (s, node) => stmt2BB cfg node s) entry body;
     in
         Cfg.link res exit;
         Cfg.fill res (genJump exit);
-        HashTable.insert funcs (id, f);
         Cfg.FUNCTION {id=id, body=cfg}
     end
 
@@ -308,6 +308,6 @@ end
 fun ast2Cfg st (PROGRAM {funcs=fs, types=ts, decls=ds}) =
     (app addType ts;
      app calcOffsets ts;
-     Cfg.PROGRAM {types=ts, decls=ds, funcs=map func2Cfg fs})
+     Cfg.PROGRAM {types=ts, decls=ds, funcs=map (func2Cfg st) fs})
 
 end
