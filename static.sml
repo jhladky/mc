@@ -216,16 +216,16 @@ fun staticCheck file st (prog as PROGRAM {funcs=funcs, ...}) =
     in
         (checkForMain st; List.app (checkFunc st) funcs)
         handle BinOp (ln, opr, t) =>
-               fail ln ("Operator " ^ (binOpToStr opr) ^ " requires an " ^
-                        (typeToStr t) ^ " type.\n")
+               fail ln ("Operator" ^ binOpToStr opr ^ "requires an " ^
+                        typeToStr t ^ " type.\n")
              | UnOp (ln, opr, t) =>
-               fail ln ("Operator " ^ (unOpToStr opr) ^ " requires an " ^
-                        (typeToStr t) ^ " type.\n")
+               fail ln ("Operator" ^ unOpToStr opr ^ "requires an " ^
+                        typeToStr t ^ " type.\n")
              | TypeMismatch (ln, t1, t2) =>
-               fail ln ("Type " ^ (typeToStr t1) ^ "required (supplied "
-                        ^ (typeToStr t2) ^ ").\n")
+               fail ln ("Type " ^ typeToStr t1 ^ " required (supplied "
+                        ^ typeToStr t2 ^ ").\n")
              | NotAFunction (ln, t) =>
-               fail ln ("Type " ^ (typeToStr t) ^ " is not callable.\n")
+               fail ln ("Type " ^ typeToStr t ^ " is not callable.\n")
              | Undefined (ln, id) =>
                fail ln ("Undefined variable " ^ id ^ ".\n")
              | Invocation ln => fail ln "Bad function invocation.\n"

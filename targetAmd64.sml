@@ -42,11 +42,14 @@ datatype register =
 datatype instruction =
      INS_RR of {opcode: opcode, r1: register, r2: register}
    | INS_IR of {opcode: opcode, immed: int, r2: register}
-   | INS_IRR of {opcode: opcode, immed: int, r1: register, r2: register}
+   (* | INS_IRR of {opcode: opcode, immed: int, r1: register, r2: register} *)
+   | INS_GR of {opcode: opcode, global: string, dest: register}
+   | INS_RG of {opcode: opcode, r1: register, global: string}
+   | INS_MR of {opcode: opcode, immed: int, base: register, offset: register,
+                scalar: int, dest: register}
+   | INS_RM of {opcode: opcode, r1: register, immed: int, base: register,
+                offset: register, scalar: int}
    | INS_L of {opcode: opcode, label: string}
-   (* | INS_DBOSR of {opcode: opcode} *)
-   (* | INS_RDBOS of {opcode: opcode} *)
-   (* | INS_IDBOS of {opcode: opcode} *)
    | INS_X of {opcode: opcode}
 
 
@@ -59,60 +62,67 @@ type function = string * basicBlock list
 datatype program = PROGRAM of {text: function list, data: string list}
 
 
-fun opToStr OP_ADDQ = "addq"
-   | opToStr OP_SUBQ = "subq"
-   | opToStr OP_IMULQ = "imulq"
-   | opToStr OP_IDIVQ = "idivq"
-   | opToStr OP_ANDQ = "andq"
-   | opToStr OP_ORQ = "orq"
-   | opToStr OP_XORQ = "xorq"
-   | opToStr OP_CMP = "cmp"
-   | opToStr OP_JMP = "jmp"
-   | opToStr OP_JE = "je"
-   | opToStr OP_JG = "jg"
-   | opToStr OP_JGE = "jge"
-   | opToStr OP_JL = "jl"
-   | opToStr OP_JLE = "jle"
-   | opToStr OP_JNE = "jne"
-   | opToStr OP_MOVQ = "movq"
-   | opToStr OP_CALL = "call"
-   | opToStr OP_RET = "ret"
-   | opToStr OP_CMOVEQ = "cmoveq"
-   | opToStr OP_CMOVGQ = "cmovgq"
-   | opToStr OP_CMOVLQ = "cmovlq"
-   | opToStr OP_CMOVLEQ = "cmovleq"
-   | opToStr OP_CMOVNEQ = "cmovneq"
-   | opToStr OP_SHRQ = "shrq"
+val opToStr =
+ fn OP_ADDQ      => "addq "
+  | OP_SUBQ      => "subq "
+  | OP_IMULQ     => "imulq "
+  | OP_IDIVQ     => "idivq "
+  | OP_ANDQ      => "andq "
+  | OP_ORQ       => "orq "
+  | OP_XORQ      => "xorq "
+  | OP_CMP       => "cmp "
+  | OP_JMP       => "jmp "
+  | OP_JE        => "je "
+  | OP_JG        => "jg "
+  | OP_JGE       => "jge "
+  | OP_JL        => "jl "
+  | OP_JLE       => "jle "
+  | OP_JNE       => "jne "
+  | OP_MOVQ      => "movq "
+  | OP_CALL      => "call "
+  | OP_RET       => "ret "
+  | OP_CMOVEQ    => "cmoveq "
+  | OP_CMOVGQ    => "cmovgq "
+  | OP_CMOVLQ    => "cmovlq "
+  | OP_CMOVLEQ   => "cmovleq "
+  | OP_CMOVNEQ   => "cmovneq "
+  | OP_SHRQ      => "shrq "
 
 
-fun regToStr REG_RAX = "%rax"
-  | regToStr REG_RBX = "%rbx"
-  | regToStr REG_RCX = "%rcx"
-  | regToStr REG_RDX = "%rdx"
-  | regToStr REG_RSI = "%rsi"
-  | regToStr REG_RDI = "%rdi"
-  | regToStr REG_RBP = "%rbp"
-  | regToStr REG_RSP = "%rsp"
-  | regToStr (REG_N n) = "%r" ^ (Int.toString n)
+val regToStr =
+ fn REG_RAX      => "%rax"
+  | REG_RBX      => "%rbx"
+  | REG_RCX      => "%rcx"
+  | REG_RDX      => "%rdx"
+  | REG_RSI      => "%rsi"
+  | REG_RDI      => "%rdi"
+  | REG_RBP      => "%rbp"
+  | REG_RSP      => "%rsp"
+  | REG_N n      => "%r" ^ Int.toString n
 
 
-fun insToStr (INS_RR {opcode=opcode, r1=r1, r2=r2}) =
-    (opToStr opcode) ^ " " ^ (regToStr r1) ^ ", " ^ (regToStr r2)
-  | insToStr (INS_IR {opcode=opcode, immed=immed, r2=r2}) =
-    (opToStr opcode) ^ " $" ^ (Int.toString immed) ^ ", " ^ (regToStr r2)
-  | insToStr (INS_IRR {opcode=opcode, immed=immed, r1=r1, r2=r2}) =
-    (opToStr opcode) ^ " $" ^ (Int.toString immed) ^ ", " ^ (regToStr r1) ^
-    ", " ^ (regToStr r2)
-  | insToStr (INS_L {opcode=opcode, label=label}) =
-    (opToStr opcode) ^ " " ^ label
-  (* | insToStr (INS_DBOSR {opcode=opcode}) = *)
-  (*   (opToStr opcode) ^ " " *)
-  (* | insToStr (INS_RDBOS {opcode=opcode}) = *)
-  (*   (opToStr opcode) ^ " " *)
-  (* | insToStr (INS_IDBOS {opcode=opcode}) = *)
-  (*   (opToStr opcode) ^ " " *)
-  | insToStr (INS_X {opcode=opcode}) =
-    opToStr opcode
+val insToStr =
+ fn INS_RR {opcode=opc, r1=r1, r2=r2} =>
+    opToStr opc ^ regToStr r1 ^ ", " ^ regToStr r2
+  | INS_IR {opcode=opc, immed=immed, r2=r2} =>
+    opToStr opc ^ "$" ^ Int.toString immed ^ ", " ^ regToStr r2
+  (* | INS_IRR {opcode=opc, immed=immed, r1=r1, r2=r2} => *)
+  (*   opToStr opc ^ "$" ^ Int.toString immed ^ ", " ^ regToStr r1 ^ ", " ^ *)
+  (*   regToStr r2 *)
+  | INS_GR {opcode=opc, global=global, dest=dest} =>
+    opToStr opc ^ global ^ "(%rip), " ^ regToStr dest
+  | INS_RG {opcode=opc, r1=r1, global=global} =>
+    opToStr opc ^ regToStr r1 ^ ", " ^ global ^ "(%rip)"
+  | INS_L {opcode=opc, label=label} => opToStr opc ^ label
+  | INS_MR {opcode=opc, immed=immed, base=base, offset=offset, scalar=scalar,
+            dest=dest} =>
+    opToStr opc ^ Int.toString immed ^ "(" ^ regToStr base ^ ", " ^
+    regToStr offset ^ ", " ^ Int.toString scalar ^ "), " ^ regToStr dest
+  | INS_RM {opcode=opc, r1=r1, immed=immed, base=base, offset=offset,
+            scalar=scalar} =>
+    opToStr opc ^ regToStr r1 ^ ", " ^  Int.toString immed ^ "(" ^
+    regToStr base ^ ", " ^ regToStr offset ^ ", " ^ Int.toString scalar ^ ")"
+  | INS_X {opcode=opc} => opToStr opc
 
 
 fun bbToStr (l, L) =

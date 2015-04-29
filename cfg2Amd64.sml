@@ -34,13 +34,15 @@ fun rrr2Amd64 r1 r2 dest Iloc.OP_ADD =
 fun rir2Amd64 r1 immed dest Iloc.OP_XORI =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_N dest},
      INS_IR {opcode=OP_XORQ, immed=immed, r2=REG_N dest}]
-  | rir2Amd64 r1 immed dest Iloc.OP_LOADAI = (*fix*)
-    [INS_X {opcode=OP_RET}]
+  | rir2Amd64 r1 immed dest Iloc.OP_LOADAI =
+    [INS_MR {opcode=OP_MOVQ, immed=immed * Util.WORD_SIZE, base=REG_N r1,
+             offset=REG_N r1, scalar=0, dest=REG_N dest}]
   | rir2Amd64 _ _ _ opcode = raise ILOCException opcode
 
 
-fun rri2Amd64 r1 r2 immed Iloc.OP_STOREAI = (*fix*)
-    [INS_X {opcode=OP_RET}]
+fun rri2Amd64 r1 r2 immed Iloc.OP_STOREAI =
+    [INS_RM {opcode=OP_MOVQ, r1=REG_N r1, immed=immed * Util.WORD_SIZE,
+             base=REG_N r2, offset=REG_N r2, scalar=0}]
   | rri2Amd64 _ _ _ opcode = raise ILOCException opcode
 
 
@@ -66,7 +68,7 @@ fun sir2Amd64 r2 immed id Iloc.OP_LOADINARGUMENT = (*fix*)
 
 
 fun new2Amd64 id fields dest Iloc.OP_NEW =
-    [INS_IR {opcode=OP_MOVQ, immed=length fields * 8, r2=REG_RDI},
+    [INS_IR {opcode=OP_MOVQ, immed=length fields * Util.WORD_SIZE, r2=REG_RDI},
      INS_L {opcode=OP_CALL, label="malloc"},
      INS_RR {opcode=OP_MOVQ, r1=REG_RAX, r2=REG_N dest}]
   | new2Amd64 _ _ _ opcode = raise ILOCException opcode
@@ -108,15 +110,15 @@ fun ri2Amd64 immed dest Iloc.OP_STOREOUTARGUMENT =
   | ri2Amd64 _ _ opcode = raise ILOCException opcode
 
 
-fun sr2Amd64 r1 id Iloc.OP_LOADGLOBAL = (*fix*)
-    [INS_X {opcode=OP_RET}]
+fun sr2Amd64 r1 id Iloc.OP_LOADGLOBAL =
+    [INS_GR {opcode=OP_MOVQ, global=id, dest=REG_N r1}]
   | sr2Amd64 r1 id Iloc.OP_COMPUTEGLOBALADDRESS = (*fix*)
     [INS_X {opcode=OP_RET}]
   | sr2Amd64 _ _ opcode = raise ILOCException opcode
 
 
-fun rs2Amd64 r1 id Iloc.OP_STOREGLOBAL = (*fix*)
-    [INS_X {opcode=OP_RET}]
+fun rs2Amd64 r1 id Iloc.OP_STOREGLOBAL =
+    [INS_RG {opcode=OP_MOVQ, r1=REG_N r1, global=id}]
   | rs2Amd64 _ _ opcode = raise ILOCException opcode
 
 
@@ -128,10 +130,10 @@ fun l2Amd64 l1 Iloc.OP_JUMPI =
 
 
 
-fun r2Amd64 r1 Iloc.OP_LOADRET = (*fix*)
-    [INS_X {opcode=OP_RET}]
-  | r2Amd64 r1 Iloc.OP_STORERET = (*fix*)
-    [INS_X {opcode=OP_RET}]
+fun r2Amd64 r1 Iloc.OP_LOADRET =
+    [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RAX}]
+  | r2Amd64 r1 Iloc.OP_STORERET =
+    [INS_RR {opcode=OP_MOVQ, r1=REG_RAX, r2=REG_N r1}]
   | r2Amd64 r1 Iloc.OP_PRINT = (*fix*)
     [INS_X {opcode=OP_RET}]
   | r2Amd64 r1 Iloc.OP_PRINTLN = (*fix*)
@@ -183,7 +185,7 @@ local
         (HashTable.insert ht (id, n); addOffsets ht (n + 1) xs)
 in
     fun calcOffsets (Ast.TYPE_DECL {id=id, decls=decls, ...}) =
-        HashTable.insert types (id, (length decls * 8,
+        HashTable.insert types (id, (length decls * Util.WORD_SIZE,
                                      addOffsets (Util.mkHt ()) 0 decls))
 end
 
