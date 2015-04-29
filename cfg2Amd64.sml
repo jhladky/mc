@@ -34,7 +34,15 @@ fun rrr2Amd64 r1 r2 dest Iloc.OP_ADD =
 fun rir2Amd64 r1 immed dest Iloc.OP_XORI =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_N dest},
      INS_IR {opcode=OP_XORQ, immed=immed, r2=REG_N dest}]
+  | rir2Amd64 r1 immed dest Iloc.OP_LOADAI = (*fix*)
+    [INS_X {opcode=OP_RET}]
   | rir2Amd64 _ _ _ opcode = raise ILOCException opcode
+
+
+fun rri2Amd64 r1 r2 immed Iloc.OP_STOREAI = (*fix*)
+    [INS_X {opcode=OP_RET}]
+  | rri2Amd64 _ _ _ opcode = raise ILOCException opcode
+
 
 (*cmp = r2 - r1*)
 fun rrc2Amd64 r1 r2 Iloc.OP_COMP =
@@ -45,25 +53,6 @@ fun rrc2Amd64 r1 r2 Iloc.OP_COMP =
 fun ric2Amd64 r1 immed Iloc.OP_COMPI =
     [INS_IR {opcode=OP_CMP, immed=immed, r2=REG_N r1}]
   | ric2Amd64 _ _ opcode = raise ILOCException opcode
-
-
-fun rsr2Amd64 r1 field dest Iloc.OP_LOADAI = (*fix*)
-    let
-        (*so how do we calculate the offset
-        we map.....
-        NO
-        I think we have to go back to the ILOC....
-        it will make things much easier.....
-         *)
-    in
-        [INS_X {opcode=OP_RET}]
-    end
-  | rsr2Amd64 _ _ _ opcode = raise ILOCException opcode
-
-
-fun rrs2Amd64 r1 r2 field Iloc.OP_STOREAI = (*fix*)
-    [INS_X {opcode=OP_RET}]
-  | rrs2Amd64 _ _ _ opcode = raise ILOCException opcode
 
 
 fun cll2Amd64 l1 l2 Iloc.OP_CBREQ =
@@ -163,10 +152,9 @@ fun x2Amd64 Iloc.OP_RET =
 val iloc2Amd64 =
  fn Iloc.INS_RRR {opcode=opc, r1=r1, dest=d, r2=r2}     => rrr2Amd64 r1 r2 d opc
   | Iloc.INS_RIR {opcode=opc, r1=r1, dest=d, immed=i}   => rir2Amd64 r1 i d opc
+  | Iloc.INS_RRI {opcode=opc, r1=r1, r2=r2, immed=i}    => rri2Amd64 r1 r2 i opc
   | Iloc.INS_RRC {opcode=opc, r1=r1, r2=r2}             => rrc2Amd64 r1 r2 opc
   | Iloc.INS_RIC {opcode=opc, r1=r1, immed=i}           => ric2Amd64 r1 i opc
-  | Iloc.INS_RSR {opcode=opc, r1=r1, dest=d, field=f}   => rsr2Amd64 r1 f d opc
-  | Iloc.INS_RRS {opcode=opc, r1=r1, r2=r2, field=f}    => rrs2Amd64 r1 r2 f opc
   | Iloc.INS_SIR {opcode=opc, r1=r1, id=id, immed=i}    => sir2Amd64 r1 i id opc
   | Iloc.INS_CLL {opcode=opc, l1=l1, l2=l2}             => cll2Amd64 l1 l2 opc
   | Iloc.INS_NEW {opcode=opc, dest=d, id=id, fields=fs} => new2Amd64 id fs d opc

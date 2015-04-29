@@ -2,6 +2,8 @@ signature STATIC = sig
     val staticCheck : string -> SymbolTable.symbolTable -> Ast.program -> unit
     val getExprType : string -> SymbolTable.symbolTable ->
                       Ast.expression -> Ast.typ
+    val getLvalueType : string -> SymbolTable.symbolTable ->
+                        Ast.lvalue -> Ast.typ
 end
 
 structure Static :> STATIC = struct
@@ -204,8 +206,11 @@ fun checkForMain (ST {funcs=funcs, ...}) =
       | NONE => raise NoMainException 1
 
 
-(*The two functions exposed in the signature are below*)
+(*Functions exposed in the signature are below.*)
 fun getExprType id st exp = checkExpr (st2Stl id MT_VOID st) exp
+
+
+fun getLvalueType id st lv = checkLvalue (st2Stl id MT_VOID st) lv
 
 
 fun staticCheck file st (prog as PROGRAM {funcs=funcs, ...}) =

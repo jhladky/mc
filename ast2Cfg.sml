@@ -11,7 +11,9 @@ val offsets : (string, (string, int) HashTable.hash_table)
                   HashTable.hash_table = Util.mkHt ()
 
 
-fun getOffset (typ, p) = HashTable.lookup (HashTable.lookup offsets typ) p
+fun getOffset prop (MT_STRUCT r) =
+    HashTable.lookup (HashTable.lookup offsets r) prop
+  | getOffset _ _ = raise Fail ""
 
 
 fun idExpr2Ins cfg id =
@@ -115,10 +117,7 @@ and expr2Ins cfg (EXP_NUM {value=value, ...}) = genLoad value (Cfg.nextReg cfg)
         val (r1, L) = expr2Ins cfg lft
         val dest = Cfg.nextReg cfg
         val (id, st) = Cfg.getSTInfo cfg
-        val r = (case Static.getExprType id st lft of
-                     MT_STRUCT r => r
-                   | _ => raise Fail "")
-        val offset = getOffset (r, prop)
+        val offset = getOffset prop (Static.getExprType id st lft)
     in
         (dest, INS_RIR {opcode=OP_LOADAI, r1=r1, immed=offset, dest=dest}::L)
     end
@@ -154,8 +153,10 @@ fun loadLvalue cfg (LV_ID {id=id, ...}) =
     let
         val (r1, L) = loadLvalue cfg lft;
         val dest = Cfg.nextReg cfg;
+        val (id, st) = Cfg.getSTInfo cfg
+        val offset = getOffset prop (Static.getLvalueType id st lft)
     in
-        (dest, L @ [INS_RSR {opcode=OP_LOADAI, r1=r1, field=prop, dest=dest}])
+        (dest, L @ [INS_RIR {opcode=OP_LOADAI, r1=r1, immed=offset, dest=dest}])
     end
 
 
@@ -166,8 +167,10 @@ fun lvalue2Ins cfg reg (LV_ID {id=id, ...}) =
   | lvalue2Ins cfg reg (LV_DOT {lft=lft, prop=prop, ...}) =
     let
         val (r2, L) = loadLvalue cfg lft;
+        val (id, st) = Cfg.getSTInfo cfg
+        val offset = getOffset prop (Static.getLvalueType id st lft)
     in
-        L @ [INS_RRS {opcode=OP_STOREAI, r1=reg, r2=r2, field=prop}]
+        L @ [INS_RRI {opcode=OP_STOREAI, r1=reg, r2=r2, immed=offset}]
     end
 
 
