@@ -1,5 +1,5 @@
 signature AST2CFG = sig
-    val ast2Cfg : Static.symbolTable -> Ast.program -> Cfg.program
+    val ast2Cfg : SymbolTable.symbolTable -> Ast.program -> Cfg.program
 end
 
 structure Ast2Cfg :> AST2CFG = struct

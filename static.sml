@@ -1,30 +1,21 @@
 signature STATIC = sig
-    datatype symbolTable =
-        ST of {
-            types : (string, (string, Ast.typ) HashTable.hash_table)
-                        HashTable.hash_table,
-            globals : (string, Ast.typ) HashTable.hash_table,
-            funcs : (string, Ast.function) HashTable.hash_table,
-            locals : (string, (string, Ast.typ) HashTable.hash_table)
-                         HashTable.hash_table
-        }
-
-    val staticCheck : string -> Ast.program -> symbolTable
-    val getExprType : symbolTable -> Ast.expression -> Ast.typ
+    val staticCheck : string -> SymbolTable.symbolTable -> Ast.program -> unit
+    val getExprType : string -> SymbolTable.symbolTable ->
+                      Ast.expression -> Ast.typ
 end
 
 structure Static :> STATIC = struct
 open HashTable
 open Ast
+open SymbolTable
 
 exception UndefException        of int * string
 exception BinOpException        of int * binaryOperator * typ
 exception UnOpException         of int * unaryOperator * typ
-exception BadTypeException      of int * typ
 exception TypeMatchException    of int * typ * typ
 exception NotAFunctionException of int * typ
 exception NotAStructException   of int * typ
-exception PrintException        of int * typ
+exception PRException           of int * typ
 exception BooleanGuardException of int * typ
 exception NoReturnException     of int
 exception BadReturnException    of int
@@ -32,59 +23,6 @@ exception InvocationException   of int (*I'll add arguments to this later.*)
 exception NoMainException       of int
 
 
-(* Variables and functions are in the same namespace,
- * but structure names are in a DIFFERENT namespace.*)
-datatype symbolTable =
-    ST of {
-        types : (string, (string, typ) hash_table) hash_table,
-        globals : (string, typ) hash_table,
-        funcs : (string, function) hash_table,
-        locals : (string, (string, typ) hash_table) hash_table
-    }
-
-
-datatype symbolTableLocal =
-    STL of {
-        types: (string, (string, typ) hash_table) hash_table,
-        globals : (string, typ) hash_table,
-        locals : (string, typ) hash_table,
-        funcs : (string, function) hash_table,
-        returnType : typ
-    }
-
-
-(*HELPER FUNCTIONS*)
-
-fun fail file l msg =
-    (TextIO.output (TextIO.stdErr, file ^ ":" ^ (Int.toString l) ^ ":" ^ msg);
-     OS.Process.exit OS.Process.failure)
-
-
-fun binOp2Str BOP_PLUS = "+"
-  | binOp2Str BOP_MINUS = "-"
-  | binOp2Str BOP_TIMES = "*"
-  | binOp2Str BOP_DIVIDE = "/"
-  | binOp2Str BOP_EQ = "=="
-  | binOp2Str BOP_NE = "!="
-  | binOp2Str BOP_LT = "<"
-  | binOp2Str BOP_GT = ">"
-  | binOp2Str BOP_LE = "<="
-  | binOp2Str BOP_GE = ">="
-  | binOp2Str BOP_AND = "&&"
-  | binOp2Str BOP_OR = "||"
-
-
-fun unOp2Str UOP_NOT = "!" | unOp2Str UOP_MINUS = "-"
-
-
-fun typ2Str MT_INT = "integer"
-  | typ2Str MT_VOID = "void"
-  | typ2Str MT_BOOL = "boolean"
-  | typ2Str MT_FUNC = "function"
-  | typ2Str (MT_STRUCT s) = "struct " ^ s
-
-
-(*AST FUNCTIONS*)
 (* null can be assigned to any struct type*)
 fun checkType l (MT_INT, MT_INT) = ()
   | checkType l (MT_BOOL, MT_BOOL) = ()
@@ -96,14 +34,8 @@ fun checkType l (MT_INT, MT_INT) = ()
   | checkType l (t1, t2) = raise TypeMatchException (l, t1, t2)
 
 
-fun checkLvalue stl (LV_ID {id=id, line=l}) =
-    let
-        val STL {locals=locals, ...} = stl
-    in
-        case find locals id of
-            SOME t => t
-          | NONE => raise UndefException (l, id)
-    end
+fun checkLvalue (STL {locals=locals, ...}) (LV_ID {id=id, line=l}) =
+    (case find locals id of SOME t => t | NONE => raise UndefException (l, id))
   | checkLvalue stl (LV_DOT {lft=lft, prop=prop, line=l}) =
     let
         val STL {types=types, ...} = stl
@@ -172,14 +104,10 @@ and checkBinExpr stl opr lft rht l =
 
 
 and checkExpr stl (EXP_NUM {value=n, ...}) = MT_INT
-  | checkExpr stl (EXP_ID {id=id, line=l}) =
-    let
-        val STL {locals=locals, ...} = stl;
-    in
-        case find locals id of
-            SOME t => t
-          | NONE => raise UndefException (l, id)
-    end
+  | checkExpr (STL {locals=locals, ...}) (EXP_ID {id=id, line=l}) =
+    (case find locals id of
+        SOME t => t
+      | NONE => raise UndefException (l, id))
   | checkExpr stl (EXP_TRUE {...}) = MT_BOOL
   | checkExpr stl (EXP_FALSE {...}) = MT_BOOL
   | checkExpr stl EXP_NULL = MT_VOID (*Not sure about this...*)
@@ -202,14 +130,10 @@ and checkExpr stl (EXP_NUM {value=n, ...}) = MT_INT
             SOME t => t
           | NONE => raise UndefException (l, prop)
     end
-  | checkExpr stl (EXP_NEW {id=id, line=l}) =
-    let
-        val STL {types=types, ...} = stl;
-    in
-        case find types id of
-            SOME _ => MT_STRUCT id
-          | NONE => raise NotAStructException (l, MT_VOID)
-    end
+  | checkExpr (STL {types=types, ...}) (EXP_NEW {id=id, line=l}) =
+    (case find types id of
+         SOME _ => MT_STRUCT id
+       | NONE => raise NotAStructException (l, MT_VOID))
   | checkExpr stl (EXP_INVOCATION {id=id, args=args, line=l}) =
     checkInvocation l id args stl
 
@@ -222,27 +146,29 @@ fun checkStmt stl (ST_BLOCK stmts) =
   | checkStmt stl (ST_PRINT {body=body, line=l, ...}) =
     (case checkExpr stl body of
          MT_INT => false
-       | t => raise PrintException (l, t))
-  | checkStmt stl (ST_READ {id=id, ...}) = (checkLvalue stl id; false)
-  | checkStmt stl (ST_IF {guard=guard, thenBlk=tB, elseBlk=eB, line=l}) =
+       | t => raise PRException (l, t))
+  | checkStmt stl (ST_READ {id=id, line=l}) =
+    (case checkLvalue stl id of
+         MT_INT => false
+       | t => raise PRException (l, t))
+  | checkStmt stl (ST_IF {guard=guard, thenBlk=tBlk, elseBlk=eBlk, line=l}) =
     (case checkExpr stl guard of
-         MT_BOOL => (checkStmt stl tB) andalso (checkStmt stl eB)
+         MT_BOOL => checkStmt stl tBlk andalso checkStmt stl eBlk
        | t => raise BooleanGuardException (l, t))
   | checkStmt stl (ST_WHILE {guard=guard, body=body, line=l}) =
     (checkStmt stl body;
      case checkExpr stl guard of
          MT_BOOL => false
        | t => raise BooleanGuardException (l, t))
-  | checkStmt stl (ST_DELETE {exp=exp, ...}) = false (*FIXFIXFIC*)
-  | checkStmt stl (ST_RETURN {exp=exp, line=l}) =
-    let
-        val STL {returnType=rt, ...} = stl
-    in
-        case exp of
-            SOME e => checkType l (rt, checkExpr stl e)
-          | NONE => checkType l (rt, checkExpr stl EXP_NULL);
-        true
-    end
+  | checkStmt stl (ST_DELETE {exp=exp, line=l}) =
+    (case checkExpr stl exp of
+         MT_STRUCT s => false
+       | t => raise NotAStructException (l, t))
+  | checkStmt (stl as STL {returnType=rt, ...}) (ST_RETURN {exp=exp, line=l}) =
+    (case exp of
+         SOME e => checkType l (rt, checkExpr stl e)
+       | NONE => checkType l (rt, checkExpr stl EXP_NULL);
+     true)
   | checkStmt stl (ST_INVOCATION {id=id, args=args, line=l}) =
     (checkInvocation l id args stl; false)
 
@@ -269,64 +195,6 @@ fun checkFunc st (FUNCTION {returnType=rt, body=body, line=l, id=id, ...}) =
     end
 
 
-fun addTypeDecl types (TYPE_DECL {id=id, decls=ds, ...}) =
-    let
-        val decls = Util.mkHt ();
-    in
-        List.app (fn (VAR_DECL {id=s, typ=t, ...}) => insert decls (s, t)) ds;
-        insert types (id, decls)
-    end
-
-
-fun checkTypeExist types (VAR_DECL {id=id, typ=t, line=l}) =
-    case t of
-        MT_STRUCT s =>
-        (case find types s of
-             SOME _ => ()
-           | NONE => raise BadTypeException (l, t))
-      | _ => ()
-
-
-fun mkLocals types globals (FUNCTION {params=params, decls=decls, ...}) =
-    let
-        val locals = copy globals
-    in
-        List.app (checkTypeExist types) decls;
-        List.app (checkTypeExist types) params;
-        List.app (fn (VAR_DECL {id=s, typ=t, ...}) => insert locals (s, t)) decls;
-        List.app (fn (VAR_DECL {id=s, typ=t, ...}) => insert locals (s, t)) params;
-        locals
-    end
-
-
-fun addLocals types locals globals (func as FUNCTION {id=id, ...}) =
-    insert locals (id, mkLocals types globals func)
-
-
-(*Check if the type is valid. If so, add it to the globals table*)
-fun addGlobal globals types (vd as VAR_DECL {id=id, typ=t, ...}) =
-    (checkTypeExist types vd; insert globals (id, t))
-
-
-(*we can remove the parend around the as ?????*)
-fun mkSymbolTable (PROGRAM {types=ts, decls=ds, funcs=fs}) =
-    let
-        val types : (string, (string, typ) hash_table) hash_table = Util.mkHt ()
-        val globals : (string, typ) hash_table = Util.mkHt ()
-        val funcs : (string, function) hash_table = Util.mkHt ()
-        val locals : (string, (string, typ) hash_table) hash_table =
-            Util.mkHt ()
-    in
-        List.app (addTypeDecl types) ts;
-        List.app (addGlobal globals types) ds;
-        List.app (fn FUNCTION {id=id, ...} => insert globals (id, MT_FUNC)) fs;
-        List.app (fn (func as FUNCTION {id=id, ...}) =>
-                     insert funcs (id, func)) fs;
-        List.app (addLocals types locals globals) fs;
-        ST {types=types, globals=globals, funcs=funcs, locals=locals}
-    end
-
-
 fun checkForMain (ST {funcs=funcs, ...}) =
     case find funcs "main" of
         SOME (FUNCTION {params=params, returnType=rt, ...}) =>
@@ -336,39 +204,35 @@ fun checkForMain (ST {funcs=funcs, ...}) =
 
 
 (*The two functions exposed in the signature are below*)
-
-fun getExprType st exp =
-    MT_VOID
+fun getExprType id st exp = checkExpr (st2Stl id MT_VOID st) exp
 
 
-fun staticCheck file (prog as PROGRAM {funcs=funcs, ...}) =
+fun staticCheck file st (prog as PROGRAM {funcs=funcs, ...}) =
     let
-        val fail = fail file
-        val st = mkSymbolTable prog
+        val fail = Util.fail file
     in
-        (checkForMain st; List.app (checkFunc st) funcs; st)
+        checkForMain st;
+        List.app (checkFunc st) funcs
         handle BinOpException (ln, opr, t) =>
-               fail ln ("Operator " ^ (binOp2Str opr) ^ " requires an " ^
-                        (typ2Str t) ^ " type.\n")
+               fail ln ("Operator " ^ (binOpToStr opr) ^ " requires an " ^
+                        (typeToStr t) ^ " type.\n")
              | UnOpException (ln, opr, t) =>
-               fail ln ("Operator " ^ (unOp2Str opr) ^ " requires an " ^
-                        (typ2Str t) ^ " type.\n")
-             | BadTypeException (ln, t) =>
-               fail ln ("Type " ^ (typ2Str t) ^ " does not exist.\n")
+               fail ln ("Operator " ^ (unOpToStr opr) ^ " requires an " ^
+                        (typeToStr t) ^ " type.\n")
              | TypeMatchException (ln, t1, t2) =>
-               fail ln ("Types " ^ (typ2Str t1) ^ " and " ^ (typ2Str t2) ^
+               fail ln ("Types " ^ (typeToStr t1) ^ " and " ^ (typeToStr t2) ^
                         " do not match.\n")
              | NotAFunctionException (ln, t) =>
-               fail ln ("Type " ^ (typ2Str t) ^ " is not callable.\n")
+               fail ln ("Type " ^ (typeToStr t) ^ " is not callable.\n")
              | NotAStructException (ln, t) =>
                fail ln ("Expression requires a struct type (Supplied " ^
-                        (typ2Str t) ^ ").\n")
-             | PrintException (ln, t) =>
-               fail ln ("`print` requires an integer argument (Supplied " ^
-                        (typ2Str t) ^ ").\n")
+                        (typeToStr t) ^ ").\n")
+             | PRException (ln, t) =>
+               fail ln ("`print` and `read` require an integer argument " ^
+                        "(Supplied " ^ (typeToStr t) ^ ").\n")
              | BooleanGuardException (ln, t) =>
                fail ln ("Statement requires a boolean " ^
-                        "expression (Supplied " ^ (typ2Str t) ^ ").\n")
+                        "expression (Supplied " ^ (typeToStr t) ^ ").\n")
              | UndefException (ln, id) =>
                fail ln ("Undefined variable " ^ id ^ ".\n")
              | InvocationException ln => fail ln "Bad function invocation.\n"
@@ -377,4 +241,5 @@ fun staticCheck file (prog as PROGRAM {funcs=funcs, ...}) =
              | NoMainException ln =>
                fail ln "No function matching `main` signature.\n"
     end
+
 end

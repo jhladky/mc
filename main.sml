@@ -32,7 +32,7 @@ fun printAst file ast =
     end
 
 
-fun dumpIL file ast st =
+fun dumpIL file st ast =
     let
         val ots = openOut (file ^ ".il");
         val printDecl = fn Cfg.FUNCTION {id=id, ...} =>
@@ -47,7 +47,7 @@ fun dumpIL file ast st =
     end
 
 
-fun printAsm file ast st =
+fun printAsm file st ast =
     let
         (* val ots = openOut (file ^ ".s") *) val ots = stdOut;
     in
@@ -63,10 +63,11 @@ fun main () =
         val fname = (hd (String.tokens (fn c => c = #".") f))
         val ins = openIn f
         val ast = json2AST ins
+        val st = SymbolTable.mkSymbolTable f ast
     in
         if p then printAst fname ast
-        else if d then dumpIL fname ast (Static.staticCheck f ast)
-        else printAsm fname ast (Static.staticCheck f ast);
+        else (Static.staticCheck f st ast;
+              if d then dumpIL fname st ast else printAsm fname st ast);
         closeIn ins;
         OS.Process.exit OS.Process.success
     end
