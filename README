@@ -1,9 +1,7 @@
-
-ooo. .oo.  .oo.    .ooooo.
-`888P"Y88bP"Y88b  d88' `"Y8
- 888   888   888  888
- 888   888   888  888   .o8
-o888o o888o o888o `Y8bod8P'
+   ____ ___  _____
+  / __ `__ \/ ___/
+ / / / / / / /__
+/_/ /_/ /_/\___/
 
 * A compiler for the "mini" toy language
 * Uses an ANTLR parser

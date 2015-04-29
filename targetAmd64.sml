@@ -44,9 +44,9 @@ datatype instruction =
    | INS_IR of {opcode: opcode, immed: int, r2: register}
    | INS_IRR of {opcode: opcode, immed: int, r1: register, r2: register}
    | INS_L of {opcode: opcode, label: string}
-   | INS_DBOSR of {opcode: opcode}
-   | INS_RDBOS of {opcode: opcode}
-   | INS_IDBOS of {opcode: opcode}
+   (* | INS_DBOSR of {opcode: opcode} *)
+   (* | INS_RDBOS of {opcode: opcode} *)
+   (* | INS_IDBOS of {opcode: opcode} *)
    | INS_X of {opcode: opcode}
 
 
@@ -105,12 +105,12 @@ fun insToStr (INS_RR {opcode=opcode, r1=r1, r2=r2}) =
     ", " ^ (regToStr r2)
   | insToStr (INS_L {opcode=opcode, label=label}) =
     (opToStr opcode) ^ " " ^ label
-  | insToStr (INS_DBOSR {opcode=opcode}) =
-    (opToStr opcode) ^ " "
-  | insToStr (INS_RDBOS {opcode=opcode}) =
-    (opToStr opcode) ^ " "
-  | insToStr (INS_IDBOS {opcode=opcode}) =
-    (opToStr opcode) ^ " "
+  (* | insToStr (INS_DBOSR {opcode=opcode}) = *)
+  (*   (opToStr opcode) ^ " " *)
+  (* | insToStr (INS_RDBOS {opcode=opcode}) = *)
+  (*   (opToStr opcode) ^ " " *)
+  (* | insToStr (INS_IDBOS {opcode=opcode}) = *)
+  (*   (opToStr opcode) ^ " " *)
   | insToStr (INS_X {opcode=opcode}) =
     opToStr opcode
 

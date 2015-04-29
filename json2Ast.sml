@@ -19,7 +19,7 @@ datatype carrier =
 (*Note there's some crap in here to make the compiler shut up about
  * non-exhaustive matches.*)
 structure Json2Ast : JSON_CALLBACKS = struct
-open Ast;
+open Ast
 
 type json_data = carrier
 

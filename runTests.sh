@@ -52,9 +52,9 @@ if [ $? -ne 0 ]; then
 fi
 rm .tmp
 
-# for f in tests/*.json; do
-#     ./mc -dumpIL $f
-# done
+for f in tests/*.json; do
+    ./mc -dumpIL $f
+done
 
 N=0
 

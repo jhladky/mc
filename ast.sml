@@ -18,7 +18,7 @@ datatype binaryOperator =
 datatype unaryOperator = UOP_NOT | UOP_MINUS
 
 
-datatype miniType =
+datatype typ =
      MT_VOID
    | MT_INT
    | MT_BOOL
@@ -26,7 +26,7 @@ datatype miniType =
    | MT_STRUCT of string
 
 
-datatype varDecl = VAR_DECL of {id: string, typ: miniType, line: int}
+datatype varDecl = VAR_DECL of {id: string, typ: typ, line: int}
 
 
 datatype typeDecl = TYPE_DECL of {id: string, decls: varDecl list, line: int}
@@ -65,7 +65,7 @@ datatype statement =
 
 
 datatype function =
-     FUNCTION of {id: string, params: varDecl list, returnType: miniType,
+     FUNCTION of {id: string, params: varDecl list, returnType: typ,
                   decls: varDecl list, body: statement list, line: int}
 
 

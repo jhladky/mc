@@ -3,7 +3,7 @@ signature MAIN = sig
 end
 
 structure Main :> MAIN = struct
-open TextIO;
+open TextIO
 
 fun printUsage () =
     (output (stdErr, "Usage: mc [-printAST|-dumpIL] <filename>\n");
@@ -32,12 +32,12 @@ fun printAst file ast =
     end
 
 
-fun dumpIL file ast =
+fun dumpIL file ast st =
     let
         val ots = openOut (file ^ ".il");
         val printDecl = fn Cfg.FUNCTION {id=id, ...} =>
                            output (ots, "@function " ^ id ^ "\n");
-        val Cfg.PROGRAM {funcs=funcs, ...} = Ast2Cfg.ast2Cfg ast;
+        val Cfg.PROGRAM {funcs=funcs, ...} = Ast2Cfg.ast2Cfg st ast;
     in
         app printDecl funcs;
         output (ots, "\n");
@@ -47,32 +47,27 @@ fun dumpIL file ast =
     end
 
 
-fun printAsm file ast =
+fun printAsm file ast st =
     let
         (* val ots = openOut (file ^ ".s") *) val ots = stdOut;
     in
         output (ots, TargetAmd64.programToStr
-                         (Cfg2Amd64.cfg2Amd64 (Ast2Cfg.ast2Cfg ast)));
+                         (Cfg2Amd64.cfg2Amd64 (Ast2Cfg.ast2Cfg st ast)));
         closeOut ots
     end
 
 
 fun main () =
     let
-        val {printAst=p, dumpIL=d, file=f} = parseArgs ();
-        val fname = (hd (String.tokens (fn c => c = #".") f));
-        val ins = openIn f;
-        val ast = json2AST ins;
+        val {printAst=p, dumpIL=d, file=f} = parseArgs ()
+        val fname = (hd (String.tokens (fn c => c = #".") f))
+        val ins = openIn f
+        val ast = json2AST ins
     in
+        if p then printAst fname ast
+        else if d then dumpIL fname ast (Static.staticCheck f ast)
+        else printAsm fname ast (Static.staticCheck f ast);
         closeIn ins;
-        if p
-        then printAst fname ast
-        else (
-            StaticCheck.staticCheck f ast;
-            if d
-            then dumpIL fname ast
-            else printAsm fname ast
-        );
         OS.Process.exit OS.Process.success
     end
 

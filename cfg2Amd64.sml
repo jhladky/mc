@@ -3,16 +3,12 @@ signature CFG2AMD64 = sig
 end
 
 structure Cfg2Amd64 :> CFG2AMD64 = struct
-open TargetAmd64;
+open TargetAmd64
 
-exception ILOCException of Iloc.opcode;
-
-fun mkHt () = HashTable.mkTable (HashString.hashString, op =)
-                                (10, Fail "Not Found")
-
+exception ILOCException of Iloc.opcode
 
 val types : (string, int * (string, int) HashTable.hash_table)
-                HashTable.hash_table = mkHt ();
+                HashTable.hash_table = Util.mkHt ()
 
 
 fun rrr2Amd64 r1 r2 dest Iloc.OP_ADD =
@@ -41,18 +37,27 @@ fun rir2Amd64 r1 immed dest Iloc.OP_XORI =
   | rir2Amd64 _ _ _ opcode = raise ILOCException opcode
 
 (*cmp = r2 - r1*)
-fun rrc2Amd64 r1 r2 Iloc.OP_COMP = (*fix*)
-    [INS_X {opcode=OP_RET}]
+fun rrc2Amd64 r1 r2 Iloc.OP_COMP =
+    [INS_RR {opcode=OP_CMP, r1=REG_N r1, r2=REG_N r2}]
   | rrc2Amd64 _ _ opcode = raise ILOCException opcode
 
 
-fun ric2Amd64 r1 immed Iloc.OP_COMPI = (*fix*)
-    [INS_X {opcode=OP_RET}]
+fun ric2Amd64 r1 immed Iloc.OP_COMPI =
+    [INS_IR {opcode=OP_CMP, immed=immed, r2=REG_N r1}]
   | ric2Amd64 _ _ opcode = raise ILOCException opcode
 
 
 fun rsr2Amd64 r1 field dest Iloc.OP_LOADAI = (*fix*)
-    [INS_X {opcode=OP_RET}]
+    let
+        (*so how do we calculate the offset
+        we map.....
+        NO
+        I think we have to go back to the ILOC....
+        it will make things much easier.....
+         *)
+    in
+        [INS_X {opcode=OP_RET}]
+    end
   | rsr2Amd64 _ _ _ opcode = raise ILOCException opcode
 
 
@@ -61,8 +66,8 @@ fun rrs2Amd64 r1 r2 field Iloc.OP_STOREAI = (*fix*)
   | rrs2Amd64 _ _ _ opcode = raise ILOCException opcode
 
 
-fun cll2Amd64 l1 l2 Iloc.OP_CBREQ = (*fix*)
-    [INS_X {opcode=OP_RET}]
+fun cll2Amd64 l1 l2 Iloc.OP_CBREQ =
+    [INS_L {opcode=OP_JE, label=l1}, INS_L {opcode=OP_JMP, label=l2}]
   | cll2Amd64 _ _ opcode = raise ILOCException opcode
 
 
@@ -83,8 +88,8 @@ fun rr2Amd64 r1 dest Iloc.OP_MOV =
   | rr2Amd64 _ _ opcode = raise ILOCException opcode
 
 
-fun ir2Amd64 immed dest Iloc.OP_LOADI = (*fix*)
-    [INS_X {opcode=OP_RET}]
+fun ir2Amd64 immed dest Iloc.OP_LOADI =
+    [INS_IR {opcode=OP_MOVQ, immed=immed, r2=REG_N dest}]
   | ir2Amd64 immed dest Iloc.OP_MOVEQ = (*fix*)
     [INS_X {opcode=OP_RET}]
   | ir2Amd64 immed dest Iloc.OP_MOVNE = (*fix*)
@@ -100,8 +105,17 @@ fun ir2Amd64 immed dest Iloc.OP_LOADI = (*fix*)
   | ir2Amd64 _ _ opcode = raise ILOCException opcode
 
 
-fun ri2Amd64 immed dest Iloc.OP_STOREOUTARGUMENT = (*fix*)
-    [INS_X {opcode=OP_RET}]
+(* rdi, rsi, rdx, rcx, r8, r9. *)
+fun ri2Amd64 immed dest Iloc.OP_STOREOUTARGUMENT =
+    (*In this instance dest is actually the source*)
+    (case immed of
+         0 => [INS_RR {opcode=OP_MOVQ, r1=REG_N dest, r2=REG_RDI}]
+       | 1 => [INS_RR {opcode=OP_MOVQ, r1=REG_N dest, r2=REG_RSI}]
+       | 2 => [INS_RR {opcode=OP_MOVQ, r1=REG_N dest, r2=REG_RDX}]
+       | 3 => [INS_RR {opcode=OP_MOVQ, r1=REG_N dest, r2=REG_RCX}]
+       | 4 => [INS_RR {opcode=OP_MOVQ, r1=REG_N dest, r2=REG_N 8}]
+       | 5 => [INS_RR {opcode=OP_MOVQ, r1=REG_N dest, r2=REG_N 9}]
+       | n => [INS_X {opcode=OP_RET}]) (*fix*)
   | ri2Amd64 _ _ opcode = raise ILOCException opcode
 
 
@@ -147,22 +161,22 @@ fun x2Amd64 Iloc.OP_RET =
 
 
 val iloc2Amd64 =
- fn Iloc.INS_RRR {opcode=opc, dest=d, r1=r1, r2=r2}     => rrr2Amd64 r1 r2 d opc
-  | Iloc.INS_RIR {opcode=opc, dest=d, r1=r1, immed=i}   => rir2Amd64 r1 i d opc
+ fn Iloc.INS_RRR {opcode=opc, r1=r1, dest=d, r2=r2}     => rrr2Amd64 r1 r2 d opc
+  | Iloc.INS_RIR {opcode=opc, r1=r1, dest=d, immed=i}   => rir2Amd64 r1 i d opc
   | Iloc.INS_RRC {opcode=opc, r1=r1, r2=r2}             => rrc2Amd64 r1 r2 opc
   | Iloc.INS_RIC {opcode=opc, r1=r1, immed=i}           => ric2Amd64 r1 i opc
-  | Iloc.INS_RSR {opcode=opc, dest=d, r1=r1, field=f}   => rsr2Amd64 r1 f d opc
+  | Iloc.INS_RSR {opcode=opc, r1=r1, dest=d, field=f}   => rsr2Amd64 r1 f d opc
   | Iloc.INS_RRS {opcode=opc, r1=r1, r2=r2, field=f}    => rrs2Amd64 r1 r2 f opc
+  | Iloc.INS_SIR {opcode=opc, r1=r1, id=id, immed=i}    => sir2Amd64 r1 i id opc
   | Iloc.INS_CLL {opcode=opc, l1=l1, l2=l2}             => cll2Amd64 l1 l2 opc
-  | Iloc.INS_SIR {opcode=opc, id=id, immed=i, r1=r1}    => sir2Amd64 r1 i id opc
   | Iloc.INS_NEW {opcode=opc, dest=d, id=id, fields=fs} => new2Amd64 id fs d opc
-  | Iloc.INS_RR  {opcode=opc, dest=d, r1=r1}            => rr2Amd64 r1 d opc
   | Iloc.INS_IR  {opcode=opc, dest=d, immed=i}          => ir2Amd64 i d opc
   | Iloc.INS_RI  {opcode=opc, dest=d, immed=i}          => ri2Amd64 i d opc
-  | Iloc.INS_SR  {opcode=opc, id=id, r1=r1}             => sr2Amd64 r1 id opc
-  | Iloc.INS_RS  {opcode=opc, id=id, r1=r1}             => rs2Amd64 r1 id opc
-  | Iloc.INS_L   {opcode=opc, l1=l1}                    => l2Amd64 l1 opc
+  | Iloc.INS_RR  {opcode=opc, r1=r1, dest=d}            => rr2Amd64 r1 d opc
+  | Iloc.INS_SR  {opcode=opc, r1=r1, id=id}             => sr2Amd64 r1 id opc
+  | Iloc.INS_RS  {opcode=opc, r1=r1, id=id}             => rs2Amd64 r1 id opc
   | Iloc.INS_R   {opcode=opc, r1=r1}                    => r2Amd64 r1 opc
+  | Iloc.INS_L   {opcode=opc, l1=l1}                    => l2Amd64 l1 opc
   | Iloc.INS_X   {opcode=opc}                           => x2Amd64 opc
 
 
@@ -182,7 +196,7 @@ local
 in
     fun calcOffsets (Ast.TYPE_DECL {id=id, decls=decls, ...}) =
         HashTable.insert types (id, (length decls * 8,
-                                     addOffsets (mkHt ()) 0 decls))
+                                     addOffsets (Util.mkHt ()) 0 decls))
 end
 
 

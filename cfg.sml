@@ -24,6 +24,7 @@ signature CFG = sig
     (*Get rid of these later*)
     val getRegs : cfg -> (string, int) HashTable.hash_table;
     val getLabel : node -> string;
+    val getName : cfg -> string;
 end
 
 structure Cfg :> CFG = struct
@@ -104,6 +105,9 @@ fun getLabel (NODE {label=label, ...}) = label
 
 
 fun getRegs (CFG {regs=regs, ...}) = regs
+
+
+fun getName (CFG {entry=NODE {label=label, ...}, ...}) = label
 
 
 (*mmmm mutation... delicious*)

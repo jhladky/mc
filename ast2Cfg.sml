@@ -1,17 +1,19 @@
 signature AST2CFG = sig
-    val ast2Cfg : Ast.program -> Cfg.program
+    val ast2Cfg : Static.symbolTable -> Ast.program -> Cfg.program
 end
 
 structure Ast2Cfg :> AST2CFG = struct
-open Ast;
-open Iloc;
+open Ast
+open Iloc
 
-fun mkHt () = HashTable.mkTable (HashString.hashString, op =)
-                                (10, Fail "Not Found")
+val funcs : (string, function) HashTable.hash_table = Util.mkHt ()
+val types : (string, string list) HashTable.hash_table = Util.mkHt ()
+val offsets : (string, (string, int) HashTable.hash_table)
+                  HashTable.hash_table = Util.mkHt ()
 
 
-val funcs : (string, Cfg.cfg) HashTable.hash_table = mkHt ();
-val types : (string, string list) HashTable.hash_table = mkHt ();
+fun getOffset (typ, field) =
+    HashTable.lookup (HashTable.lookup offsets typ) field * Util.WORD_SIZE
 
 
 fun idExpr2Ins cfg id =
@@ -25,18 +27,18 @@ fun idExpr2Ins cfg id =
         end
 
 
-fun bop2Op BOP_PLUS = OP_ADD
-  | bop2Op BOP_MINUS = OP_SUB
-  | bop2Op BOP_TIMES = OP_MULT
-  | bop2Op BOP_DIVIDE = OP_DIV
-  | bop2Op BOP_AND = OP_AND
-  | bop2Op BOP_OR = OP_OR
-  | bop2Op BOP_EQ = OP_MOVEQ
-  | bop2Op BOP_NE = OP_MOVNE
-  | bop2Op BOP_LT = OP_MOVLT
-  | bop2Op BOP_GT = OP_MOVGT
-  | bop2Op BOP_LE = OP_MOVLE
-  | bop2Op BOP_GE = OP_MOVGE
+val bop2Op = fn BOP_PLUS => OP_ADD
+  | BOP_MINUS => OP_SUB
+  | BOP_TIMES => OP_MULT
+  | BOP_DIVIDE => OP_DIV
+  | BOP_AND => OP_AND
+  | BOP_OR => OP_OR
+  | BOP_EQ => OP_MOVEQ
+  | BOP_NE => OP_MOVNE
+  | BOP_LT => OP_MOVLT
+  | BOP_GT => OP_MOVGT
+  | BOP_LE => OP_MOVLE
+  | BOP_GE => OP_MOVGE
 
 
 local
@@ -114,7 +116,9 @@ and expr2Ins cfg (EXP_NUM {value=value, ...}) = genLoad value (Cfg.nextReg cfg)
     let
         val (r1, L) = expr2Ins cfg lft;
         val dest = Cfg.nextReg cfg;
+        (* val offset = StaticCheck.getExprType program func prop; *)
     in
+        (* (dest, INS_RIR {opcode=OP_LOADAI, r1=r1, immed=___, dest=dest}::L) *)
         (dest, INS_RSR {opcode=OP_LOADAI, r1=r1, field=prop, dest=dest}::L)
     end
   | expr2Ins cfg (EXP_NEW {id=id, ...}) =
@@ -282,7 +286,7 @@ fun func2Cfg (f as FUNCTION {id=id, body=body, params=params, ...}) =
     in
         Cfg.link res exit;
         Cfg.fill res (genJump exit);
-        HashTable.insert funcs (id, cfg);
+        HashTable.insert funcs (id, f);
         Cfg.FUNCTION {id=id, body=cfg}
     end
 
@@ -291,7 +295,19 @@ fun addType (TYPE_DECL {id=id, decls=decls, ...}) =
     HashTable.insert types (id, map (fn (VAR_DECL {id=s, ...}) => s) decls)
 
 
-fun ast2Cfg (PROGRAM {funcs=fs, types=ts, decls=ds}) =
-    (app addType ts; Cfg.PROGRAM {types=ts, decls=ds, funcs=map func2Cfg fs})
+local
+    fun addOffsets ht n [] = ht
+      | addOffsets ht n ((VAR_DECL {id=id, ...})::xs) =
+        (HashTable.insert ht (id, n); addOffsets ht (n + 1) xs)
+in
+    fun calcOffsets (TYPE_DECL {id=id, decls=decls, ...}) =
+        HashTable.insert offsets (id, addOffsets (Util.mkHt ()) 0 decls)
+end
+
+
+fun ast2Cfg st (PROGRAM {funcs=fs, types=ts, decls=ds}) =
+    (app addType ts;
+     app calcOffsets ts;
+     Cfg.PROGRAM {types=ts, decls=ds, funcs=map func2Cfg fs})
 
 end
