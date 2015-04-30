@@ -4,6 +4,7 @@ signature CFG2AMD64 = sig
 end
 
 structure Cfg2Amd64 :> CFG2AMD64 = struct
+open SymbolTable
 open TargetAmd64
 
 exception ILOCException of Iloc.opcode
@@ -180,14 +181,30 @@ val iloc2Amd64 =
   | Iloc.INS_X   {opcode=opc}                           => x2Amd64 opc
 
 
-(*so again, we're going to need some sort of accumulator here....*)
-(* fun getMostParams funcs (FUNC_INFO {calls=calls, ...}) = *)
+(*The static check means that we know the function exists*)
+fun getParamsLen funcs call =
+    let
+        val FUNC_INFO {params=ps, ...} = HashTable.lookup funcs call
+    in
+        length ps
+    end
+
+
+fun getMostParams max funcs [] = max
+  | getMostParams max funcs (call::calls) =
+    let
+        val new = getParamsLen funcs call
+    in
+        getMostParams (if new > max then new else max) funcs calls
+    end
 
 
 (*this is the function level*)
-fun func2Amd64 st (func as Cfg.FUNCTION {id=id, ...}) =
+fun func2Amd64 (ST {funcs=funcs, ...}) (func as Cfg.FUNCTION {id=id, ...}) =
     let
         val bb2Amd64 = fn (l, L) => (l, List.concat (map iloc2Amd64 L))
+        val (FUNC_INFO {calls=calls, ...}) = HashTable.lookup funcs id
+        val max = getMostParams 0 funcs calls
     in
         (id, map bb2Amd64 (Cfg.toList func))
     end

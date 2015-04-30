@@ -62,15 +62,8 @@ fun checkLvalue (STL {locals=locals, ...}) (LV_ID {id=id, line=l}) =
     end
 
 
-fun checkArgs l stl [] [] = ()
-  | checkArgs l stl (x::xs) [] = raise Invocation l
-  | checkArgs l stl [] (x::xs) = raise Invocation l
-  | checkArgs l stl (param::params) (arg::args)  =
-    (checkType l (param, checkExpr stl arg); checkArgs l stl params args)
-
-
 (*the type of the invocation expression is the RETURN TYPE of the function...*)
-and checkInvocation l id args (stl as STL {globals=globals, funcs=funcs, ...}) =
+fun checkInvocation l id args (stl as STL {globals=globals, funcs=funcs, ...}) =
     let
         val () = (case find globals id of
                       SOME MT_FUNC => ()
@@ -80,7 +73,9 @@ and checkInvocation l id args (stl as STL {globals=globals, funcs=funcs, ...}) =
          * make sure f was a function*)
         val FUNC_INFO {params=params, returnType=rt, ...} = lookup funcs id
     in
-        checkArgs l stl params args; rt
+        ListPair.appEq (checkType l) (params, (List.map (checkExpr stl) args))
+        handle UnequalLengths => raise Invocation l;
+        rt
     end
 
 

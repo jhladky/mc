@@ -1,0 +1,10 @@
+fun foo(int i) int
+{
+   return i;
+}
+
+fun main() int
+{
+   foo();
+   return 0;
+}

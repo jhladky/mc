@@ -6,7 +6,6 @@ signature SYMBOL_TABLE = sig
             calls: string list
         }
 
-
     datatype symbol_table =
         ST of {
             types: (string, (string, Ast.typ) HashTable.hash_table)
@@ -33,7 +32,6 @@ datatype func_info =
         returnType: typ, (*return type of the function*)
         calls: string list (*list of calls the function makes*)
     }
-
 
 (* Variables and functions are in the same namespace,
  * but structure names are in a DIFFERENT namespace.*)

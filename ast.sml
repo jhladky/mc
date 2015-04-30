@@ -65,13 +65,22 @@ datatype statement =
 
 
 datatype function =
-     FUNCTION of {id: string, params: var_decl list, returnType: typ,
-                  decls: var_decl list, body: statement list, line: int}
+     FUNCTION of {
+         id: string,
+         params: var_decl list,
+         returnType: typ,
+         decls: var_decl list,
+         body: statement list,
+         line: int
+     }
 
 
 datatype program =
-     PROGRAM of {types: type_decl list, decls: var_decl list,
-                 funcs: function list}
+     PROGRAM of {
+         types: type_decl list,
+         decls: var_decl list,
+         funcs: function list
+     }
 
 
 fun foldd sep f [] = ""
