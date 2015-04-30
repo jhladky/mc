@@ -4,8 +4,8 @@
 datatype carrier =
      carrier_list  of carrier list
    | s_c_pair      of string * carrier
-   | var_decl       of Ast.var_decl
-   | type_decl      of Ast.type_decl
+   | var_decl      of Ast.var_decl
+   | type_decl     of Ast.type_decl
    | lvalue        of Ast.lvalue
    | expression    of Ast.expression
    | statement     of Ast.statement
