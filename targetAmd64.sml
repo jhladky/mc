@@ -43,6 +43,7 @@ datatype instruction =
      INS_RR of {opcode: opcode, r1: register, r2: register}
    | INS_IR of {opcode: opcode, immed: int, r2: register}
    (* | INS_IRR of {opcode: opcode, immed: int, r1: register, r2: register} *)
+   | INS_SR of {opcode: opcode, id: string, dest: register}
    | INS_GR of {opcode: opcode, global: string, dest: register}
    | INS_RG of {opcode: opcode, r1: register, global: string}
    | INS_MR of {opcode: opcode, immed: int, base: register, offset: register,
@@ -53,10 +54,10 @@ datatype instruction =
    | INS_X of {opcode: opcode}
 
 
-type basicBlock = string * instruction list
+type basic_block = string * instruction list
 
 
-type function = string * basicBlock list
+type function = string * basic_block list
 
 
 datatype program = PROGRAM of {text: function list, data: string list}
@@ -111,17 +112,17 @@ val insToStr =
   (*   regToStr r2 *)
   | INS_GR {opcode=opc, global=global, dest=dest} =>
     opToStr opc ^ global ^ "(%rip), " ^ regToStr dest
+  | INS_SR {opcode=opc, id=id, dest=dest} =>
+    opToStr opc ^ "$" ^ id ^ ", " ^ regToStr dest
   | INS_RG {opcode=opc, r1=r1, global=global} =>
     opToStr opc ^ regToStr r1 ^ ", " ^ global ^ "(%rip)"
   | INS_L {opcode=opc, label=label} => opToStr opc ^ label
-  | INS_MR {opcode=opc, immed=immed, base=base, offset=offset, scalar=scalar,
-            dest=dest} =>
-    opToStr opc ^ Int.toString immed ^ "(" ^ regToStr base ^ ", " ^
-    regToStr offset ^ ", " ^ Int.toString scalar ^ "), " ^ regToStr dest
-  | INS_RM {opcode=opc, r1=r1, immed=immed, base=base, offset=offset,
-            scalar=scalar} =>
-    opToStr opc ^ regToStr r1 ^ ", " ^  Int.toString immed ^ "(" ^
-    regToStr base ^ ", " ^ regToStr offset ^ ", " ^ Int.toString scalar ^ ")"
+  | INS_MR {opcode=opc, immed=i, base=base, offset=offset, scalar=s, dest=d} =>
+    opToStr opc ^ Int.toString i ^ "(" ^ regToStr base ^ ", " ^
+    regToStr offset ^ ", " ^ Int.toString s ^ "), " ^ regToStr d
+  | INS_RM {opcode=opc, r1=r1, immed=i, base=base, offset=offset, scalar=s} =>
+    opToStr opc ^ regToStr r1 ^ ", " ^  Int.toString i ^ "(" ^ regToStr base ^
+    ", " ^ regToStr offset ^ ", " ^ Int.toString s ^ ")"
   | INS_X {opcode=opc} => opToStr opc
 
 
@@ -141,8 +142,8 @@ fun programToStr (PROGRAM {text=text, data=data}) =
     (foldr (fn (func, s) => (funcToStr func) ^ s) "" text) ^
     "\t.section data\n" ^
     (foldr (fn (id, s) => "\t.comm " ^ id ^ ", 8, 8\n" ^ s) "" data) ^
-    "\t.section rodata\nL__pstr__:\n\t.asciz \"%s\"\n" ^
-    "L__pstre__:\n\t.asciz \"%s\\n\"\n"
+    "\t.section rodata\nL__s__:\n\t.asciz \"%d\"\n" ^
+    "L__sn__:\n\t.asciz \"%d\\n\"\n"
 
 
 end

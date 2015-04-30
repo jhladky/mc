@@ -67,7 +67,7 @@ datatype instruction =
    | INS_X   of {opcode: opcode}
 
 
-type basicBlock = string * instruction list
+type basic_block = string * instruction list
 
 
 fun opToStr OP_ADD = "add"

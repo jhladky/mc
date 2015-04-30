@@ -6,24 +6,24 @@ signature CFG = sig
     datatype function = FUNCTION of {id: string, body: cfg};
     datatype program =
         PROGRAM of {
-            types: Ast.typeDecl list,
-            decls: Ast.varDecl list,
+            types: Ast.type_decl list,
+            decls: Ast.var_decl list,
             funcs: function list
         };
 
-    val mkCfg : SymbolTable.symbolTable -> Ast.function -> node * node * cfg;
+    val mkCfg : SymbolTable.symbol_table -> Ast.function -> node * node * cfg;
     val mkIf : node -> node * node * node;
     val mkWhile : node -> node * node * node;
     val mkReturn : cfg -> node * node;
 
     val link : node -> node -> unit;
     val fill : node -> Iloc.instruction list -> unit;
-    val toList : function -> Iloc.basicBlock list;
+    val toList : function -> Iloc.basic_block list;
     val nextReg : cfg -> int;
 
     val getRegs : cfg -> (string, int) HashTable.hash_table;
     val getLabel : node -> string;
-    val getSTInfo : cfg -> string * SymbolTable.symbolTable;
+    val getSTInfo : cfg -> string * SymbolTable.symbol_table;
 end
 
 structure Cfg :> CFG = struct
@@ -39,7 +39,7 @@ datatype node =
 
 datatype cfg =
     CFG of {
-        st: SymbolTable.symbolTable,
+        st: SymbolTable.symbol_table,
         regs: (string, int) HashTable.hash_table,
         nextReg: int ref,
         entry: node,
@@ -50,8 +50,8 @@ datatype function = FUNCTION of {id: string, body: cfg};
 
 datatype program =
     PROGRAM of {
-        types: Ast.typeDecl list,
-        decls: Ast.varDecl list,
+        types: Ast.type_decl list,
+        decls: Ast.var_decl list,
         funcs: function list
     }
 

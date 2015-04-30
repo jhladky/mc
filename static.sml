@@ -1,8 +1,8 @@
 signature STATIC = sig
-    val staticCheck : string -> SymbolTable.symbolTable -> Ast.program -> unit
-    val getExprType : string -> SymbolTable.symbolTable ->
+    val staticCheck : string -> SymbolTable.symbol_table -> Ast.program -> unit
+    val getExprType : string -> SymbolTable.symbol_table ->
                       Ast.expression -> Ast.typ
-    val getLvalueType : string -> SymbolTable.symbolTable ->
+    val getLvalueType : string -> SymbolTable.symbol_table ->
                         Ast.lvalue -> Ast.typ
 end
 
@@ -12,14 +12,28 @@ open Ast
 open SymbolTable
 
 
+datatype symbol_table_local =
+    STL of {
+        types: (string, (string, typ) hash_table) hash_table,
+        globals: (string, typ) hash_table,
+        locals: (string, typ) hash_table,
+        funcs: (string, func_info) hash_table,
+        returnType: typ
+    }
+
+
 exception Undefined        of int * string
-exception BinOp            of int * binaryOperator * typ
-exception UnOp             of int * unaryOperator * typ
+exception BinOp            of int * binary_operator * typ
+exception UnOp             of int * unary_operator * typ
 exception TypeMismatch     of int * typ * typ
 exception NotAFunction     of int * typ
 exception ReturnMissing    of int
 exception Invocation       of int (*I'll add arguments to this later.*)
 exception NoMain           of int
+
+
+fun st2Stl id rt (ST {types=ts, globals=gs, funcs=fs, locals=ls}) =
+    STL {types=ts, globals=gs, locals=lookup ls id, funcs=fs, returnType=rt}
 
 
 (* null can be assigned to any struct type*)
@@ -51,8 +65,8 @@ fun checkLvalue (STL {locals=locals, ...}) (LV_ID {id=id, line=l}) =
 fun checkArgs l stl [] [] = ()
   | checkArgs l stl (x::xs) [] = raise Invocation l
   | checkArgs l stl [] (x::xs) = raise Invocation l
-  | checkArgs l stl (VAR_DECL {typ=tParam, ...}::params) (arg::args)  =
-    (checkType l (tParam, checkExpr stl arg); checkArgs l stl params args)
+  | checkArgs l stl (param::params) (arg::args)  =
+    (checkType l (param, checkExpr stl arg); checkArgs l stl params args)
 
 
 (*the type of the invocation expression is the RETURN TYPE of the function...*)
@@ -64,7 +78,7 @@ and checkInvocation l id args (stl as STL {globals=globals, funcs=funcs, ...}) =
                     | NONE => raise NotAFunction (l, MT_VOID))
         (* We can do this safely since we already checked to
          * make sure f was a function*)
-        val (FUNCTION {params=params, returnType=rt, ...}) = lookup funcs id
+        val FUNC_INFO {params=params, returnType=rt, ...} = lookup funcs id
     in
         checkArgs l stl params args; rt
     end
@@ -138,8 +152,7 @@ and checkExpr stl (EXP_NUM {value=n, ...}) = MT_INT
 
 
 (*Returns a boolean indicating whether the statement returns on all paths*)
-fun checkStmt stl (ST_BLOCK stmts) =
-    checkStmts stl stmts
+fun checkStmt stl (ST_BLOCK stmts) = checkStmts stl stmts
   | checkStmt stl (ST_ASSIGN {target=target, source=source, line=l}) =
     (checkType l (checkLvalue stl target, checkExpr stl source); false)
   | checkStmt stl (ST_PRINT {body=body, line=l, ...}) =
@@ -181,11 +194,6 @@ and checkStmts1 retDetect stl [] = retDetect
 and checkStmts stl L = checkStmts1 false stl L
 
 
-(*move to SymbolTable struct later*)
-fun st2Stl id rt (ST {types=ts, globals=gs, funcs=fs, locals=ls}) =
-    STL {types=ts, globals=gs, locals=lookup ls id, funcs=fs, returnType=rt}
-
-
 fun checkFunc st (FUNCTION {returnType=rt, body=body, line=l, id=id, ...}) =
     let
         val doesRet = checkStmts (st2Stl id rt st) body
@@ -197,7 +205,7 @@ fun checkFunc st (FUNCTION {returnType=rt, body=body, line=l, id=id, ...}) =
 
 fun checkForMain (ST {funcs=funcs, ...}) =
     case find funcs "main" of
-        SOME (FUNCTION {params=params, returnType=rt, ...}) =>
+        SOME (FUNC_INFO {params=params, returnType=rt, ...}) =>
         if length params = 0 andalso rt = MT_INT then ()
         else raise NoMain 1
       | NONE => raise NoMain 1

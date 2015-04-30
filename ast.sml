@@ -1,6 +1,6 @@
 structure Ast = struct
 
-datatype binaryOperator =
+datatype binary_operator =
      BOP_PLUS
    | BOP_MINUS
    | BOP_TIMES
@@ -15,7 +15,7 @@ datatype binaryOperator =
    | BOP_OR
 
 
-datatype unaryOperator = UOP_NOT | UOP_MINUS
+datatype unary_operator = UOP_NOT | UOP_MINUS
 
 
 datatype typ =
@@ -26,10 +26,10 @@ datatype typ =
    | MT_STRUCT of string
 
 
-datatype varDecl = VAR_DECL of {id: string, typ: typ, line: int}
+datatype var_decl = VAR_DECL of {id: string, typ: typ, line: int}
 
 
-datatype typeDecl = TYPE_DECL of {id: string, decls: varDecl list, line: int}
+datatype type_decl = TYPE_DECL of {id: string, decls: var_decl list, line: int}
 
 
 datatype lvalue =
@@ -43,9 +43,9 @@ datatype expression =
    | EXP_TRUE of {line: int}
    | EXP_FALSE of {line: int}
    | EXP_NULL
-   | EXP_BINARY of {opr: binaryOperator, lft: expression,
+   | EXP_BINARY of {opr: binary_operator, lft: expression,
                     rht: expression, line: int}
-   | EXP_UNARY of {opr: unaryOperator, opnd: expression, line: int}
+   | EXP_UNARY of {opr: unary_operator, opnd: expression, line: int}
    | EXP_DOT of {lft: expression, prop: string, line: int}
    | EXP_NEW of {id: string, line: int}
    | EXP_INVOCATION of {id: string, args: expression list, line: int}
@@ -65,12 +65,12 @@ datatype statement =
 
 
 datatype function =
-     FUNCTION of {id: string, params: varDecl list, returnType: typ,
-                  decls: varDecl list, body: statement list, line: int}
+     FUNCTION of {id: string, params: var_decl list, returnType: typ,
+                  decls: var_decl list, body: statement list, line: int}
 
 
 datatype program =
-     PROGRAM of {types: typeDecl list, decls: varDecl list,
+     PROGRAM of {types: type_decl list, decls: var_decl list,
                  funcs: function list}
 
 

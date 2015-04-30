@@ -1,5 +1,5 @@
 signature CFG2AMD64 = sig
-    val cfg2Amd64 : Cfg.program -> TargetAmd64.program;
+    val cfg2Amd64 : Cfg.program -> TargetAmd64.program
 end
 
 structure Cfg2Amd64 :> CFG2AMD64 = struct
@@ -46,7 +46,6 @@ fun rri2Amd64 r1 r2 immed Iloc.OP_STOREAI =
   | rri2Amd64 _ _ _ opcode = raise ILOCException opcode
 
 
-(*cmp = r2 - r1*)
 fun rrc2Amd64 r1 r2 Iloc.OP_COMP =
     [INS_RR {opcode=OP_CMP, r1=REG_N r1, r2=REG_N r2}]
   | rrc2Amd64 _ _ opcode = raise ILOCException opcode
@@ -62,8 +61,16 @@ fun cll2Amd64 l1 l2 Iloc.OP_CBREQ =
   | cll2Amd64 _ _ opcode = raise ILOCException opcode
 
 
-fun sir2Amd64 r2 immed id Iloc.OP_LOADINARGUMENT = (*fix*)
-    [INS_X {opcode=OP_RET}]
+fun sir2Amd64 r2 immed id Iloc.OP_LOADINARGUMENT =
+    (*r2 is the dest in this case...*)
+    (case immed of
+         0 => [INS_RR {opcode=OP_MOVQ, r1=REG_RDI, r2=REG_N r2}]
+       | 1 => [INS_RR {opcode=OP_MOVQ, r1=REG_RSI, r2=REG_N r2}]
+       | 2 => [INS_RR {opcode=OP_MOVQ, r1=REG_RDX, r2=REG_N r2}]
+       | 3 => [INS_RR {opcode=OP_MOVQ, r1=REG_RCX, r2=REG_N r2}]
+       | 4 => [INS_RR {opcode=OP_MOVQ, r1=REG_N 8, r2=REG_N r2}]
+       | 5 => [INS_RR {opcode=OP_MOVQ, r1=REG_N 9, r2=REG_N r2}]
+       | n => [INS_X {opcode=OP_RET}]) (*fix*)
   | sir2Amd64 _ _ _ opcode = raise ILOCException opcode
 
 
@@ -96,6 +103,8 @@ fun ir2Amd64 immed dest Iloc.OP_LOADI =
   | ir2Amd64 _ _ opcode = raise ILOCException opcode
 
 
+(*when you enter a function find out which one needs the most arguments and then allocate at least that much space on the stack*)
+
 (* rdi, rsi, rdx, rcx, r8, r9. *)
 fun ri2Amd64 immed dest Iloc.OP_STOREOUTARGUMENT =
     (*In this instance dest is actually the source*)
@@ -112,8 +121,8 @@ fun ri2Amd64 immed dest Iloc.OP_STOREOUTARGUMENT =
 
 fun sr2Amd64 r1 id Iloc.OP_LOADGLOBAL =
     [INS_GR {opcode=OP_MOVQ, global=id, dest=REG_N r1}]
-  | sr2Amd64 r1 id Iloc.OP_COMPUTEGLOBALADDRESS = (*fix*)
-    [INS_X {opcode=OP_RET}]
+  | sr2Amd64 r1 id Iloc.OP_COMPUTEGLOBALADDRESS =
+    [INS_SR {opcode=OP_MOVQ, id=id, dest=REG_N r1}]
   | sr2Amd64 _ _ opcode = raise ILOCException opcode
 
 
@@ -122,32 +131,32 @@ fun rs2Amd64 r1 id Iloc.OP_STOREGLOBAL =
   | rs2Amd64 _ _ opcode = raise ILOCException opcode
 
 
-fun l2Amd64 l1 Iloc.OP_JUMPI =
-    [INS_L {opcode=OP_JMP, label=l1}]
-  | l2Amd64 l1 Iloc.OP_CALL =
-    [INS_L {opcode=OP_CALL, label=l1}]
+fun l2Amd64 l1 Iloc.OP_JUMPI = [INS_L {opcode=OP_JMP, label=l1}]
+  | l2Amd64 l1 Iloc.OP_CALL = [INS_L {opcode=OP_CALL, label=l1}]
   | l2Amd64 _ opcode = raise ILOCException opcode
 
+
+fun io2Amd64 r1 label funcName =
+    [INS_SR {opcode=OP_MOVQ, id=label, dest=REG_RDI},
+     INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RSI},
+     INS_IR {opcode=OP_MOVQ, immed=0, r2=REG_RAX},
+     INS_L {opcode=OP_CALL, label=funcName}]
 
 
 fun r2Amd64 r1 Iloc.OP_LOADRET =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RAX}]
   | r2Amd64 r1 Iloc.OP_STORERET =
     [INS_RR {opcode=OP_MOVQ, r1=REG_RAX, r2=REG_N r1}]
-  | r2Amd64 r1 Iloc.OP_PRINT = (*fix*)
-    [INS_X {opcode=OP_RET}]
-  | r2Amd64 r1 Iloc.OP_PRINTLN = (*fix*)
-    [INS_X {opcode=OP_RET}]
-  | r2Amd64 r1 Iloc.OP_READ = (*fix*)
-    [INS_X {opcode=OP_RET}]
+  | r2Amd64 r1 Iloc.OP_PRINT = io2Amd64 r1 "L__s__" "printf"
+  | r2Amd64 r1 Iloc.OP_PRINTLN = io2Amd64 r1 "L__sn__" "printf"
+  | r2Amd64 r1 Iloc.OP_READ = io2Amd64 r1 "L__s__" "scanf"
   | r2Amd64 r1 Iloc.OP_DEL =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RDI},
      INS_L {opcode=OP_CALL, label="free"}]
   | r2Amd64 _ opcode = raise ILOCException opcode
 
 
-fun x2Amd64 Iloc.OP_RET =
-    [INS_X {opcode=OP_RET}]
+fun x2Amd64 Iloc.OP_RET = [INS_X {opcode=OP_RET}]
   | x2Amd64 opcode = raise ILOCException opcode
 
 

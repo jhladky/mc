@@ -2,21 +2,21 @@
  * So `carrier` acts as a sort-of 'superclass' for the various parts
  * of the AST.*)
 datatype carrier =
-     carrier_list of carrier list
-   | s_c_pair of string * carrier
-   | varDecl of Ast.varDecl
-   | typeDecl of Ast.typeDecl
-   | lvalue of Ast.lvalue
-   | expression of Ast.expression
-   | statement of Ast.statement
-   | function of Ast.function
-   | program of Ast.program
-   | string of string
-   | int of int
-   | bool of bool
+     carrier_list  of carrier list
+   | s_c_pair      of string * carrier
+   | var_decl       of Ast.var_decl
+   | type_decl      of Ast.type_decl
+   | lvalue        of Ast.lvalue
+   | expression    of Ast.expression
+   | statement     of Ast.statement
+   | function      of Ast.function
+   | program       of Ast.program
+   | string        of string
+   | int           of int
+   | bool          of bool
 
 
-(*Note there's some crap in here to make the compiler shut up about
+(* Note there's some crap in here to make the compiler shut up about
  * non-exhaustive matches.*)
 structure Json2Ast : JSON_CALLBACKS = struct
 open Ast
@@ -26,72 +26,57 @@ type json_data = carrier
 (* HELPER FUNCTIONS *)
 fun carrier2Ht L =
     let
-        val ht = HashTable.mkTable (HashString.hashString, op =)
-                                   (10, Fail "Not Found");
-        fun carrier2Ht_ (s_c_pair p) = HashTable.insert ht p
-          | carrier2Ht_ _ = raise Fail "Expected an `s_c_pair`."
+        val ht = Util.mkHt ()
     in
-        (app carrier2Ht_ L; ht)
+        app (fn s_c_pair p => HashTable.insert ht p
+            | _ => raise Fail "Expected n `s_c_pair`.") L;
+        ht
     end
 
 
-fun str2BinaryOpr "+" = BOP_PLUS
-  | str2BinaryOpr "-" = BOP_MINUS
-  | str2BinaryOpr "*" = BOP_TIMES
-  | str2BinaryOpr "/" = BOP_DIVIDE
-  | str2BinaryOpr "==" = BOP_EQ
-  | str2BinaryOpr "!=" = BOP_NE
-  | str2BinaryOpr "<" = BOP_LT
-  | str2BinaryOpr ">" = BOP_GT
-  | str2BinaryOpr "<=" = BOP_LE
-  | str2BinaryOpr ">=" = BOP_GE
-  | str2BinaryOpr "&&" = BOP_AND
-  | str2BinaryOpr "||" = BOP_OR
-  | str2BinaryOpr s = raise Fail s
+val str2BinaryOpr =
+ fn "+"  => BOP_PLUS
+  | "-"  => BOP_MINUS
+  | "*"  => BOP_TIMES
+  | "/"  => BOP_DIVIDE
+  | "==" => BOP_EQ
+  | "!=" => BOP_NE
+  | "<"  => BOP_LT
+  | ">"  => BOP_GT
+  | "<=" => BOP_LE
+  | ">=" => BOP_GE
+  | "&&" => BOP_AND
+  | "||" => BOP_OR
+  | s    => raise Fail s
 
 
-fun str2UnaryOpr "!" = UOP_NOT
-  | str2UnaryOpr "-" = UOP_MINUS
-  | str2UnaryOpr s = raise Fail s
+val str2UnaryOpr = fn "!" => UOP_NOT | "_" => UOP_MINUS | s => raise Fail s
 
 
-fun carrier2MiniType (string "int") = MT_INT
-  | carrier2MiniType (string "bool") = MT_BOOL
-  | carrier2MiniType (string "void") = MT_VOID
-  | carrier2MiniType (string s) = MT_STRUCT s
-  | carrier2MiniType _ = raise Fail "Expected a `string`."
+val carrier2MiniType =
+ fn string "int"  => MT_INT
+  | string "bool" => MT_BOOL
+  | string "void" => MT_VOID
+  | string s      => MT_STRUCT s
+  | _             => raise Fail "Expected a `string`."
 
 
 (*'uwr' stands for 'unwrap'*)
-fun uwrStr (string s) = s | uwrStr _ = raise Fail "Expected a `string`."
-
-
-fun uwrExpr (expression e) = e
-  | uwrExpr _ = raise Fail "Expected an `expression`."
-
-
-fun uwrStmt (statement s) = s
-  | uwrStmt _ = raise Fail "Expected a `statement`."
-
-
-fun uwrLvalue (lvalue l) = l
-  | uwrLvalue _ = raise Fail "Expected a `lvalue`."
-
-
-fun uwrBool (bool b) = b | uwrBool _ = raise Fail "Expected a `bool`."
+val uwrStr =  fn string s => s     | _ => raise Fail "Expected a `string`."
+val uwrExpr = fn expression e => e | _ => raise Fail "Expected a `expression`."
+val uwrStmt = fn statement s => s  | _ => raise Fail "Expected a `statement`."
+val uwrVd   = fn var_decl vd => vd | _ => raise Fail "Expected a `varDecl`."
+val uwrLval = fn lvalue l => l     | _ => raise Fail "Expected a `lvalue`."
+val uwrBool = fn bool b => b       | _ => raise Fail "Expected a `bool`."
 
 
 fun uwrCL f (carrier_list L) = map f L
   | uwrCL _ _ = raise Fail "Expected a `carrier_list`"
 
 
-fun uwrVds c = uwrCL (fn (varDecl vd) => vd | _ => raise Fail "") c
-
-
-fun uwrExprs c = uwrCL uwrExpr c
-
-
-fun uwrStmts c = uwrCL uwrStmt c
+val uwrVds = uwrCL uwrVd
+val uwrExprs = uwrCL uwrExpr
+val uwrStmts = uwrCL uwrStmt
 
 
 fun line get = (fn (int n) => n | _ => raise Fail "Expected an `int`.")
@@ -142,7 +127,7 @@ fun statement2Ast get =
         "block" => ST_BLOCK (uwrStmts (get "list"))
       | "assign" =>
         ST_ASSIGN {
-            target=uwrLvalue (get "target"),
+            target=uwrLval (get "target"),
             source=uwrExpr (get "source"),
             line=line get
         }
@@ -152,7 +137,7 @@ fun statement2Ast get =
             endl=uwrBool (get "endl"),
             line=line get
         }
-      | "read" => ST_READ {id=uwrLvalue (get "target"), line=line get}
+      | "read" => ST_READ {id=uwrLval (get "target"), line=line get}
       | "if" =>
         ST_IF {
             guard=uwrExpr (get "guard"),
@@ -213,7 +198,7 @@ fun lvalue2Ast get =
         "id" => LV_ID {id=uwrStr (get "id"), line=line get}
       | "dot" =>
         LV_DOT {
-            lft=uwrLvalue (get "left"),
+            lft=uwrLval (get "left"),
             prop=uwrStr (get "id"),
             line=line get
         }
@@ -222,7 +207,7 @@ fun lvalue2Ast get =
 
 fun program2Ast get =
     PROGRAM {
-        types=uwrCL (fn (typeDecl td) => td | _ => raise Fail "")
+        types=uwrCL (fn (type_decl td) => td | _ => raise Fail "")
                     (get "types"),
         decls=uwrVds (get "declarations"),
         funcs=uwrCL (fn (function f) => f | _ => raise Fail "")
@@ -237,8 +222,8 @@ fun json_object L =
         case uwrStr (HashTable.lookup ht "ast_node") of
             "expression" => expression (expression2Ast (HashTable.lookup ht))
           | "statement" => statement (statement2Ast (HashTable.lookup ht))
-          | "varDecl" => varDecl (varDecl2Ast (HashTable.lookup ht))
-          | "typeDecl" => typeDecl (typeDecl2Ast (HashTable.lookup ht))
+          | "varDecl" => var_decl (varDecl2Ast (HashTable.lookup ht))
+          | "typeDecl" => type_decl (typeDecl2Ast (HashTable.lookup ht))
           | "function" => function (function2Ast (HashTable.lookup ht))
           | "lvalue" => lvalue (lvalue2Ast (HashTable.lookup ht))
           | "program" => program (program2Ast (HashTable.lookup ht))
@@ -246,14 +231,14 @@ fun json_object L =
     end
 
 
-fun json_pair p = s_c_pair p;
-fun json_array L = carrier_list L;
-fun json_value v = v;
-fun json_int i = int i;
-fun json_bool b = bool b;
-fun json_string s = string s;
-fun json_real _ = raise Fail "Unexpected `real`.";
-fun json_null () = raise Fail "Unexpected `null`.";
+fun json_pair p = s_c_pair p
+fun json_array L = carrier_list L
+fun json_value v = v
+fun json_int i = int i
+fun json_bool b = bool b
+fun json_string s = string s
+fun json_real _ = raise Fail "Unexpected `real`."
+fun json_null () = raise Fail "Unexpected `null`."
 
 
 fun error_handle (msg, pos, data) =
@@ -261,7 +246,7 @@ fun error_handle (msg, pos, data) =
 
 end
 
-structure parser = JSONParser (Json2Ast);
+structure parser = JSONParser (Json2Ast)
 
 fun json2AST ins =
     case parser.parse (TextIO.inputAll ins) of
