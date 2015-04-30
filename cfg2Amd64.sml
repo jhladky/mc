@@ -1,5 +1,6 @@
 signature CFG2AMD64 = sig
-    val cfg2Amd64 : Cfg.program -> TargetAmd64.program
+    val cfg2Amd64 : SymbolTable.symbol_table -> Cfg.program ->
+                    TargetAmd64.program
 end
 
 structure Cfg2Amd64 :> CFG2AMD64 = struct
@@ -179,8 +180,12 @@ val iloc2Amd64 =
   | Iloc.INS_X   {opcode=opc}                           => x2Amd64 opc
 
 
+(*so again, we're going to need some sort of accumulator here....*)
+(* fun getMostParams funcs (FUNC_INFO {calls=calls, ...}) = *)
+
+
 (*this is the function level*)
-fun func2Amd64 (func as Cfg.FUNCTION {id=id, ...}) =
+fun func2Amd64 st (func as Cfg.FUNCTION {id=id, ...}) =
     let
         val bb2Amd64 = fn (l, L) => (l, List.concat (map iloc2Amd64 L))
     in
@@ -202,9 +207,9 @@ end
 fun global2Amd64 (Ast.VAR_DECL {id=id, ...}) = id
 
 
-fun cfg2Amd64 (Cfg.PROGRAM {funcs=funcs, types=types, decls=decls}) =
+fun cfg2Amd64 st (Cfg.PROGRAM {funcs=funcs, types=types, decls=decls}) =
     (app calcOffsets types;
-     PROGRAM {text=map func2Amd64 funcs, data=map global2Amd64 decls})
+     PROGRAM {text=map (func2Amd64 st) funcs, data=map global2Amd64 decls})
     handle ILOCException _ =>
            (print "Bad ILOC instruction.\n"; OS.Process.exit OS.Process.failure)
 

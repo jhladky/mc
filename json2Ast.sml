@@ -50,7 +50,7 @@ val str2BinaryOpr =
   | s    => raise Fail s
 
 
-val str2UnaryOpr = fn "!" => UOP_NOT | "_" => UOP_MINUS | s => raise Fail s
+val str2UnaryOpr = fn "!" => UOP_NOT | "-" => UOP_MINUS | s => raise Fail s
 
 
 val carrier2MiniType =
@@ -92,7 +92,7 @@ fun expression2Ast get =
       | "id" => EXP_ID {id=uwrStr (get "id"), line=line get}
       | "true" => EXP_TRUE {line=line get}
       | "false" => EXP_FALSE {line=line get}
-      | "null" => EXP_NULL
+      | "null" => EXP_NULL {line=line get}
       | "binary" =>
         EXP_BINARY {
             opr=str2BinaryOpr (uwrStr (get "operator")),

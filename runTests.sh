@@ -17,8 +17,8 @@ get_dir_name () {
     NAME=${arr[1]}
 }
 
-# rm -f tests/*.json
-# rm -f tests/*.il
+rm -f tests/*.json
+rm -f tests/*.il
 for dir in benchmarks/*; do
     rm -f $dir/output.myout
     rm -f $dir/*.json
@@ -32,10 +32,10 @@ if [ $? -ne 0 ]; then
 fi
 rm .tmp
 
-# for f in ../tests/*.mini; do
-#     get_file_name $f
-#     java Mini $f > "../tests/$NAME.json"
-# done
+for f in ../tests/*.mini; do
+    get_file_name $f
+    java Mini $f > "../tests/$NAME.json"
+done
 
 for dir in ../benchmarks/*; do
     for f in $dir/*.mini; do

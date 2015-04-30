@@ -52,7 +52,7 @@ fun printAsm file st ast =
         (* val ots = openOut (file ^ ".s") *) val ots = stdOut;
     in
         output (ots, TargetAmd64.programToStr
-                         (Cfg2Amd64.cfg2Amd64 (Ast2Cfg.ast2Cfg st ast)));
+                         (Cfg2Amd64.cfg2Amd64 st (Ast2Cfg.ast2Cfg st ast)));
         closeOut ots
     end
 

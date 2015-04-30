@@ -106,9 +106,9 @@ and unExpr2Ins cfg opnd UOP_NOT =
 
 and expr2Ins cfg (EXP_NUM {value=value, ...}) = genLoad value (Cfg.nextReg cfg)
   | expr2Ins cfg (EXP_ID {id=id, ...}) = idExpr2Ins cfg id
-  | expr2Ins cfg (EXP_TRUE {...}) = genLoad 1 (Cfg.nextReg cfg)
-  | expr2Ins cfg (EXP_FALSE {...}) = genLoad 0 (Cfg.nextReg cfg)
-  | expr2Ins cfg EXP_NULL = genLoad 0 (Cfg.nextReg cfg)
+  | expr2Ins cfg (EXP_TRUE _) = genLoad 1 (Cfg.nextReg cfg)
+  | expr2Ins cfg (EXP_FALSE _) = genLoad 0 (Cfg.nextReg cfg)
+  | expr2Ins cfg (EXP_NULL _) = genLoad 0 (Cfg.nextReg cfg)
   | expr2Ins cfg (EXP_UNARY {opr=opr, opnd=opd, ...}) = unExpr2Ins cfg opd opr
   | expr2Ins cfg (EXP_BINARY {opr=opr, lft=lft, rht=rht, ...}) =
     binExpr2Ins cfg opr lft rht

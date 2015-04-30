@@ -58,8 +58,6 @@ fun addTypeDecl (TYPE_DECL {id=id, decls=ds, ...}) =
     end
 
 
-(*NEED TO FIX THE TYPES... MAKE IT A GLOBAL AND THEN JUST USE HASHTABLE/COPY*)
-
 fun checkTypeExist (VAR_DECL {id=id, typ=t, line=l}) =
     case t of
         MT_STRUCT s =>
@@ -114,11 +112,12 @@ fun getStmtCalls L (ST_BLOCK stmts) =
 
 
 fun makeFuncInfo (FUNCTION {params=params, returnType=rt, body=body, ...}) =
-    FUNC_INFO {
-        returnType=rt,
-        params=List.map (fn VAR_DECL {typ=t, ...} => t) params,
-        calls=foldr (fn (s, L) => getStmtCalls L s) [] body
-    }
+    (List.app checkTypeExist params;
+     FUNC_INFO {
+         returnType=rt,
+         params=List.map (fn VAR_DECL {typ=t, ...} => t) params,
+         calls=foldr (fn (s, L) => getStmtCalls L s) [] body
+    })
 
 
 fun addFuncInfo ht (func as FUNCTION {id=id, ...}) =

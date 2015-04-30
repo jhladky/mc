@@ -42,7 +42,7 @@ datatype expression =
    | EXP_ID of {id: string, line: int}
    | EXP_TRUE of {line: int}
    | EXP_FALSE of {line: int}
-   | EXP_NULL
+   | EXP_NULL of {line: int}
    | EXP_BINARY of {opr: binary_operator, lft: expression,
                     rht: expression, line: int}
    | EXP_UNARY of {opr: unary_operator, opnd: expression, line: int}
@@ -119,9 +119,9 @@ fun lvalueToStr (LV_ID {id=id, ...}) = id
 
 fun expToStr (EXP_NUM {value=n, ...}) = Int.toString n
   | expToStr (EXP_ID {id=id, ...}) = id
-  | expToStr (EXP_TRUE {...}) = "true"
-  | expToStr (EXP_FALSE {...}) = "false"
-  | expToStr EXP_NULL = "null"
+  | expToStr (EXP_TRUE _) = "true"
+  | expToStr (EXP_FALSE _) = "false"
+  | expToStr (EXP_NULL _) = "null"
   | expToStr (EXP_BINARY {opr=opr, lft=lft, rht=rht, ...}) =
     (expToStr lft) ^ (binOpToStr opr) ^ (expToStr rht)
   | expToStr (EXP_UNARY {opr=opr, opnd=opnd, ...}) =

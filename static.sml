@@ -121,9 +121,9 @@ and checkExpr stl (EXP_NUM {value=n, ...}) = MT_INT
     (case find locals id of
         SOME t => t
       | NONE => raise Undefined (l, id))
-  | checkExpr stl (EXP_TRUE {...}) = MT_BOOL
-  | checkExpr stl (EXP_FALSE {...}) = MT_BOOL
-  | checkExpr stl EXP_NULL = MT_VOID (*Not sure about this...*)
+  | checkExpr stl (EXP_TRUE _) = MT_BOOL
+  | checkExpr stl (EXP_FALSE _) = MT_BOOL
+  | checkExpr stl (EXP_NULL _) = MT_VOID (*Not sure about this...*)
   | checkExpr stl (EXP_BINARY {opr=opr, lft=lft, rht=rht, line=l}) =
     checkBinExpr stl opr lft rht l
   | checkExpr stl (EXP_UNARY {opr=opr, opnd=opnd, line=l}) =
