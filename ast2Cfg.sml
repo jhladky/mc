@@ -308,9 +308,7 @@ in
 end
 
 
-fun ast2Cfg st (PROGRAM {funcs=fs, types=ts, decls=ds}) =
-    (app addType ts;
-     app calcOffsets ts;
-     Cfg.PROGRAM {types=ts, decls=ds, funcs=map (func2Cfg st) fs})
+fun ast2Cfg st (PROGRAM {funcs=fs, types=ts, ...}) =
+    (app addType ts; app calcOffsets ts; map (func2Cfg st) fs)
 
 end

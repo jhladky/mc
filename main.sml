@@ -13,8 +13,8 @@ fun printUsage () =
 (*This should use an array at some point*)
 fun parseArgs () =
     let
-        val args = CommandLine.arguments ();
-        val _ = if length args = 0 then printUsage () else ();
+        val args = CommandLine.arguments ()
+        val _ = if length args = 0 then printUsage () else ()
     in
         if (hd args = "-printAST")
         then {printAst=true, dumpIL=false, file=List.nth (args, 1)}
@@ -26,18 +26,19 @@ fun parseArgs () =
 
 fun printAst file ast =
     let
-        val ots = stdOut;
+        val ots = stdOut
     in
-        output (ots, Ast.programToStr ast)
+        output (ots, Ast.programToStr ast);
+        closeOut ots
     end
 
 
 fun dumpIL file st ast =
     let
-        val ots = openOut (file ^ ".il");
+        val ots = openOut (file ^ ".il")
         val printDecl = fn Cfg.FUNCTION {id=id, ...} =>
-                           output (ots, "@function " ^ id ^ "\n");
-        val Cfg.PROGRAM {funcs=funcs, ...} = Ast2Cfg.ast2Cfg st ast;
+                           output (ots, "@function " ^ id ^ "\n")
+        val funcs = Ast2Cfg.ast2Cfg st ast
     in
         app printDecl funcs;
         output (ots, "\n");
@@ -49,7 +50,7 @@ fun dumpIL file st ast =
 
 fun printAsm file st ast =
     let
-        (* val ots = openOut (file ^ ".s") *) val ots = stdOut;
+        (* val ots = openOut (file ^ ".s") *) val ots = stdOut
     in
         output (ots, TargetAmd64.programToStr
                          (Cfg2Amd64.cfg2Amd64 st (Ast2Cfg.ast2Cfg st ast)));

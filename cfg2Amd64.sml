@@ -9,8 +9,20 @@ open TargetAmd64
 
 exception ILOCException of Iloc.opcode
 
-val types : (string, int * (string, int) HashTable.hash_table)
-                HashTable.hash_table = Util.mkHt ()
+
+(* when you enter a function find out which one needs the most arguments
+ * and then allocate at least that much space on the stack*)
+fun genPrologue len =
+    [INS_R {opcode=OP_PUSHQ, r1=REG_RBP},
+     INS_RR {opcode=OP_MOVQ, r1=REG_RSP, r2=REG_RBP},
+     INS_IR {opcode=OP_SUBQ, immed=len, r2=REG_RSP}]
+
+
+fun genEpilogue len =
+    [INS_IR {opcode=OP_ADDQ, immed=len, r2=REG_RSP},
+     INS_RR {opcode=OP_MOVQ, r1=REG_RBP, r2=REG_RSP},
+     INS_R {opcode=OP_POPQ, r1=REG_RBP},
+     INS_X {opcode=OP_RET}]
 
 
 fun rrr2Amd64 r1 r2 dest Iloc.OP_ADD =
@@ -105,8 +117,6 @@ fun ir2Amd64 immed dest Iloc.OP_LOADI =
   | ir2Amd64 _ _ opcode = raise ILOCException opcode
 
 
-(*when you enter a function find out which one needs the most arguments and then allocate at least that much space on the stack*)
-
 (* rdi, rsi, rdx, rcx, r8, r9. *)
 fun ri2Amd64 immed dest Iloc.OP_STOREOUTARGUMENT =
     (*In this instance dest is actually the source*)
@@ -158,7 +168,8 @@ fun r2Amd64 r1 Iloc.OP_LOADRET =
   | r2Amd64 _ opcode = raise ILOCException opcode
 
 
-fun x2Amd64 Iloc.OP_RET = [INS_X {opcode=OP_RET}]
+(* this is a problem area here.... need to get the len to genEpilogue...*)
+fun x2Amd64 Iloc.OP_RET = genEpilogue 0
   | x2Amd64 opcode = raise ILOCException opcode
 
 
@@ -181,52 +192,37 @@ val iloc2Amd64 =
   | Iloc.INS_X   {opcode=opc}                           => x2Amd64 opc
 
 
-(*The static check means that we know the function exists*)
-fun getParamsLen funcs call =
+fun getPLen funcs (call, max) =
     let
         val FUNC_INFO {params=ps, ...} = HashTable.lookup funcs call
+        val new = length ps
     in
-        length ps
+        if new > max then new else max
     end
 
 
-fun getMostParams max funcs [] = max
-  | getMostParams max funcs (call::calls) =
-    let
-        val new = getParamsLen funcs call
-    in
-        getMostParams (if new > max then new else max) funcs calls
-    end
+(*id is the function name, we need it so we know where the entry block is*)
+fun bb2Amd64 id len (l, L) =
+    if l = id then (l, genPrologue len @ List.concat (map iloc2Amd64 L))
+    else (l, List.concat (map iloc2Amd64 L))
 
 
 (*this is the function level*)
 fun func2Amd64 (ST {funcs=funcs, ...}) (func as Cfg.FUNCTION {id=id, ...}) =
     let
-        val bb2Amd64 = fn (l, L) => (l, List.concat (map iloc2Amd64 L))
         val (FUNC_INFO {calls=calls, ...}) = HashTable.lookup funcs id
-        val max = getMostParams 0 funcs calls
+        val max = foldr (getPLen funcs) 0 calls
     in
-        (id, map bb2Amd64 (Cfg.toList func))
+        (*NOTE len goes where the 0 is!*)
+        (id, map (bb2Amd64 id 0) (Cfg.toList func))
     end
 
 
-local
-    fun addOffsets ht n [] = ht
-      | addOffsets ht n ((Ast.VAR_DECL {id=id, ...})::xs) =
-        (HashTable.insert ht (id, n); addOffsets ht (n + 1) xs)
-in
-    fun calcOffsets (Ast.TYPE_DECL {id=id, decls=decls, ...}) =
-        HashTable.insert types (id, (length decls * Util.WORD_SIZE,
-                                     addOffsets (Util.mkHt ()) 0 decls))
-end
-
-
-fun global2Amd64 (Ast.VAR_DECL {id=id, ...}) = id
-
-
-fun cfg2Amd64 st (Cfg.PROGRAM {funcs=funcs, types=types, decls=decls}) =
-    (app calcOffsets types;
-     PROGRAM {text=map (func2Amd64 st) funcs, data=map global2Amd64 decls})
+fun cfg2Amd64 (st as ST {globals=globals, ...}) funcs =
+    PROGRAM {
+        text=map (func2Amd64 st) funcs,
+        data=map #1 (HashTable.listItemsi globals)
+    }
     handle ILOCException _ =>
            (print "Bad ILOC instruction.\n"; OS.Process.exit OS.Process.failure)
 

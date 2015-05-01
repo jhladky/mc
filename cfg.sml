@@ -1,15 +1,10 @@
 
 
 signature CFG = sig
-    type node;
-    type cfg;
-    datatype function = FUNCTION of {id: string, body: cfg};
-    datatype program =
-        PROGRAM of {
-            types: Ast.type_decl list,
-            decls: Ast.var_decl list,
-            funcs: function list
-        };
+    type node
+    type cfg
+    datatype function = FUNCTION of {id: string, body: cfg}
+    type program = function list
 
     val mkCfg : SymbolTable.symbol_table -> Ast.function -> node * node * cfg;
     val mkIf : node -> node * node * node;
@@ -46,15 +41,9 @@ datatype cfg =
         exit: node
     }
 
-datatype function = FUNCTION of {id: string, body: cfg};
+datatype function = FUNCTION of {id: string, body: cfg}
 
-datatype program =
-    PROGRAM of {
-        types: Ast.type_decl list,
-        decls: Ast.var_decl list,
-        funcs: function list
-    }
-
+type program = function list
 
 val nextLabel = ref 0;
 

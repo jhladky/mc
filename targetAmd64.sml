@@ -8,6 +8,8 @@ datatype opcode =
    | OP_ANDQ
    | OP_ORQ
    | OP_XORQ
+   | OP_PUSHQ
+   | OP_POPQ
    | OP_CMP
    | OP_JMP
    | OP_JE
@@ -50,6 +52,7 @@ datatype instruction =
                 scalar: int, dest: register}
    | INS_RM of {opcode: opcode, r1: register, immed: int, base: register,
                 offset: register, scalar: int}
+   | INS_R of {opcode: opcode, r1: register}
    | INS_L of {opcode: opcode, label: string}
    | INS_X of {opcode: opcode}
 
@@ -71,6 +74,8 @@ val opToStr =
   | OP_ANDQ      => "andq "
   | OP_ORQ       => "orq "
   | OP_XORQ      => "xorq "
+  | OP_PUSHQ     => "pushq "
+  | OP_POPQ      => "popq "
   | OP_CMP       => "cmp "
   | OP_JMP       => "jmp "
   | OP_JE        => "je "
@@ -116,6 +121,7 @@ val insToStr =
     opToStr opc ^ "$" ^ id ^ ", " ^ regToStr dest
   | INS_RG {opcode=opc, r1=r1, global=global} =>
     opToStr opc ^ regToStr r1 ^ ", " ^ global ^ "(%rip)"
+  | INS_R {opcode=opc, r1=r1} => opToStr opc ^ regToStr r1
   | INS_L {opcode=opc, label=label} => opToStr opc ^ label
   | INS_MR {opcode=opc, immed=i, base=base, offset=offset, scalar=s, dest=d} =>
     opToStr opc ^ Int.toString i ^ "(" ^ regToStr base ^ ", " ^
