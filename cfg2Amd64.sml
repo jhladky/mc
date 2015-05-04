@@ -35,7 +35,7 @@ fun rrr2Amd64 r1 r2 dest Iloc.OP_ADD =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r2, r2=REG_N dest},
      INS_RR {opcode=OP_IMULQ, r1=REG_N r1, r2=REG_N dest}]
   | rrr2Amd64 r1 r2 dest Iloc.OP_DIV =
-    [INS_IR {opcode=OP_MOVQ, immed=0, r2=REG_RDX},
+    [INS_KR {opcode=OP_SARQ, k=63, r2=REG_RDX},
      INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RAX},
      INS_R {opcode=OP_IDIVQ, r1= REG_N r2},
      INS_RR {opcode=OP_MOVQ, r1=REG_RAX, r2=REG_N dest}]
@@ -53,13 +53,13 @@ fun rir2Amd64 r1 immed dest Iloc.OP_XORI =
      INS_IR {opcode=OP_XORQ, immed=immed, r2=REG_N dest}]
   | rir2Amd64 r1 immed dest Iloc.OP_LOADAI =
     [INS_MR {opcode=OP_MOVQ, immed=immed * Util.WORD_SIZE, base=REG_N r1,
-             offset=REG_N r1, scalar=0, dest=REG_N dest}]
+             offset=NONE, dest=REG_N dest}]
   | rir2Amd64 _ _ _ opcode = raise ILOCException opcode
 
 
 fun rri2Amd64 r1 r2 immed Iloc.OP_STOREAI =
     [INS_RM {opcode=OP_MOVQ, r1=REG_N r1, immed=immed * Util.WORD_SIZE,
-             base=REG_N r2, offset=REG_N r2, scalar=0}]
+             base=REG_N r2, offset=NONE}]
   | rri2Amd64 _ _ _ opcode = raise ILOCException opcode
 
 
@@ -87,7 +87,7 @@ fun sir2Amd64 r2 immed id Iloc.OP_LOADINARGUMENT =
        | 4 => [INS_RR {opcode=OP_MOVQ, r1=REG_N 8, r2=REG_N r2}]
        | 5 => [INS_RR {opcode=OP_MOVQ, r1=REG_N 9, r2=REG_N r2}]
        | n => [INS_MR {opcode=OP_MOVQ, immed=Util.WORD_SIZE * (n - 6) + 16,
-                       dest=REG_N r2,  base=REG_RBP, offset=REG_RBP, scalar=0}])
+                       dest=REG_N r2,  base=REG_RBP, offset=NONE}])
   | sir2Amd64 _ _ _ opcode = raise ILOCException opcode
 
 
@@ -129,7 +129,7 @@ fun ri2Amd64 immed r1 Iloc.OP_STOREOUTARGUMENT =
        | 4 => [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_N 8}]
        | 5 => [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_N 9}]
        | n => [INS_RM {opcode=OP_MOVQ, immed=Util.WORD_SIZE * (n - 6),
-                       r1=REG_N r1, base=REG_RSP, scalar=0, offset=REG_RSP}])
+                       r1=REG_N r1, base=REG_RSP, offset=NONE}])
   | ri2Amd64 _ _ opcode = raise ILOCException opcode
 
 

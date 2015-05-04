@@ -27,7 +27,7 @@ datatype opcode =
    | OP_CMOVLQ
    | OP_CMOVLEQ
    | OP_CMOVNEQ
-   | OP_SHRQ
+   | OP_SARQ
 
 
 datatype register =
@@ -45,13 +45,14 @@ datatype register =
 datatype instruction =
      INS_RR of {opcode: opcode, r1: register, r2: register}
    | INS_IR of {opcode: opcode, immed: int, r2: register}
+   | INS_KR of {opcode: opcode, k: int, r2: register}
    | INS_SR of {opcode: opcode, id: string, dest: register}
    | INS_GR of {opcode: opcode, global: string, dest: register}
    | INS_RG of {opcode: opcode, r1: register, global: string}
-   | INS_MR of {opcode: opcode, immed: int, base: register, offset: register,
-                scalar: int, dest: register}
+   | INS_MR of {opcode: opcode, immed: int, base: register, dest: register,
+                offset: (register * int) option}
    | INS_RM of {opcode: opcode, r1: register, immed: int, base: register,
-                offset: register, scalar: int}
+                offset: (register * int ) option}
    | INS_R of {opcode: opcode, r1: register}
    | INS_L of {opcode: opcode, label: string}
    | INS_X of {opcode: opcode}
@@ -93,7 +94,7 @@ val opToStr =
   | OP_CMOVLQ    => "cmovlq "
   | OP_CMOVLEQ   => "cmovleq "
   | OP_CMOVNEQ   => "cmovneq "
-  | OP_SHRQ      => "shrq "
+  | OP_SARQ      => "shrq "
 
 
 val regToStr =
@@ -113,6 +114,8 @@ val insToStr =
     opToStr opc ^ regToStr r1 ^ ", " ^ regToStr r2
   | INS_IR {opcode=opc, immed=immed, r2=r2} =>
     opToStr opc ^ "$" ^ Int.toString immed ^ ", " ^ regToStr r2
+  | INS_KR {opcode=opc, k=k, r2=r2} =>
+    opToStr opc ^ " " ^ Int.toString k ^ ", " ^ regToStr r2
   | INS_GR {opcode=opc, global=global, dest=dest} =>
     opToStr opc ^ global ^ "(%rip), " ^ regToStr dest
   | INS_SR {opcode=opc, id=id, dest=dest} =>
@@ -121,12 +124,18 @@ val insToStr =
     opToStr opc ^ regToStr r1 ^ ", " ^ global ^ "(%rip)"
   | INS_R {opcode=opc, r1=r1} => opToStr opc ^ regToStr r1
   | INS_L {opcode=opc, label=label} => opToStr opc ^ label
-  | INS_MR {opcode=opc, immed=i, base=base, offset=offset, scalar=s, dest=d} =>
-    opToStr opc ^ Int.toString i ^ "(" ^ regToStr base ^ ", " ^
-    regToStr offset ^ ", " ^ Int.toString s ^ "), " ^ regToStr d
-  | INS_RM {opcode=opc, r1=r1, immed=i, base=base, offset=offset, scalar=s} =>
+  | INS_MR {opcode=opc, immed=i, base=base, offset=offset, dest=d} =>
+    opToStr opc ^ Int.toString i ^ "(" ^ regToStr base ^
+    (case offset of
+         SOME (reg, s) => ", " ^ regToStr reg ^ ", " ^ Int.toString s
+       | NONE => "")
+    ^ "), " ^ regToStr d
+  | INS_RM {opcode=opc, r1=r1, immed=i, base=base, offset=offset} =>
     opToStr opc ^ regToStr r1 ^ ", " ^  Int.toString i ^ "(" ^ regToStr base ^
-    ", " ^ regToStr offset ^ ", " ^ Int.toString s ^ ")"
+    (case offset of
+         SOME (reg, s) => ", " ^ regToStr reg ^ ", " ^ Int.toString s
+       | NONE => "")
+    ^ ")"
   | INS_X {opcode=opc} => opToStr opc
 
 
