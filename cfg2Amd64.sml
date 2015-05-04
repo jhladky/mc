@@ -11,7 +11,7 @@ exception ILOCException of Iloc.opcode
 
 
 (* when you enter a function find out which one needs the most arguments
- * and then allocate at least that much space on the stack*)
+ * and then allocate at least that much space on the stack *)
 fun genPrologue len =
     [INS_R {opcode=OP_PUSHQ, r1=REG_RBP},
      INS_RR {opcode=OP_MOVQ, r1=REG_RSP, r2=REG_RBP},
@@ -34,8 +34,11 @@ fun rrr2Amd64 r1 r2 dest Iloc.OP_ADD =
   | rrr2Amd64 r1 r2 dest Iloc.OP_MULT =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r2, r2=REG_N dest},
      INS_RR {opcode=OP_IMULQ, r1=REG_N r1, r2=REG_N dest}]
-  | rrr2Amd64 r1 r2 dest Iloc.OP_DIV = (*fix*)
-    [INS_X {opcode=OP_RET}]
+  | rrr2Amd64 r1 r2 dest Iloc.OP_DIV =
+    [INS_IR {opcode=OP_MOVQ, immed=0, r2=REG_RDX},
+     INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RAX},
+     INS_R {opcode=OP_IDIVQ, r1= REG_N r2},
+     INS_RR {opcode=OP_MOVQ, r1=REG_RAX, r2=REG_N dest}]
   | rrr2Amd64 r1 r2 dest Iloc.OP_AND =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r2, r2=REG_N dest},
      INS_RR {opcode=OP_ANDQ, r1=REG_N r1, r2=REG_N dest}]
@@ -102,18 +105,18 @@ fun rr2Amd64 r1 dest Iloc.OP_MOV =
 
 fun ir2Amd64 immed dest Iloc.OP_LOADI =
     [INS_IR {opcode=OP_MOVQ, immed=immed, r2=REG_N dest}]
-  | ir2Amd64 immed dest Iloc.OP_MOVEQ = (*fix*)
-    [INS_X {opcode=OP_RET}]
-  | ir2Amd64 immed dest Iloc.OP_MOVNE = (*fix*)
-    [INS_X {opcode=OP_RET}]
-  | ir2Amd64 immed dest Iloc.OP_MOVLT = (*fix*)
-    [INS_X {opcode=OP_RET}]
-  | ir2Amd64 immed dest Iloc.OP_MOVGT = (*fix*)
-    [INS_X {opcode=OP_RET}]
-  | ir2Amd64 immed dest Iloc.OP_MOVLE = (*fix*)
-    [INS_X {opcode=OP_RET}]
-  | ir2Amd64 immed dest Iloc.OP_MOVGE = (*fix*)
-    [INS_X {opcode=OP_RET}]
+  | ir2Amd64 immed dest Iloc.OP_MOVEQ =
+    [INS_IR {opcode=OP_CMOVEQ, immed=immed, r2=REG_N dest}]
+  | ir2Amd64 immed dest Iloc.OP_MOVNE =
+    [INS_IR {opcode=OP_CMOVNEQ, immed=immed, r2=REG_N dest}]
+  | ir2Amd64 immed dest Iloc.OP_MOVLT =
+    [INS_IR {opcode=OP_CMOVLQ, immed=immed, r2=REG_N dest}]
+  | ir2Amd64 immed dest Iloc.OP_MOVGT =
+    [INS_IR {opcode=OP_CMOVGQ, immed=immed, r2=REG_N dest}]
+  | ir2Amd64 immed dest Iloc.OP_MOVLE =
+    [INS_IR {opcode=OP_CMOVLEQ, immed=immed, r2=REG_N dest}]
+  | ir2Amd64 immed dest Iloc.OP_MOVGE =
+    [INS_IR {opcode=OP_CMOVGEQ, immed=immed, r2=REG_N dest}]
   | ir2Amd64 _ _ opcode = raise ILOCException opcode
 
 
@@ -199,13 +202,13 @@ fun getPLen funcs (call, max) =
     end
 
 
-(*Id is the function name, we need it so we know where the entry block is.*)
+(* Id is the function name, we need it so we know where the entry block is. *)
 fun bb2Amd64 id len (l, L) =
     if l = id then (l, genPrologue len @ List.concat (map (iloc2Amd64 len) L))
     else (l, List.concat (map (iloc2Amd64 len) L))
 
 
-(*this is the function level*)
+(* This is the function level. *)
 fun func2Amd64 (ST {funcs=funcs, ...}) (func as Cfg.FUNCTION {id=id, ...}) =
     let
         val (FUNC_INFO {calls=calls, ...}) = HashTable.lookup funcs id

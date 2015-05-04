@@ -27,7 +27,8 @@ fun idExpr2Ins cfg id =
         end
 
 
-val bop2Op = fn BOP_PLUS => OP_ADD
+val bop2Op =
+ fn BOP_PLUS => OP_ADD
   | BOP_MINUS => OP_SUB
   | BOP_TIMES => OP_MULT
   | BOP_DIVIDE => OP_DIV
