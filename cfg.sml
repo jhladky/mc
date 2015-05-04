@@ -1,5 +1,3 @@
-
-
 signature CFG = sig
     type node
     type cfg

@@ -1,4 +1,4 @@
-FILES=util.sml ast.sml ast2Cfg.sml cfg.sml iloc.sml json2Ast.sml main.sml static.sml symbolTable.sml targetAmd64.sml cfg2Amd64.sml
+FILES=util.sml ast.sml ast2Cfg.sml cfg.sml iloc.sml json2Ast.sml main.sml static.sml symbolTable.sml targetAmd64.sml cfg2Amd64.sml graph.sml
 
 all: mc
 
