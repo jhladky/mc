@@ -76,7 +76,6 @@ fun cll2Amd64 l1 l2 Iloc.OP_CBREQ =
 
 
 fun sir2Amd64 r2 immed id Iloc.OP_LOADINARGUMENT =
-    (*r2 is the dest in this case...*)
     (case immed of
          0 => [INS_RR {opcode=OP_MOVQ, r1=REG_RDI, r2=REG_N r2}]
        | 1 => [INS_RR {opcode=OP_MOVQ, r1=REG_RSI, r2=REG_N r2}]
@@ -84,7 +83,8 @@ fun sir2Amd64 r2 immed id Iloc.OP_LOADINARGUMENT =
        | 3 => [INS_RR {opcode=OP_MOVQ, r1=REG_RCX, r2=REG_N r2}]
        | 4 => [INS_RR {opcode=OP_MOVQ, r1=REG_N 8, r2=REG_N r2}]
        | 5 => [INS_RR {opcode=OP_MOVQ, r1=REG_N 9, r2=REG_N r2}]
-       | n => [INS_X {opcode=OP_RET}]) (*fix*)
+       | n => [INS_MR {opcode=OP_MOVQ, immed=Util.WORD_SIZE * (n - 6) + 16,
+                       dest=REG_N r2,  base=REG_RBP, offset=REG_RBP, scalar=0}])
   | sir2Amd64 _ _ _ opcode = raise ILOCException opcode
 
 
@@ -117,17 +117,16 @@ fun ir2Amd64 immed dest Iloc.OP_LOADI =
   | ir2Amd64 _ _ opcode = raise ILOCException opcode
 
 
-(* rdi, rsi, rdx, rcx, r8, r9. *)
-fun ri2Amd64 immed dest Iloc.OP_STOREOUTARGUMENT =
-    (*In this instance dest is actually the source*)
+fun ri2Amd64 immed r1 Iloc.OP_STOREOUTARGUMENT =
     (case immed of
-         0 => [INS_RR {opcode=OP_MOVQ, r1=REG_N dest, r2=REG_RDI}]
-       | 1 => [INS_RR {opcode=OP_MOVQ, r1=REG_N dest, r2=REG_RSI}]
-       | 2 => [INS_RR {opcode=OP_MOVQ, r1=REG_N dest, r2=REG_RDX}]
-       | 3 => [INS_RR {opcode=OP_MOVQ, r1=REG_N dest, r2=REG_RCX}]
-       | 4 => [INS_RR {opcode=OP_MOVQ, r1=REG_N dest, r2=REG_N 8}]
-       | 5 => [INS_RR {opcode=OP_MOVQ, r1=REG_N dest, r2=REG_N 9}]
-       | n => [INS_X {opcode=OP_RET}]) (*fix*)
+         0 => [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RDI}]
+       | 1 => [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RSI}]
+       | 2 => [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RDX}]
+       | 3 => [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RCX}]
+       | 4 => [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_N 8}]
+       | 5 => [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_N 9}]
+       | n => [INS_RM {opcode=OP_MOVQ, immed=Util.WORD_SIZE * (n - 6),
+                       r1=REG_N r1, base=REG_RSP, scalar=0, offset=REG_RSP}])
   | ri2Amd64 _ _ opcode = raise ILOCException opcode
 
 
@@ -168,12 +167,11 @@ fun r2Amd64 r1 Iloc.OP_LOADRET =
   | r2Amd64 _ opcode = raise ILOCException opcode
 
 
-(* this is a problem area here.... need to get the len to genEpilogue...*)
-fun x2Amd64 Iloc.OP_RET = genEpilogue 0
-  | x2Amd64 opcode = raise ILOCException opcode
+fun x2Amd64 len Iloc.OP_RET = genEpilogue len
+  | x2Amd64 _ opcode = raise ILOCException opcode
 
 
-val iloc2Amd64 =
+fun iloc2Amd64 len =
  fn Iloc.INS_RRR {opcode=opc, r1=r1, dest=d, r2=r2}     => rrr2Amd64 r1 r2 d opc
   | Iloc.INS_RIR {opcode=opc, r1=r1, dest=d, immed=i}   => rir2Amd64 r1 i d opc
   | Iloc.INS_RRI {opcode=opc, r1=r1, r2=r2, immed=i}    => rri2Amd64 r1 r2 i opc
@@ -189,7 +187,7 @@ val iloc2Amd64 =
   | Iloc.INS_RS  {opcode=opc, r1=r1, id=id}             => rs2Amd64 r1 id opc
   | Iloc.INS_R   {opcode=opc, r1=r1}                    => r2Amd64 r1 opc
   | Iloc.INS_L   {opcode=opc, l1=l1}                    => l2Amd64 l1 opc
-  | Iloc.INS_X   {opcode=opc}                           => x2Amd64 opc
+  | Iloc.INS_X   {opcode=opc}                           => x2Amd64 len opc
 
 
 fun getPLen funcs (call, max) =
@@ -201,20 +199,19 @@ fun getPLen funcs (call, max) =
     end
 
 
-(*id is the function name, we need it so we know where the entry block is*)
+(*Id is the function name, we need it so we know where the entry block is.*)
 fun bb2Amd64 id len (l, L) =
-    if l = id then (l, genPrologue len @ List.concat (map iloc2Amd64 L))
-    else (l, List.concat (map iloc2Amd64 L))
+    if l = id then (l, genPrologue len @ List.concat (map (iloc2Amd64 len) L))
+    else (l, List.concat (map (iloc2Amd64 len) L))
 
 
 (*this is the function level*)
 fun func2Amd64 (ST {funcs=funcs, ...}) (func as Cfg.FUNCTION {id=id, ...}) =
     let
         val (FUNC_INFO {calls=calls, ...}) = HashTable.lookup funcs id
-        val max = foldr (getPLen funcs) 0 calls
+        val max = foldr (getPLen funcs) 0 calls * Util.WORD_SIZE
     in
-        (*NOTE len goes where the 0 is!*)
-        (id, map (bb2Amd64 id 0) (Cfg.toList func))
+        (id, map (bb2Amd64 id max) (Cfg.toList func))
     end
 
 
