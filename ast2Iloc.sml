@@ -1,8 +1,8 @@
-signature AST2CFG = sig
-    val ast2Cfg : SymbolTable.symbol_table -> Ast.program -> Cfg.program
+signature AST2ILOC = sig
+    val ast2Iloc : SymbolTable.symbol_table -> Ast.program -> Iloc.program
 end
 
-structure Ast2Cfg :> AST2CFG = struct
+structure Ast2Iloc :> AST2ILOC = struct
 open Ast
 open Iloc
 
@@ -291,7 +291,7 @@ fun func2Cfg st (f as FUNCTION {id=id, body=body, params=params, ...}) =
     in
         Cfg.link res exit;
         Cfg.fill res (genJump exit);
-        Cfg.FUNCTION {id=id, body=cfg}
+        (id, Cfg.toList cfg)
     end
 
 
@@ -309,7 +309,7 @@ in
 end
 
 
-fun ast2Cfg st (PROGRAM {funcs=fs, types=ts, ...}) =
+fun ast2Iloc st (PROGRAM {funcs=fs, types=ts, ...}) =
     (app addType ts; app calcOffsets ts; map (func2Cfg st) fs)
 
 end

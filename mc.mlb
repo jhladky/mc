@@ -11,9 +11,8 @@ symbolTable.sml
 static.sml
 
 iloc.sml
-graph.sml
 cfg.sml
-ast2Cfg.sml
+ast2Iloc.sml
 
 targetAmd64.sml
 cfg2Amd64.sml

@@ -36,14 +36,13 @@ fun printAst file ast =
 fun dumpIL file st ast =
     let
         val ots = openOut (file ^ ".il")
-        val printDecl = fn Cfg.FUNCTION {id=id, ...} =>
-                           output (ots, "@function " ^ id ^ "\n")
-        val funcs = Ast2Cfg.ast2Cfg st ast
+        val printDecl = fn (id, _) => output (ots, "@function " ^ id ^ "\n")
+        val funcs = Ast2Iloc.ast2Iloc st ast
     in
         app printDecl funcs;
         output (ots, "\n");
         app (fn bb => output (ots, Iloc.bbToStr bb))
-            (List.concat (map Cfg.toList funcs));
+            (List.concat (map #2 funcs));
         closeOut ots
     end
 
@@ -53,7 +52,7 @@ fun printAsm file st ast =
         (* val ots = openOut (file ^ ".s") *) val ots = stdOut
     in
         output (ots, TargetAmd64.programToStr
-                         (Cfg2Amd64.cfg2Amd64 st (Ast2Cfg.ast2Cfg st ast)));
+                         (Cfg2Amd64.cfg2Amd64 st (Ast2Iloc.ast2Iloc st ast)));
         closeOut ots
     end
 
@@ -75,4 +74,4 @@ fun main () =
 
 end
 
-val _ = Main.main ();
+val _ = Main.main ()

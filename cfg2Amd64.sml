@@ -1,5 +1,5 @@
 signature CFG2AMD64 = sig
-    val cfg2Amd64 : SymbolTable.symbol_table -> Cfg.program ->
+    val cfg2Amd64 : SymbolTable.symbol_table -> Iloc.program ->
                     TargetAmd64.program
 end
 
@@ -209,12 +209,12 @@ fun bb2Amd64 id len (l, L) =
 
 
 (* This is the function level. *)
-fun func2Amd64 (ST {funcs=funcs, ...}) (func as Cfg.FUNCTION {id=id, ...}) =
+fun func2Amd64 (ST {funcs=funcs, ...}) (id, bbs) =
     let
         val (FUNC_INFO {calls=calls, ...}) = HashTable.lookup funcs id
         val max = foldr (getPLen funcs) 0 calls * Util.WORD_SIZE
     in
-        (id, map (bb2Amd64 id max) (Cfg.toList func))
+        (id, map (bb2Amd64 id max) bbs)
     end
 
 

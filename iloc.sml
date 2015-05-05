@@ -70,6 +70,12 @@ datatype instruction =
 type basic_block = string * instruction list
 
 
+type function = string * basic_block list
+
+
+type program = function list
+
+
 fun opToStr OP_ADD = "add"
   | opToStr OP_ADDI = "addi"
   | opToStr OP_DIV = "div"
