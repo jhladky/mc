@@ -8,7 +8,7 @@ signature UORD_SET = sig
     val singleton : item -> set
     val add : set * item -> set
     val addList : set * item list -> set
-    (* val delete : set * item -> set *) (* Not implemented *)
+    val delete : set * item -> set
     val member : set * item -> bool
     val isEmpty : set -> bool
     val equal : set * set -> bool
@@ -30,6 +30,8 @@ end
 
 structure UnorderedSet :> UORD_SET = struct
 
+exception NotFound
+
 type item = TargetAmd64.register
 
 datatype set = SET of item list
@@ -41,6 +43,12 @@ fun has item L = List.exists (fn i => i = item) L
 
 fun addList (SET L, items) =
     SET (foldr (fn (item, L) => if has item L then L else item::L) L items)
+
+
+fun delete (SET L, item) =
+    case List.find (fn i => i = item) L of
+        NONE => raise NotFound
+      | SOME _ => SET (List.filter (fn i => i <> item) L)
 
 
 (* Returns true iff the first set is a subset of the second O(n^2). *)

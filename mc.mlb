@@ -19,6 +19,7 @@ targetAmd64.sml
 cfg2Amd64.sml
 
 unorderedSet.sml
+ifeGraph.sml
 regAlloc.sml
 
 main.sml

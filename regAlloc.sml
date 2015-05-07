@@ -1,5 +1,5 @@
 signature REG_ALLOC = sig
-    val regAlloc : TargetAmd64.program -> unit
+    val regAlloc : TargetAmd64.program -> TargetAmd64.program
 end
 
 structure RegAlloc :> REG_ALLOC = struct
@@ -14,6 +14,7 @@ datatype live_analysis =
              liveOut: set,
              loDiff: bool
          }
+
 
 fun condAdd (gen, kill) reg =
     if not (member (kill, reg)) then add (gen, reg) else gen
@@ -63,8 +64,7 @@ fun bbToGK (id, bb) =
 
 
 (* Function level.*)
-fun funcToGK (id, cfg) =
-    (id, Cfg.map bbToGK cfg)
+fun funcToGK (id, cfg) = (id, Cfg.map bbToGK cfg)
 
 
 fun bbLiveOut1 (LVA {gk=(gen, kill), liveOut=liveOut, ...}) =
@@ -76,7 +76,6 @@ fun bbLiveOut succs (LVA {label=id, bb=bb, gk=gk, liveOut=liveOut, ...}) =
         val lo = List.foldr (fn (bb, s) => union (s, bbLiveOut1 bb))
                             (empty ()) succs
     in
-        (* if equal (liveOut, lo) then print "SAME\n" else print "DIFFERENT\n"; *)
         LVA {label=id, bb=bb, gk=gk, liveOut=lo, loDiff=not (equal (liveOut, lo))}
     end
 
@@ -86,22 +85,48 @@ fun diffCheck1 diff [] = diff
     if loDiff then diffCheck1 true lvas else diffCheck1 diff lvas
 
 
-fun diffCheck cfg =
-    diffCheck1 false (Cfg.toList cfg)
+fun diffCheck cfg = diffCheck1 false (Cfg.toList cfg)
 
 
-(* This is where we have to keep doing the liveout thing
+(* This is where we have to keep doing the liveOut thing
  * Iteratively recompute liveout until there is no change *)
 fun funcLiveOut (id, cfg) =
-    if diffCheck cfg then (Cfg.apply bbLiveOut cfg; (* print "\n"; *) funcLiveOut (id, cfg))
+    if diffCheck cfg then (Cfg.apply bbLiveOut cfg; funcLiveOut (id, cfg))
     else (id, cfg)
 
 
-fun regAlloc (PROGRAM {text=text, data=data}) =
+(* for each instruction in Block, from the bottom to the top *)
+(*     add the edge from target to each register in LiveNow set *)
+(*     remove target from LiveNow set *)
+(*     add all sources to the LiveNow set *)
+
+
+(* This function will be passed the successors of the node as part of
+ * how Cfg.apply is written, but we don't need them here. *)
+fun bbIfeGraph ife _ (lva as LVA {...}) =
+    (*what do we do with the lva now that we have it????*)
+    let
+    in
+        lva
+    end
+
+
+(*build the interferance graph here*)
+fun funcIfeGraph (id, cfg) =
+    let
+        val ife = IfeGraph.mkGraph ()
+    in
+        Cfg.apply (bbIfeGraph ife) cfg;
+        (id, ife)
+    end
+
+
+fun regAlloc (p as PROGRAM {text=text, data=data}) =
     let
         val funcs = List.map funcLiveOut (List.map funcToGK text)
+        val _ = List.map funcIfeGraph funcs
     in
-        ()
+        p (*just sending the same program back at this point*)
     end
 
 end
