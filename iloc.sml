@@ -76,100 +76,100 @@ type function = string * basic_block Cfg.cfg
 type program = function list
 
 
-fun opToStr OP_ADD = "add"
-  | opToStr OP_ADDI = "addi"
-  | opToStr OP_DIV = "div"
-  | opToStr OP_MULT = "mult"
-  | opToStr OP_SUB = "sub"
-  | opToStr OP_SUBI = "subi"
-  | opToStr OP_AND = "and"
-  | opToStr OP_OR = "or"
-  | opToStr OP_XORI = "xori"
-  | opToStr OP_COMP = "comp"
-  | opToStr OP_COMPI = "compi"
-  | opToStr OP_CBREQ = "cbreq"
-  | opToStr OP_CBRGE = "cbrge"
-  | opToStr OP_CBRGT = "cbrgt"
-  | opToStr OP_CBRLE = "cbrle"
-  | opToStr OP_CBRLT = "cbrlt"
-  | opToStr OP_CBRNE = "cbrne"
-  | opToStr OP_JUMPI = "jumpi"
-  | opToStr OP_LOADI = "loadi"
-  | opToStr OP_LOADAI = "loadai"
-  | opToStr OP_LOADGLOBAL = "loadglobal"
-  | opToStr OP_LOADINARGUMENT = "loadinargument"
-  | opToStr OP_LOADRET = "loadret"
-  | opToStr OP_COMPUTEFORMALADDRESS = "computeformaladdress"
-  | opToStr OP_RESTOREFORMAL = "restoreformal"
-  | opToStr OP_COMPUTEGLOBALADDRESS = "computeglobaladdress"
-  | opToStr OP_STOREAI = "storeai"
-  | opToStr OP_STOREGLOBAL = "storeglobal"
-  | opToStr OP_STOREINARGUMENT = "storeinargument"
-  | opToStr OP_STOREOUTARGUMENT = "storeoutargument"
-  | opToStr OP_STORERET = "storeret"
-  | opToStr OP_CALL = "call"
-  | opToStr OP_RET = "ret"
-  | opToStr OP_NEW = "new"
-  | opToStr OP_DEL = "del"
-  | opToStr OP_PRINT = "print"
-  | opToStr OP_PRINTLN = "println"
-  | opToStr OP_READ = "read"
-  | opToStr OP_MOV = "mov"
-  | opToStr OP_MOVEQ = "moveq"
-  | opToStr OP_MOVGE = "movge"
-  | opToStr OP_MOVGT = "movgt"
-  | opToStr OP_MOVLE = "movle"
-  | opToStr OP_MOVLT = "movlt"
-  | opToStr OP_MOVNE = "movne"
+val opToStr =
+ fn OP_ADD                  => "add "
+  | OP_ADDI                 => "addi "
+  | OP_DIV                  => "div "
+  | OP_MULT                 => "mult "
+  | OP_SUB                  => "sub "
+  | OP_SUBI                 => "subi "
+  | OP_AND                  => "and "
+  | OP_OR                   => "or "
+  | OP_XORI                 => "xori "
+  | OP_COMP                 => "comp "
+  | OP_COMPI                => "compi "
+  | OP_CBREQ                => "cbreq "
+  | OP_CBRGE                => "cbrge "
+  | OP_CBRGT                => "cbrgt "
+  | OP_CBRLE                => "cbrle "
+  | OP_CBRLT                => "cbrlt "
+  | OP_CBRNE                => "cbrne "
+  | OP_JUMPI                => "jumpi "
+  | OP_LOADI                => "loadi "
+  | OP_LOADAI               => "loadai "
+  | OP_LOADGLOBAL           => "loadglobal "
+  | OP_LOADINARGUMENT       => "loadinargument "
+  | OP_LOADRET              => "loadret "
+  | OP_COMPUTEFORMALADDRESS => "computeformaladdress "
+  | OP_RESTOREFORMAL        => "restoreformal "
+  | OP_COMPUTEGLOBALADDRESS => "computeglobaladdress "
+  | OP_STOREAI              => "storeai "
+  | OP_STOREGLOBAL          => "storeglobal "
+  | OP_STOREINARGUMENT      => "storeinargument "
+  | OP_STOREOUTARGUMENT     => "storeoutargument "
+  | OP_STORERET             => "storeret "
+  | OP_CALL                 => "call "
+  | OP_RET                  => "ret "
+  | OP_NEW                  => "new "
+  | OP_DEL                  => "del "
+  | OP_PRINT                => "print "
+  | OP_PRINTLN              => "println "
+  | OP_READ                 => "read "
+  | OP_MOV                  => "mov "
+  | OP_MOVEQ                => "moveq "
+  | OP_MOVGE                => "movge "
+  | OP_MOVGT                => "movgt "
+  | OP_MOVLE                => "movle "
+  | OP_MOVLT                => "movlt "
+  | OP_MOVNE                => "movne "
 
 
-fun r2Str r = "r" ^ (Int.toString r)
+fun rToStr r = "r" ^ Int.toString r
+fun iToStr i = Int.toString i
 
 
-local
-    fun fs2Str [] = ""
-      | fs2Str (field::[]) = field
-      | fs2Str (field::fields) = field ^ ", " ^ (fs2Str fields)
-in
-    fun newToStr opcode id fds d =
-        (opToStr opcode) ^ " " ^ id ^ ", [" ^ (fs2Str fds) ^ "], " ^ (r2Str d)
-end
+fun newToStr opc id fds d =
+    opToStr opc ^ id ^ ", [" ^ Ast.foldd ", " (fn f => f) fds ^ "], " ^ rToStr d
 
 
 val insToStr =
  fn INS_RRR {opcode=opc, r1=r1, r2=r2, dest=d} =>
-    (opToStr opc) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2) ^ ", " ^ (r2Str d)
+    opToStr opc ^ rToStr r1 ^ ", " ^ rToStr r2 ^ ", " ^ rToStr d
   | INS_RIR {opcode=opc, r1=r1, immed=i, dest=d} =>
-    (opToStr opc) ^ " " ^ (r2Str r1) ^ ", " ^ (Int.toString i) ^ ", " ^ (r2Str d)
+    opToStr opc ^ rToStr r1 ^ ", " ^ iToStr i ^ ", " ^ rToStr d
   | INS_RRI {opcode=opc, r1=r1, r2=r2, immed=i} =>
-    (opToStr opc) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2) ^ ", " ^ (Int.toString i)
+    opToStr opc ^ rToStr r1 ^ ", " ^ rToStr r2 ^ ", " ^ iToStr i
   | INS_RRC {opcode=opc, r1=r1, r2=r2} =>
-    (opToStr opc) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str r2)
+    opToStr opc ^ rToStr r1 ^ ", " ^ rToStr r2
   | INS_RIC {opcode=opc, r1=r1, immed=i} =>
-    (opToStr opc) ^ " " ^ (r2Str r1) ^ ", " ^ (Int.toString i)
-  | INS_CLL {opcode=opc, l1=l1, l2=l2} =>
-    (opToStr opc) ^ " " ^ l1 ^ ", " ^ l2
-  | INS_L {opcode=opc, l1=l1} =>
-    (opToStr opc) ^ " " ^ l1
-  | INS_IR {opcode=opc, immed=i, dest=dest} =>
-    (opToStr opc) ^ " " ^  (Int.toString i) ^ ", " ^ (r2Str dest)
-  | INS_RI {opcode=opc, immed=i, dest=dest} =>
-    (opToStr opc) ^ " " ^ (r2Str dest) ^ ", " ^ (Int.toString i)
-  | INS_SR {opcode=opc, id=id, r1=r1} =>
-    (opToStr opc) ^ " " ^ id ^ ", " ^ (r2Str r1)
-  | INS_RS {opcode=opc, id=id, r1=r1} =>
-    (opToStr opc) ^ " " ^ (r2Str r1) ^ ", " ^ id
+    opToStr opc ^ rToStr r1 ^ ", " ^ iToStr i
+  | INS_CLL {opcode=opc, l1=l1, l2=l2} => opToStr opc ^ l1 ^ ", " ^ l2
+  | INS_L {opcode=opc, l1=l1} => opToStr opc ^ l1
+  | INS_IR {opcode=opc, immed=i, dest=d} =>
+    opToStr opc ^  iToStr i ^ ", " ^ rToStr d
+  | INS_RI {opcode=opc, immed=i, dest=d} =>
+    opToStr opc ^ rToStr d ^ ", " ^ iToStr i
+  | INS_SR {opcode=opc, id=id, r1=r1} => opToStr opc ^ id ^ ", " ^ rToStr r1
+  | INS_RS {opcode=opc, id=id, r1=r1} => opToStr opc ^ rToStr r1 ^ ", " ^ id
   | INS_SIR {opcode=opc, id=id, immed=i, r1=r1} =>
-    (opToStr opc) ^ " " ^ id ^ ", " ^ (Int.toString i) ^ ", " ^ (r2Str r1)
-  | INS_R {opcode=opc, r1=r1} => (opToStr opc) ^ " " ^ (r2Str r1)
-  | INS_X {opcode=opc} => (opToStr opc)
-  | INS_NEW {opcode=opc, id=id, fields=fields, dest=dest} =>
-    newToStr opc id fields dest
-  | INS_RR {opcode=opc, r1=r1, dest=dest} =>
-    (opToStr opc) ^ " " ^ (r2Str r1) ^ ", " ^ (r2Str dest)
+    opToStr opc ^ id ^ ", " ^ iToStr i ^ ", " ^ rToStr r1
+  | INS_R {opcode=opc, r1=r1} => opToStr opc ^ rToStr r1
+  | INS_X {opcode=opc} => opToStr opc
+  | INS_NEW {opcode=opc, id=id, fields=fields, dest=d} =>
+    newToStr opc id fields d
+  | INS_RR {opcode=opc, r1=r1, dest=d} =>
+    opToStr opc ^ rToStr r1 ^ ", " ^ rToStr d
 
 
 fun bbToStr (l, L) =
-    l ^ ":\n" ^ (foldr (fn (ins, s) => "\t" ^ (insToStr ins) ^ "\n" ^ s) "" L)
+    l ^ ":\n" ^ (foldr (fn (ins, s) => "\t" ^ insToStr ins ^ "\n" ^ s) "" L)
+
+
+fun funcToStr (id, body) =
+    (foldr (fn (bb, s) => bbToStr bb ^ s) "" (Cfg.toList body)) ^ "\n"
+
+
+fun programToStr funcs =
+    foldr (fn (func, s) => (funcToStr func) ^ s) "" funcs
 
 end

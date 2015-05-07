@@ -42,32 +42,17 @@ fun printAst file ast =
     end
 
 
-(*This is the proper dumpIL function*)
 fun dumpIL file st ast =
     let
         val ots = openOut (file ^ ".il")
         val printDecl = fn (id, _) => output (ots, "@function " ^ id ^ "\n")
-        val funcs = map (fn (l, cfg) => (l, Cfg.toList cfg))
-                        (Ast2Iloc.ast2Iloc st ast)
+        val iloc = Ast2Iloc.ast2Iloc st ast
     in
-        app printDecl funcs;
+        app printDecl iloc;
         output (ots, "\n");
-        app (fn bb => output (ots, Iloc.bbToStr bb))
-            (List.concat (map #2 funcs));
+        output (ots, Iloc.programToStr iloc);
         closeOut ots
     end
-
-
-(* fun dumpIL file st ast = *)
-(*     let *)
-(*         val ots = stdOut *)
-(*         val mapBB = fn (label, ins) => (label, "TEST " ^ label ^ "\n") *)
-(*         val mapFunc = fn (label, bb) => Cfg.map mapBB bb *)
-(*         val funcs = map mapFunc (Ast2Iloc.ast2Iloc st ast) *)
-(*         val funcs = map (fn cfg => Cfg.toList cfg) funcs *)
-(*     in *)
-(*         app (fn (l, str) => print (l ^ "\n" ^ str)) (List.concat funcs) *)
-(*     end *)
 
 
 fun printAsm file st ast =
