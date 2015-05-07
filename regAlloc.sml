@@ -16,42 +16,38 @@ datatype live_analysis =
          }
 
 
-fun condAdd (gen, kill) reg =
+fun condAdd kill (reg, gen) =
     if not (member (kill, reg)) then add (gen, reg) else gen
 
 
-fun regToGK (gen, kill) (INS_RR {r1=r1, r2=r2, ...}) =
-    (condAdd (gen, kill) r1, add (kill, r2))
-  | regToGK (gen, kill) (INS_IR {immed=immed, r2=r2, ...}) =
-    (gen, add (kill, r2))
-  | regToGK (gen, kill) (INS_KR {k=k, r2=r2, ...}) =
-    (gen, add (kill, r2))
-  | regToGK (gen, kill) (INS_SR {id=id, dest=dest, ...}) =
-    (gen, add (kill, dest))
-  | regToGK (gen, kill) (INS_GR {global=global, dest=dest, ...}) =
-    (gen, add (kill, dest))
-  | regToGK (gen, kill) (INS_RG {r1=r1, global=global, ...}) =
-    (condAdd (gen, kill) r1, kill)
-  | regToGK (gen, kill) (INS_MR {immed=immed, base=base, dest=dest,
-                                 offset=offset, ...}) =
-    let
-        val gen = condAdd (gen, kill) base
-    in
-        (case offset of SOME (r, _) => condAdd (gen, kill) r | NONE => gen,
-         add (kill, dest))
-    end
-  | regToGK (gen, kill) (INS_RM {r1=r1, immed=immed, base=base,
-                                 offset=offset, ...}) =
-    let
-        val kill = add (kill, base)
-    in
-        (condAdd (gen, kill) r1,
-         case offset of SOME (r, _) => add (kill, r) | NONE => kill)
-    end
-  | regToGK (gen, kill) (INS_R {r1=r1, ...}) = (*pretty sure this is wrong*)
-    (gen, add (kill, r1))
-  (* The remaining instruction types don't involve any registers. *)
-  | regToGK gk _ = gk
+fun condAddList (gen, kill) regs = List.foldr (condAdd kill) gen regs
+
+
+fun getOffReg off = case off of SOME (r, _) => [r] | NONE => []
+
+
+val getSources =
+ fn INS_RR {r1=r1, ...}                     => [r1]
+  | INS_RG {r1=r1, ...}                     => [r1]
+  | INS_MR {base=b, offset=off, ...}        => b::getOffReg off
+  | INS_RM {r1=r1, base=b, offset=off, ...} => r1::b::getOffReg off
+  | INS_R {r1=r1, ...}                      => [] (*think this is wrong...*)
+  | _                                       => []
+
+
+val getTargets =
+ fn INS_RR {r2=r2, ...}        => [r2]
+  | INS_IR {r2=r2, ...}        => [r2]
+  | INS_KR {r2=r2, ...}        => [r2]
+  | INS_SR {dest=dest, ...}    => [dest]
+  | INS_GR {dest=dest, ...}    => [dest]
+  | INS_MR {dest=dest, ...}    => [dest]
+  | INS_R {r1=r1, ...}         => [r1] (*think this is wrong....*)
+  | _                          => []
+
+
+fun regToGK (gen, kill) ins =
+    (condAddList (gen, kill) (getSources ins), addList (kill, getTargets ins))
 
 
 fun bbToGK (id, bb) =
@@ -95,15 +91,15 @@ fun funcLiveOut (id, cfg) =
     else (id, cfg)
 
 
-(* for each instruction in Block, from the bottom to the top *)
-(*     add the edge from target to each register in LiveNow set *)
-(*     remove target from LiveNow set *)
-(*     add all sources to the LiveNow set *)
+(* for each instruction in Block, from the bottom to the top
+ *     add the edge from target to each register in LiveNow set
+ *     remove target from LiveNow set
+ *     add all sources to the LiveNow set *)
 
 
 (* This function will be passed the successors of the node as part of
  * how Cfg.apply is written, but we don't need them here. *)
-fun bbIfeGraph ife _ (lva as LVA {...}) =
+fun bbIfeGraph ife _ (lva as LVA {bb=bb, liveOut=liveOut, ...}) =
     (*what do we do with the lva now that we have it????*)
     let
     in
