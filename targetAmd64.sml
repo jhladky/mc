@@ -61,7 +61,7 @@ datatype instruction =
 type basic_block = string * instruction list
 
 
-type function = string * basic_block list
+type function = string * basic_block Cfg.cfg
 
 
 datatype program = PROGRAM of {text: function list, data: string list}
@@ -145,7 +145,7 @@ fun bbToStr (l, L) =
 
 fun funcToStr (id, body) =
     "\t.globl " ^ id ^ "\n\t.type " ^ id ^ ", @function\n" ^
-    (foldr (fn (bb, s) => (bbToStr bb) ^ s) "" body) ^
+    (foldr (fn (bb, s) => (bbToStr bb) ^ s) "" (Cfg.toList body)) ^
     "\t.size " ^ id ^ ", .-" ^ id ^ "\n\n"
 
 

@@ -70,7 +70,7 @@ datatype instruction =
 type basic_block = string * instruction list
 
 
-type function = string * basic_block list
+type function = string * basic_block Cfg.cfg
 
 
 type program = function list

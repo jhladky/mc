@@ -209,15 +209,16 @@ fun bb2Amd64 id len (l, L) =
 
 
 (* This is the function level. *)
-fun func2Amd64 (ST {funcs=funcs, ...}) (id, bbs) =
+fun func2Amd64 (ST {funcs=funcs, ...}) (id, cfg) =
     let
         val (FUNC_INFO {calls=calls, ...}) = HashTable.lookup funcs id
         val max = foldr (getPLen funcs) 0 calls * Util.WORD_SIZE
     in
-        (id, map (bb2Amd64 id max) bbs)
+        (id, Cfg.map (bb2Amd64 id max) cfg)
     end
 
 
+(*we have a list of *)
 fun cfg2Amd64 (st as ST {globals=globals, ...}) funcs =
     PROGRAM {
         text=map (func2Amd64 st) funcs,

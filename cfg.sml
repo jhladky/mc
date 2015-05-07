@@ -1,148 +1,100 @@
 signature CFG = sig
-    type node
-    type cfg
+    type 'a node
+    type 'a cfg
 
-    val mkCfg : SymbolTable.symbol_table -> Ast.function -> node * node * cfg
-    val mkIf : node -> node * node * node
-    val mkWhile : node -> node * node * node
-    val mkReturn : cfg -> node * node
+    val mkCfg : 'a -> 'a -> 'a node * 'a node * 'a cfg
+    val toList : 'a cfg -> 'a list
+    val map : ('a -> 'b) -> 'a cfg -> 'b cfg
 
-    val link : node -> node -> unit
-    val fill : node -> Iloc.instruction list -> unit
-    val toList : cfg -> Iloc.basic_block list
-    val nextReg : cfg -> int
+    val mkNode : 'a -> 'a node
+    val link : 'a node -> 'a node -> unit (* Rename to addEdge *)
+    val update : 'a node -> 'a -> unit
+    val getData : 'a node -> 'a
+    val successors : 'a node -> 'a list
 
-    val getRegs : cfg -> (string, int) HashTable.hash_table
-    val getLabel : node -> string
-    val getSTInfo : cfg -> string * SymbolTable.symbol_table
+    val getExit : 'a cfg -> 'a node (* Remove later *)
 end
 
 structure Cfg :> CFG = struct
-open Iloc
 
-datatype node = NODE of {next: node list ref, data: basic_block ref}
+datatype 'a node = NODE of {id: int ref, next: 'a node list ref, data: 'a ref}
 
-datatype cfg =
-    CFG of {
-        st: SymbolTable.symbol_table,
-        regs: (string, int) HashTable.hash_table,
-        nextReg: int ref,
-        entry: node,
-        exit: node
-    }
-
-val nextLabel = ref 0;
+datatype 'a cfg = CFG of {entry: 'a node, exit: 'a node}
 
 
-fun mkNode () =
+fun mkNode data = NODE {id=ref 0, next=ref [], data=ref data}
+
+
+fun mkCfg enData exData =
     let
-        val label = "L" ^ (Int.toString (!nextLabel));
+        val entry = mkNode enData
+        val exit = mkNode exData
     in
-        nextLabel := 1 + (!nextLabel);
-        NODE {next=ref [], data=ref (label, [])}
+        (entry, exit, CFG {entry=entry, exit=exit}) (*this is bad*)
     end
-
-
-fun assignRegs ht =
-    let
-        val n = ref 0;
-    in
-        HashTable.map (fn _ => !n before n := 1 + (!n)) ht
-    end
-
-
-fun mkCfg st (Ast.FUNCTION {params=params, decls=decls, id=id, ...}) =
-    let
-        val ht = Util.mkHt ();
-        val addVD = (fn (Ast.VAR_DECL {id=s, typ=t, ...}) =>
-                        HashTable.insert ht (s, t));
-        val entry = NODE {next=ref [], data=ref (id, [])}
-        val exit = mkNode ();
-    in
-        app addVD decls;
-        app addVD params;
-        (entry,
-         exit,
-         CFG {
-             st=st,
-             regs=assignRegs ht,
-             nextReg=ref (HashTable.numItems ht),
-             entry=entry,
-             exit=exit
-        })
-    end
-
-
-fun nextReg (CFG {nextReg=nextReg, ...}) =
-    !nextReg before nextReg := 1 + (!nextReg)
-
-
-fun getLabel (NODE {data=data, ...}) = #1 (!data)
-
-
-fun getRegs (CFG {regs=regs, ...}) = regs
-
-
-fun getSTInfo (CFG {st=st, entry=NODE {data=data, ...}, ...}) = (#1 (!data), st)
 
 
 (*mmmm mutation... delicious*)
-fun link nod1 nod2 =
-    let
-        val (NODE {next=next, ...}) = nod1;
-    in
-        next := nod2::(!next)
-    end
+fun update (NODE {data=data, ...}) newData = data := newData
+fun link (NODE {next=next, ...}) node2 = next := node2::(!next)
+fun getExit (CFG {exit=exit, ...}) = exit
+fun getData (NODE {data=data, ...}) = !data
 
 
-fun fill (NODE {data=data, ...}) L = data := (#1 (!data), (#2 (!data)) @ L)
+fun successors (NODE {next=next, ...}) =
+    map (fn NODE {data=data, ...} => !data) (!next)
 
 
-fun mkIf node =
-    let
-        val exitNode = mkNode ();
-        val thenNode = mkNode ();
-        val elseNode = mkNode ();
-    in
-        link node elseNode;
-        link node thenNode;
-        (thenNode, elseNode, exitNode)
-    end
-
-fun mkWhile node =
-    let
-        val guard = mkNode ();
-        val body = mkNode ();
-        val exit = mkNode ();
-    in
-        link node guard;
-        link guard body;
-        link guard exit;
-        (guard, body, exit)
-    end
-
-
-fun mkReturn (CFG {exit=exit, ...}) =
-    let
-        val node = mkNode ();
-    in
-        (exit, node)
-    end
-
-
-fun toList1 (nod as NODE {next=next, data=data}, L) =
-    if not (isSome (List.find (fn item => item = !data) L)) then
-        foldr toList1 (L @ [!data]) (!next)
+fun toList1 (node as NODE {id=nId, next=next, ...}, L) =
+    if not (isSome (List.find (fn NODE {id=id, ...} => id = nId) L)) then
+        foldr toList1 (L @ [node]) (!next)
     else L
 
 
-fun toList (CFG {entry=en as NODE {data=dEn, ...},
-                 exit=NODE {data=dEx, ...}, ...}) =
+fun toList (CFG {entry=en as NODE {id=enId, ...},
+                 exit=ex as NODE {id=exId, ...}}) =
     let
-        val L = List.filter (fn p => p <> !dEn andalso p <> !dEx)
+        val L = List.filter (fn NODE {id=id, ...} =>
+                                id <> enId andalso id <> exId)
                             (toList1 (en, []))
     in
-        [!dEn] @ L @ [!dEx]
+        List.map (fn NODE {data=data, ...} => !data) ([en] @ L @ [ex])
     end
+
+
+fun map1 f L (NODE {id=nId, data=data, next=next}) =
+    case List.find (fn NODE {id=id, ...} => id = nId) (!L) of
+        SOME newNode => newNode
+      | NONE =>
+        let
+            val newNext = ref []
+            val newNode = NODE {
+                    id=nId,
+                    data=ref (f (!data)),
+                    next=newNext
+                }
+        in
+            L := newNode::(!L);
+            newNext := List.map (map1 f L) (!next);
+            newNode
+        end
+
+
+fun findExit exitId node =
+    let
+        val L = toList1 (node, [])
+    in
+        valOf (List.find (fn NODE {id=id, ...} => id = exitId) L)
+    end
+
+
+fun map f (CFG {entry=entry, exit=NODE {id=id, ...}}) =
+    let
+        val newEntry = map1 f (ref []) entry
+        val newExit = findExit id newEntry
+    in
+        CFG {entry=newEntry, exit=newExit}
+    end
+
 
 end
