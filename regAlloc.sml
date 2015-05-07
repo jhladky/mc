@@ -6,6 +6,15 @@ structure RegAlloc :> REG_ALLOC = struct
 open TargetAmd64
 open UnorderedSet
 
+datatype live_analysis =
+         LVA of {
+             label: string,
+             bb: instruction list,
+             gk: set * set,
+             liveOut: set,
+             loDiff: bool
+         }
+
 fun condAdd (gen, kill) reg =
     if not (member (kill, reg)) then add (gen, reg) else gen
 
@@ -49,9 +58,7 @@ fun bbToGK (id, bb) =
         val gk = List.foldl (fn (ins, gk) => regToGK gk ins)
                             (empty (), empty ()) bb
     in
-        (* string  * instruction list * (set * set) * set*)
-        (*bb label, bb instructions, gen/kill set, liveout set*)
-        (id, bb, gk, empty ())
+        LVA {label=id, bb=bb, gk=gk, liveOut=empty (), loDiff=true}
     end
 
 
@@ -60,33 +67,40 @@ fun funcToGK (id, cfg) =
     (id, Cfg.map bbToGK cfg)
 
 
-(* LiveOut(n) = union (for every set where m is in the successors of n) of the gen set of m union with the LiveOut set of m - the kill set of m. *)
-(* n / m is a basic block. *)
-
-(* gen(m) U (LiveOut(m) - kill(m)) *)
-
-fun bbLiveOut1 (_, _, (gen, kill), liveOut) =
+fun bbLiveOut1 (LVA {gk=(gen, kill), liveOut=liveOut, ...}) =
     union (gen, difference (liveOut, kill))
 
-fun bbLiveOut succs (id, bb, gk, liveOut) =
+
+fun bbLiveOut succs (LVA {label=id, bb=bb, gk=gk, liveOut=liveOut, ...}) =
     let
         val lo = List.foldr (fn (bb, s) => union (s, bbLiveOut1 bb))
                             (empty ()) succs
     in
-        (id, bb, gk, lo)
+        (* if equal (liveOut, lo) then print "SAME\n" else print "DIFFERENT\n"; *)
+        LVA {label=id, bb=bb, gk=gk, liveOut=lo, loDiff=not (equal (liveOut, lo))}
     end
 
 
+fun diffCheck1 diff [] = diff
+  | diffCheck1 diff (LVA {loDiff=loDiff, ...}::lvas) =
+    if loDiff then diffCheck1 true lvas else diffCheck1 diff lvas
+
+
+fun diffCheck cfg =
+    diffCheck1 false (Cfg.toList cfg)
+
+
+(* This is where we have to keep doing the liveout thing
+ * Iteratively recompute liveout until there is no change *)
 fun funcLiveOut (id, cfg) =
-    (id, Cfg.apply bbLiveOut cfg)
+    if diffCheck cfg then (Cfg.apply bbLiveOut cfg; (* print "\n"; *) funcLiveOut (id, cfg))
+    else (id, cfg)
 
 
 fun regAlloc (PROGRAM {text=text, data=data}) =
     let
-        val funcs = List.map funcToGK text
+        val funcs = List.map funcLiveOut (List.map funcToGK text)
     in
-        (*so funcs is the base, now let's write functions to compute the liveout set once*)
-        List.map funcLiveOut funcs;
         ()
     end
 

@@ -104,7 +104,9 @@ fun apply1 f L (node as NODE {id=nId, data=data, next=next}) =
         let
             val succs = List.map getData (foldr toList1 [] (!next))
         in
-            L := node::(!L); update node (f succs (!data))
+            L := node::(!L);
+            update node (f succs (!data));
+            List.app (apply1 f L) (!next)
         end
 
 
