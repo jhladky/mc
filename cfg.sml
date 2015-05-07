@@ -5,6 +5,7 @@ signature CFG = sig
     val mkCfg : 'a -> 'a -> 'a node * 'a node * 'a cfg
     val toList : 'a cfg -> 'a list
     val map : ('a -> 'b) -> 'a cfg -> 'b cfg
+    val apply : ('a list -> 'a -> 'a) -> 'a cfg -> unit
 
     val mkNode : 'a -> 'a node
     val link : 'a node -> 'a node -> unit (* Rename to addEdge *)
@@ -58,7 +59,7 @@ fun toList (CFG {entry=en as NODE {id=enId, ...},
                                 id <> enId andalso id <> exId)
                             (toList1 (en, []))
     in
-        List.map (fn NODE {data=data, ...} => !data) ([en] @ L @ [ex])
+        List.map getData ([en] @ L @ [ex])
     end
 
 
@@ -68,18 +69,16 @@ fun map1 f L (NODE {id=nId, data=data, next=next}) =
       | NONE =>
         let
             val newNext = ref []
-            val newNode = NODE {
-                    id=nId,
-                    data=ref (f (!data)),
-                    next=newNext
-                }
+            val newNode = NODE {id=nId, data=ref (f (!data)), next=newNext}
         in
+            (*might be a problem area here...*)
             L := newNode::(!L);
             newNext := List.map (map1 f L) (!next);
             newNode
         end
 
 
+(* This is bad. *)
 fun findExit exitId node =
     let
         val L = toList1 (node, [])
@@ -91,10 +90,25 @@ fun findExit exitId node =
 fun map f (CFG {entry=entry, exit=NODE {id=id, ...}}) =
     let
         val newEntry = map1 f (ref []) entry
-        val newExit = findExit id newEntry
     in
-        CFG {entry=newEntry, exit=newExit}
+        CFG {entry=newEntry, exit=findExit id newEntry}
     end
+
+
+(* There's a lot of duplication going on here...
+ * find a way to fix it in the future. *)
+fun apply1 f L (node as NODE {id=nId, data=data, next=next}) =
+    case List.find (fn NODE {id=id, ...} => id = nId) (!L) of
+        SOME _ => ()
+      | NONE =>
+        let
+            val succs = List.map getData (foldr toList1 [] (!next))
+        in
+            L := node::(!L); update node (f succs (!data))
+        end
+
+
+fun apply f (CFG {entry=entry, ...}) = apply1 f (ref []) entry
 
 
 end
