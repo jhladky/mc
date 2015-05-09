@@ -5,6 +5,7 @@ signature IFE_GRAPH = sig
     val mkGraph : unit -> ife_graph
     val toList : ife_graph -> TargetAmd64.register list
     val mkNode : ife_graph -> TargetAmd64.register -> node
+    val find : ife_graph -> TargetAmd64.register -> node option
 
     val addEdge : node -> node -> unit
     val getData : node -> TargetAmd64.register
@@ -30,6 +31,10 @@ fun mkNode (IG {nodes=nodes}) data =
 
 fun addEdge (node1 as NODE {adj=adj1, ...}) (node2 as NODE {adj=adj2, ...}) =
     (adj1 := node2::(!adj1); adj2 := node1::(!adj2))
+
+
+fun find (IG {nodes=nodes}) data =
+    List.find (fn NODE {data=d, ...} => d = data) (!nodes)
 
 
 fun mkGraph () = IG {nodes=ref []}

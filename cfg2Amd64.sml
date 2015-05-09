@@ -7,7 +7,7 @@ structure Cfg2Amd64 :> CFG2AMD64 = struct
 open SymbolTable
 open TargetAmd64
 
-exception ILOCException of Iloc.opcode
+exception BadOpcode of Iloc.opcode
 
 
 (* when you enter a function find out which one needs the most arguments
@@ -45,7 +45,7 @@ fun rrr2Amd64 r1 r2 dest Iloc.OP_ADD =
   | rrr2Amd64 r1 r2 dest Iloc.OP_OR =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r2, r2=REG_N dest},
      INS_RR {opcode=OP_ORQ, r1=REG_N r1, r2=REG_N dest}]
-  | rrr2Amd64 _ _ _ opcode = raise ILOCException opcode
+  | rrr2Amd64 _ _ _ opcode = raise BadOpcode opcode
 
 
 fun rir2Amd64 r1 immed dest Iloc.OP_XORI =
@@ -54,28 +54,28 @@ fun rir2Amd64 r1 immed dest Iloc.OP_XORI =
   | rir2Amd64 r1 immed dest Iloc.OP_LOADAI =
     [INS_MR {opcode=OP_MOVQ, immed=immed * Util.WORD_SIZE, base=REG_N r1,
              offset=NONE, dest=REG_N dest}]
-  | rir2Amd64 _ _ _ opcode = raise ILOCException opcode
+  | rir2Amd64 _ _ _ opcode = raise BadOpcode opcode
 
 
 fun rri2Amd64 r1 r2 immed Iloc.OP_STOREAI =
     [INS_RM {opcode=OP_MOVQ, r1=REG_N r1, immed=immed * Util.WORD_SIZE,
              base=REG_N r2, offset=NONE}]
-  | rri2Amd64 _ _ _ opcode = raise ILOCException opcode
+  | rri2Amd64 _ _ _ opcode = raise BadOpcode opcode
 
 
 fun rrc2Amd64 r1 r2 Iloc.OP_COMP =
     [INS_RR {opcode=OP_CMP, r1=REG_N r1, r2=REG_N r2}]
-  | rrc2Amd64 _ _ opcode = raise ILOCException opcode
+  | rrc2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
 fun ric2Amd64 r1 immed Iloc.OP_COMPI =
     [INS_IR {opcode=OP_CMP, immed=immed, r2=REG_N r1}]
-  | ric2Amd64 _ _ opcode = raise ILOCException opcode
+  | ric2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
 fun cll2Amd64 l1 l2 Iloc.OP_CBREQ =
     [INS_L {opcode=OP_JE, label=l1}, INS_L {opcode=OP_JMP, label=l2}]
-  | cll2Amd64 _ _ opcode = raise ILOCException opcode
+  | cll2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
 fun sir2Amd64 r2 immed id Iloc.OP_LOADINARGUMENT =
@@ -88,19 +88,19 @@ fun sir2Amd64 r2 immed id Iloc.OP_LOADINARGUMENT =
        | 5 => [INS_RR {opcode=OP_MOVQ, r1=REG_N 9, r2=REG_N r2}]
        | n => [INS_MR {opcode=OP_MOVQ, immed=Util.WORD_SIZE * (n - 6) + 16,
                        dest=REG_N r2,  base=REG_RBP, offset=NONE}])
-  | sir2Amd64 _ _ _ opcode = raise ILOCException opcode
+  | sir2Amd64 _ _ _ opcode = raise BadOpcode opcode
 
 
 fun new2Amd64 id fields dest Iloc.OP_NEW =
     [INS_IR {opcode=OP_MOVQ, immed=length fields * Util.WORD_SIZE, r2=REG_RDI},
      INS_L {opcode=OP_CALL, label="malloc"},
      INS_RR {opcode=OP_MOVQ, r1=REG_RAX, r2=REG_N dest}]
-  | new2Amd64 _ _ _ opcode = raise ILOCException opcode
+  | new2Amd64 _ _ _ opcode = raise BadOpcode opcode
 
 
 fun rr2Amd64 r1 dest Iloc.OP_MOV =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_N dest}]
-  | rr2Amd64 _ _ opcode = raise ILOCException opcode
+  | rr2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
 fun ir2Amd64 immed dest Iloc.OP_LOADI =
@@ -117,7 +117,7 @@ fun ir2Amd64 immed dest Iloc.OP_LOADI =
     [INS_IR {opcode=OP_CMOVLEQ, immed=immed, r2=REG_N dest}]
   | ir2Amd64 immed dest Iloc.OP_MOVGE =
     [INS_IR {opcode=OP_CMOVGEQ, immed=immed, r2=REG_N dest}]
-  | ir2Amd64 _ _ opcode = raise ILOCException opcode
+  | ir2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
 fun ri2Amd64 immed r1 Iloc.OP_STOREOUTARGUMENT =
@@ -130,24 +130,24 @@ fun ri2Amd64 immed r1 Iloc.OP_STOREOUTARGUMENT =
        | 5 => [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_N 9}]
        | n => [INS_RM {opcode=OP_MOVQ, immed=Util.WORD_SIZE * (n - 6),
                        r1=REG_N r1, base=REG_RSP, offset=NONE}])
-  | ri2Amd64 _ _ opcode = raise ILOCException opcode
+  | ri2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
 fun sr2Amd64 r1 id Iloc.OP_LOADGLOBAL =
     [INS_GR {opcode=OP_MOVQ, global=id, dest=REG_N r1}]
   | sr2Amd64 r1 id Iloc.OP_COMPUTEGLOBALADDRESS =
     [INS_SR {opcode=OP_MOVQ, id=id, dest=REG_N r1}]
-  | sr2Amd64 _ _ opcode = raise ILOCException opcode
+  | sr2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
 fun rs2Amd64 r1 id Iloc.OP_STOREGLOBAL =
     [INS_RG {opcode=OP_MOVQ, r1=REG_N r1, global=id}]
-  | rs2Amd64 _ _ opcode = raise ILOCException opcode
+  | rs2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
 fun l2Amd64 l1 Iloc.OP_JUMPI = [INS_L {opcode=OP_JMP, label=l1}]
   | l2Amd64 l1 Iloc.OP_CALL = [INS_L {opcode=OP_CALL, label=l1}]
-  | l2Amd64 _ opcode = raise ILOCException opcode
+  | l2Amd64 _ opcode = raise BadOpcode opcode
 
 
 fun io2Amd64 r1 label funcName =
@@ -167,11 +167,11 @@ fun r2Amd64 r1 Iloc.OP_LOADRET =
   | r2Amd64 r1 Iloc.OP_DEL =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RDI},
      INS_L {opcode=OP_CALL, label="free"}]
-  | r2Amd64 _ opcode = raise ILOCException opcode
+  | r2Amd64 _ opcode = raise BadOpcode opcode
 
 
 fun x2Amd64 len Iloc.OP_RET = genEpilogue len
-  | x2Amd64 _ opcode = raise ILOCException opcode
+  | x2Amd64 _ opcode = raise BadOpcode opcode
 
 
 fun iloc2Amd64 len =
@@ -224,7 +224,7 @@ fun cfg2Amd64 (st as ST {globals=globals, ...}) funcs =
         text=map (func2Amd64 st) funcs,
         data=map #1 (HashTable.listItemsi globals)
     }
-    handle ILOCException _ =>
+    handle BadOpcode _ =>
            (print "Bad ILOC instruction.\n"; OS.Process.exit OS.Process.failure)
 
 end
