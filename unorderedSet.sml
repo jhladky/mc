@@ -4,6 +4,8 @@ signature UORD_SET = sig
     type item = TargetAmd64.register
     type set
 
+    exception NotFound
+
     val empty : unit -> set
     val singleton : item -> set
     val add : set * item -> set

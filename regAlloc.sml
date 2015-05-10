@@ -138,7 +138,7 @@ fun diffCheck cfg = diffCheck1 false (Cfg.toList cfg)
 (* This is where we have to keep doing the liveOut thing
  * Iteratively recompute liveout until there is no change *)
 fun funcLiveOut (id, cfg) =
-    if diffCheck cfg then (Cfg.apply bbLiveOut cfg; funcLiveOut (id, cfg))
+    if diffCheck cfg then (Cfg.apply bbLiveOut cfg; (*print ("LENGTH " ^ Int.toString (numItems let val LVA {liveOut=liveOut, ...} = Cfg.getData (Cfg.getExit cfg) in liveOut end) ^ "\n"); *)funcLiveOut (id, cfg))
     else (id, cfg)
 
 
@@ -151,17 +151,15 @@ fun addEdge ife r1 r2 =
     end
 
 
-(* for each instruction in Block, from the bottom to the top
- *     add the edge from target to each register in LiveNow set
- *     remove target from LiveNow set
- *     add all sources to the LiveNow set *)
 fun insIfeGraph ife (ins, liveNow) =
     let
         val (sources, targets) = getST ins
     in
         List.app (fn t => app (addEdge ife t) liveNow) targets;
         (*since we're going to modify the livenow set, we have to pass it back*)
-        addList (List.foldr (fn (t, ln) => delete (ln, t)) liveNow targets,
+
+        (*this exception is a problem.... what's going on here...*)
+        addList (List.foldr (fn (t, ln) => delete (ln, t) handle NotFound => ln) liveNow targets,
                  sources)
     end
 
@@ -173,8 +171,10 @@ fun bbIfeGraph ife _ (lva as LVA {bb=bb, liveOut=liveOut, ...}) =
     (* what do we do with the 'liveNow' set / lva
      * once we're done with it on each bb*)
     let
+        (*liveOut comes out of here*)
+        val liveOut_final = List.foldr (insIfeGraph ife) liveOut bb
     in
-        List.foldr (insIfeGraph ife) liveOut bb; (*liveOut comes out of here*)
+        print ("length: " ^ Int.toString (numItems liveOut_final) ^ "\n");
         lva
     end
 

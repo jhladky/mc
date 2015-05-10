@@ -31,8 +31,10 @@
 # Debug files
 *.dSYM/
 
-# Application binary
+# Application binaries
 mc
+testUnorderedSet
+
 # Test JSON files
 tests/*.json
 tests/*.il

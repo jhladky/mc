@@ -8,6 +8,7 @@ signature IFE_GRAPH = sig
     val find : ife_graph -> TargetAmd64.register -> node option
 
     val addEdge : node -> node -> unit
+    val numEdges : node -> int
     val getData : node -> TargetAmd64.register
     val neighbors : node -> TargetAmd64.register list
 end
@@ -41,5 +42,6 @@ fun mkGraph () = IG {nodes=ref []}
 fun getData (NODE {data=data, ...}) = data
 fun neighbors (NODE {adj=adj, ...}) = List.map getData (!adj)
 fun toList (IG {nodes=nodes}) = List.map getData (!nodes)
+fun numEdges (NODE {adj=adj, ...}) = length (!adj)
 
 end
