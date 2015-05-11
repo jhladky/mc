@@ -27,6 +27,8 @@ signature UORD_SET = sig
     val filter : (''a -> bool) -> ''a set -> ''a set
     val exists : (''a -> bool) -> ''a set -> bool
     val find : (''a -> bool) -> ''a set -> ''a option
+
+    val toString : (''a -> string) -> ''a set -> string
 end
 
 structure UnorderedSet :> UORD_SET = struct
@@ -68,13 +70,22 @@ fun difference (SET L1, SET L2) =
     SET (foldr (fn (item, L) => if has item L2 then L else item::L) [] L1)
 
 
+fun equal1 other [] = true
+  | equal1 other (x::xs) =
+    if has x other then equal1 other xs else false
+
+
+(* Returns true iff each element of one set is present in the other O(n^2). *)
+fun equal (SET L1, SET L2) =
+    if equal1 L1 L2 andalso equal1 L2 L1 then true else false
+
+
 fun empty () = SET []
 fun singleton item = SET [item]
 fun add (s as SET L, item) = if has item L then s else SET (item::L)
 fun add' (item, s as SET L) = if has item L then s else SET (item::L)
 fun member (SET L, item) = has item L
 fun isEmpty (SET L) = length L = 0
-fun equal (SET L1, SET L2) = L1 = L2
 fun numItems (SET L) = length L
 fun listItems (SET L) = L
 fun map f (SET L) = SET (List.map f L)
@@ -84,5 +95,14 @@ fun foldr f start (SET L) = List.foldr f start L
 fun exists f (SET L) = List.exists f L
 fun filter f (SET L) = SET (List.filter f L)
 fun find f (SET L) = List.find f L
+
+
+(* This is actually taken from the Ast structure. *)
+fun foldd sep f [] = ""
+  | foldd sep f (x::[]) = f x
+  | foldd sep f (x::xs) = (f x) ^ sep ^ (foldd sep f xs)
+
+
+fun toString toStr (SET L) = "{" ^ (foldd ", " toStr L) ^ "}"
 
 end
