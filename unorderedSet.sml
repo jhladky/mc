@@ -31,6 +31,8 @@ signature UORD_SET = sig
     val toString : (''a -> string) -> ''a set -> string
 end
 
+(* TODO: Rework to take in an equality function instead of
+ * requiring an equality type.*)
 structure UnorderedSet :> UORD_SET = struct
 
 exception NotFound
@@ -95,14 +97,6 @@ fun foldr f start (SET L) = List.foldr f start L
 fun exists f (SET L) = List.exists f L
 fun filter f (SET L) = SET (List.filter f L)
 fun find f (SET L) = List.find f L
-
-
-(* This is actually taken from the Ast structure. *)
-fun foldd sep f [] = ""
-  | foldd sep f (x::[]) = f x
-  | foldd sep f (x::xs) = (f x) ^ sep ^ (foldd sep f xs)
-
-
-fun toString toStr (SET L) = "{" ^ (foldd ", " toStr L) ^ "}"
+fun toString toStr (SET L) = "{" ^ (Util.foldd ", " toStr L) ^ "}"
 
 end

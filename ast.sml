@@ -83,12 +83,8 @@ datatype program =
      }
 
 
-fun foldd sep f [] = ""
-  | foldd sep f (x::[]) = f x
-  | foldd sep f (x::xs) = (f x) ^ sep ^ (foldd sep f xs)
-
-
-val binOpToStr = fn BOP_PLUS => " + "
+val binOpToStr =
+ fn BOP_PLUS => " + "
   | BOP_MINUS => " - "
   | BOP_TIMES => " * "
   | BOP_DIVIDE => " / "
@@ -138,7 +134,7 @@ fun expToStr (EXP_NUM {value=n, ...}) = Int.toString n
   | expToStr (EXP_DOT {lft=lft, prop=prop, ...}) = (expToStr lft) ^ "." ^ prop
   | expToStr (EXP_NEW {id=s, ...}) = "new " ^ s
   | expToStr (EXP_INVOCATION {id=id, args=args, ...}) =
-    id ^ "(" ^ (foldd ", " expToStr args) ^ ")"
+    id ^ "(" ^ (Util.foldd ", " expToStr args) ^ ")"
 
 
 fun stmtToStr (ST_BLOCK body) =
@@ -157,12 +153,12 @@ fun stmtToStr (ST_BLOCK body) =
   | stmtToStr (ST_RETURN {exp=exp, ...}) =
     "return" ^ (case exp of SOME e => expToStr e | NONE => "")
   | stmtToStr (ST_INVOCATION {id=id, args=args, ...}) =
-    id ^ "(" ^ (foldd ", " expToStr args) ^ ")"
+    id ^ "(" ^ (Util.foldd ", " expToStr args) ^ ")"
 
 
 fun funcToStr (FUNCTION {id=id, params=params, returnType=rt, decls=decls,
                          body=body, ...}) =
-    "fun " ^ id ^ " (" ^ (foldd ", " varDeclToStr params) ^ ") " ^
+    "fun " ^ id ^ " (" ^ (Util.foldd ", " varDeclToStr params) ^ ") " ^
     (typeToStr rt) ^ "\n{\n" ^
     (foldr (fn (d, s) => (varDeclToStr d) ^ ";\n" ^ s) "" decls) ^
     (foldr (fn (t, s) => (stmtToStr t) ^ "\n" ^ s) "" body) ^ "}\n"

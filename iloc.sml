@@ -128,8 +128,8 @@ fun rToStr r = "r" ^ Int.toString r
 fun iToStr i = Int.toString i
 
 
-fun newToStr opc id fds d =
-    opToStr opc ^ id ^ ", [" ^ Ast.foldd ", " (fn f => f) fds ^ "], " ^ rToStr d
+fun newToStr opc id fs d =
+    opToStr opc ^ id ^ ", [" ^ Util.foldd ", " (fn f => f) fs ^ "], " ^ rToStr d
 
 
 val insToStr =

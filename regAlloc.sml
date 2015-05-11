@@ -17,6 +17,10 @@ datatype live_analysis =
              loDiff: bool
          }
 
+val INIT_AVAIL_REGS = 15
+val realRegs = addList (empty (), [REG_RAX, REG_RBX, REG_RCX, REG_RDX,
+                                   REG_RSI, REG_RDI, REG_RBP, REG_RSP])
+
 
 (* Helper functions. *)
 fun condAdd kill (reg, gen) =
@@ -27,6 +31,10 @@ fun condAddList (gen, kill) regs = List.foldr (condAdd kill) gen regs
 
 
 fun getOffReg off = case off of SOME (r, _) => [r] | NONE => []
+
+
+fun has reg s =
+    case find (fn r => r = reg) s of SOME _ => true | NONE => false
 
 
 fun getSTrr r1 r2 OP_MOVQ  = ([r1], [r2])
@@ -44,13 +52,13 @@ fun getSTir r OP_SUBQ    = ([r], [r])
   | getSTir r OP_XORQ    = ([r], [r])
   | getSTir r OP_CMP     = ([r], [])
   | getSTir r OP_MOVQ    = ([], [r])
-  | getSTir r OP_CMOVEQ  = ([], [r])
-  | getSTir r OP_CMOVNEQ = ([], [r])
-  | getSTir r OP_CMOVLQ  = ([], [r])
-  | getSTir r OP_CMOVGQ  = ([], [r])
-  | getSTir r OP_CMOVLEQ = ([], [r])
-  | getSTir r OP_CMOVGEQ = ([], [r])
-  | getSTir _ opc = raise RegisterType opc
+  | getSTir r OP_CMOVEQ  = ([r], [r])
+  | getSTir r OP_CMOVNEQ = ([r], [r])
+  | getSTir r OP_CMOVLQ  = ([r], [r])
+  | getSTir r OP_CMOVGQ  = ([r], [r])
+  | getSTir r OP_CMOVLEQ = ([r], [r])
+  | getSTir r OP_CMOVGEQ = ([r], [r])
+  | getSTir _ opc        = raise RegisterType opc
 
 
 fun getSTkr r OP_SARQ = ([r], [r]) | getSTkr _ opc = raise RegisterType opc
@@ -138,7 +146,7 @@ fun diffCheck cfg = diffCheck1 false (Cfg.toList cfg)
 (* This is where we have to keep doing the liveOut thing
  * Iteratively recompute liveout until there is no change *)
 fun funcLiveOut (id, cfg) =
-    if diffCheck cfg then (Cfg.apply bbLiveOut cfg; (*print ("LENGTH " ^ Int.toString (numItems let val LVA {liveOut=liveOut, ...} = Cfg.getData (Cfg.getExit cfg) in liveOut end) ^ "\n"); *)funcLiveOut (id, cfg))
+    if diffCheck cfg then (Cfg.apply bbLiveOut cfg; funcLiveOut (id, cfg))
     else (id, cfg)
 
 
@@ -157,26 +165,16 @@ fun insIfeGraph ife (ins, liveNow) =
     in
         List.app (fn t => app (addEdge ife t) liveNow) targets;
         (*since we're going to modify the livenow set, we have to pass it back*)
-
-        (*this exception is a problem.... what's going on here...*)
-        addList (List.foldr (fn (t, ln) => delete (ln, t) handle NotFound => ln) liveNow targets,
-                 sources)
+        addList (List.foldr (fn (t, ln) => delete (ln, t) handle NotFound => ln)
+                            liveNow targets, sources)
     end
 
 
 (* This function will be passed the successors of the node as part of
  * how Cfg.apply is written, but we don't need them here. *)
 fun bbIfeGraph ife _ (lva as LVA {bb=bb, liveOut=liveOut, ...}) =
-    (*recall bb is the instruction list*)
-    (* what do we do with the 'liveNow' set / lva
-     * once we're done with it on each bb*)
-    let
-        (*liveOut comes out of here*)
-        val liveOut_final = List.foldr (insIfeGraph ife) liveOut bb
-    in
-        print ("length: " ^ Int.toString (numItems liveOut_final) ^ "\n");
-        lva
-    end
+    (*liveOut comes out of here*)
+    (List.foldr (insIfeGraph ife) liveOut bb; lva)
 
 
 (*build the interferance graph here*)
@@ -185,14 +183,43 @@ fun funcIfeGraph (id, cfg) =
         val ife = IfeGraph.mkGraph ()
     in
         Cfg.apply (bbIfeGraph ife) cfg;
-        (id, ife)
+        ife
+    end
+
+
+(* |Graph Coloring|
+ * * heuristic-based
+ * * Deconstruct graph, place each node in a stack: Select a node,
+ *       a) from unconstrained (w/ fewer edges than colors) nodes or
+ *       b) if there are no unconstrained, from one of the constrained nodes
+ *   How do we select which nodes from the unconstrained?
+ *   What would be a good spill candidate?
+ * * We put it into the stack, and then when we take it off we assign a color
+ * * Reconstruct the graph from the stack, and color as we do so *)
+
+(* Take things out of the graph and turn them into a stack based on how easy they are to color.
+ * You can deconstruct the graph in this order
+ *     1) unconstrained (fewer edges than colors)
+ *     2) constrained by heuristic
+ *     3) real registers *)
+fun uncReq node = IfeGraph.numEdges node < INIT_AVAIL_REGS andalso
+                  not (has (IfeGraph.getData node) realRegs)
+
+
+fun deconstruct ife =
+    let
+        (* This will form the base of our stack. *)
+        val unconstrained = IfeGraph.filter ife uncReq
+    in
+        []
     end
 
 
 fun regAlloc (p as PROGRAM {text=text, data=data}) =
     let
         val funcs = List.map funcLiveOut (List.map funcToGK text)
-        val _ = List.map funcIfeGraph funcs
+        val ifes = List.map funcIfeGraph funcs
+        val stacks = List.map deconstruct ifes
     in
         p (*just sending the same program back at this point*)
     end
