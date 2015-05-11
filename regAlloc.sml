@@ -12,8 +12,8 @@ datatype live_analysis =
          LVA of {
              label: string,
              bb: instruction list,
-             gk: set * set,
-             liveOut: set,
+             gk: register set * register set,
+             liveOut: register set,
              loDiff: bool
          }
 

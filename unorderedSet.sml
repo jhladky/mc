@@ -1,42 +1,39 @@
 (* Implementation of an unordered set using lists.
  * This is not efficient. *)
 signature UORD_SET = sig
-    type item = TargetAmd64.register
-    type set
+    type ''a set
 
     exception NotFound
 
-    val empty : unit -> set
-    val singleton : item -> set
-    val add : set * item -> set
-    val addList : set * item list -> set
-    val delete : set * item -> set
-    val member : set * item -> bool
-    val isEmpty : set -> bool
-    val equal : set * set -> bool
-    (* val compare : set * set -> order *) (* Not implemented *)
-    val isSubset : set * set -> bool
-    val numItems : set -> int
-    val listItems : set -> item list
-    val union : set * set -> set
-    val intersection : set * set -> set
-    val difference : set * set -> set
-    val map : (item -> item) -> set -> set
-    val app : (item -> unit) -> set -> unit
-    val foldl : ((item * 'b) -> 'b) -> 'b -> set -> 'b
-    val foldr : ((item * 'b) -> 'b) -> 'b -> set -> 'b
-    val filter : (item -> bool) -> set -> set
-    val exists : (item -> bool) -> set -> bool
-    val find : (item -> bool) -> set -> item option
+    val empty : unit -> ''a set
+    val singleton : ''a -> ''a set
+    val add : ''a set * ''a -> ''a set
+    val addList : ''a set * ''a list -> ''a set
+    val delete : ''a set * ''a -> ''a set
+    val member : ''a set * ''a -> bool
+    val isEmpty : ''a set -> bool
+    val equal : ''a set * ''a set -> bool
+    (* val compare : ''a set * ''a set -> order *) (* Not implemented *)
+    val isSubset : ''a set * ''a set -> bool
+    val numItems : ''a set -> int
+    val listItems : ''a set -> ''a list
+    val union : ''a set * ''a set -> ''a set
+    val intersection : ''a set * ''a set -> ''a set
+    val difference : ''a set * ''a set -> ''a set
+    val map : (''a -> ''b) -> ''a set -> ''b set
+    val app : (''a -> unit) -> ''a set -> unit
+    val foldl : ((''a * 'b) -> 'b) -> 'b -> ''a set -> 'b
+    val foldr : ((''a * 'b) -> 'b) -> 'b -> ''a set -> 'b
+    val filter : (''a -> bool) -> ''a set -> ''a set
+    val exists : (''a -> bool) -> ''a set -> bool
+    val find : (''a -> bool) -> ''a set -> ''a option
 end
 
 structure UnorderedSet :> UORD_SET = struct
 
 exception NotFound
 
-type item = TargetAmd64.register
-
-datatype set = SET of item list
+datatype ''a set = SET of ''a list
 
 
 (* Helper function. O(n) *)
