@@ -28,6 +28,10 @@
 *.x86_64
 *.hex
 
+# Raw assembly files
+*.il
+*.s
+
 # Debug files
 *.dSYM/
 

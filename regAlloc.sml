@@ -23,18 +23,18 @@ val actual = addList (empty (), [REG_RAX, REG_RBX, REG_RCX, REG_RDX,
                                  REG_RSI, REG_RDI, REG_RBP, REG_RSP])
 
 (* Set of all the registers we have available for coloring. *)
-val avail = addList (empty (), [REG_N 8, REG_N 9, REG_N 10, REG_N 11,
-                                REG_N 12, REG_N 13, REG_N 14, REG_N 15,
+val avail = addList (empty (), [REG_8, REG_9, REG_10, REG_11,
+                                REG_12, REG_13, REG_14, REG_15,
                                 REG_RAX, REG_RBX, REG_RCX, REG_RDX,
                                 REG_RSI, REG_RDI, REG_RBP])
 
 (* Registers that must be preserved in the function i.e. callee saved. *)
 val preserved = addList (empty (), [REG_RBX, REG_RSP, REG_RBP,
-                                    REG_N 12, REG_N 13, REG_N 14, REG_N 15])
+                                    REG_12, REG_13, REG_14, REG_15])
 
 (* Registers that can be used as scratch i.e. caller saved. *)
 val scratch = addList (empty (), [REG_RAX, REG_RDI, REG_RSI, REG_RDX, REG_RCX,
-                                  REG_N 8, REG_N 9, REG_N 10, REG_N 11])
+                                  REG_8, REG_9, REG_10, REG_11])
 
 (* Helper functions. *)
 fun condAdd kill (reg, gen) =
@@ -72,7 +72,6 @@ fun getSTir r OP_SUBQ    = ([r], [r])
   | getSTir _ opc        = raise RegisterType opc
 
 
-(* fun getSTkr r OP_SARQ = ([r], [r]) | getSTkr _ opc = raise RegisterType opc *)
 fun getSTsr d OP_MOVQ = ([], [d]) | getSTsr _ opc = raise RegisterType opc
 fun getSTgr d OP_MOVQ = ([], [d]) | getSTgr _ opc = raise RegisterType opc
 fun getSTrg r OP_MOVQ = ([r], []) | getSTrg _ opc = raise RegisterType opc
@@ -89,7 +88,7 @@ fun getSTrm reg base offset OP_MOVQ = (reg::base::getOffReg offset, [])
 fun getSTr r OP_PUSHQ = ([r], [])
   | getSTr r OP_POPQ  = ([], [r])
   | getSTr r OP_IDIVQ = ([REG_RAX, REG_RDX, r], [REG_RAX])
-  | getSTr _ opc = raise RegisterType opc
+  | getSTr _ opc      = raise RegisterType opc
 
 
 val getST =
@@ -204,7 +203,7 @@ fun deconstruct ife =
     end
 
 
-fun addRealRegToSet vtr (REG_N n, used) =
+fun addRealRegToSet vtr (REG_V n, used) =
     (case HashTable.find vtr (Int.toString n) of
          SOME reg => add (used, reg)
        | NONE => used)
@@ -228,7 +227,7 @@ fun spill () =
     (print "SPILL!\n"; OS.Process.exit OS.Process.failure)
 
 
-fun addToIfe vtr ife (REG_N n, adjs) =
+fun addToIfe vtr ife (REG_V n, adjs) =
     (*here we're dealing with a virtual register*)
     (case pick (getAvailRegs vtr adjs) of
          SOME (reg, _) => (* `Pick` also returns the rest of the list,
@@ -240,7 +239,7 @@ fun addToIfe vtr ife (REG_N n, adjs) =
     List.app (addEdgeNoCreate ife (IfeGraph.mkNode ife reg)) adjs
 
 
-fun replace vtr (REG_N n) = HashTable.lookup vtr (Int.toString n)
+fun replace vtr (REG_V n) = HashTable.lookup vtr (Int.toString n)
   | replace vtr reg = reg
 
 

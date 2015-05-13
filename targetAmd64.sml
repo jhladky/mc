@@ -42,7 +42,15 @@ datatype register =
    | REG_RDI
    | REG_RBP
    | REG_RSP
-   | REG_N of int
+   | REG_8
+   | REG_9
+   | REG_10
+   | REG_11
+   | REG_12
+   | REG_13
+   | REG_14
+   | REG_15
+   | REG_V of int
 
 
 datatype instruction =
@@ -108,7 +116,16 @@ val regToStr =
   | REG_RDI      => "%rdi"
   | REG_RBP      => "%rbp"
   | REG_RSP      => "%rsp"
-  | REG_N n      => "%r" ^ Int.toString n
+  | REG_8        => "%r8"
+  | REG_9        => "%r9"
+  | REG_10       => "%r10"
+  | REG_11       => "%r11"
+  | REG_12       => "%r12"
+  | REG_13       => "%r13"
+  | REG_14       => "%r14"
+  | REG_15       => "%r15"
+  (* Put a v in to make sure we remember these are _virtual_. *)
+  | REG_V n      => "%rv" ^ Int.toString n
 
 
 val insToStr =

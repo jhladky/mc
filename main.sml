@@ -33,18 +33,18 @@ fun parseArgs () =
     end
 
 
-fun printAst file ast =
+fun printAst fname ast =
     let
-        val ots = stdOut
+        val ots = openOut (fname ^ ".ast")
     in
         output (ots, Ast.programToStr ast);
         closeOut ots
     end
 
 
-fun dumpIL file st ast =
+fun dumpIL fname st ast =
     let
-        val ots = openOut (file ^ ".il")
+        val ots = openOut (fname ^ ".il")
         val printDecl = fn (id, _) => output (ots, "@function " ^ id ^ "\n")
         val iloc = Ast2Iloc.ast2Iloc st ast
     in
@@ -55,36 +55,41 @@ fun dumpIL file st ast =
     end
 
 
-fun printAsm file st ast =
+fun printAsm fname st ast =
     let
-        (* val ots = openOut (file ^ ".s") *) val ots = stdOut
+        val ots = openOut (fname ^ ".s")
     in
         output (ots, TargetAmd64.programToStr
-                         (Cfg2Amd64.cfg2Amd64 st (Ast2Iloc.ast2Iloc st ast)));
+                         (Iloc2Amd64.iloc2Amd64 st (Ast2Iloc.ast2Iloc st ast)));
         closeOut ots
     end
 
 
-fun compile file st ast =
+fun compile fname st ast =
     let
-        (* val ots = openOut (file ^ ".s") *) val ots = stdOut
+        val ots = openOut (fname ^ ".s")
     in
         output (ots, TargetAmd64.programToStr (
-                    RegAlloc.regAlloc (Cfg2Amd64.cfg2Amd64 st (
+                    RegAlloc.regAlloc (Iloc2Amd64.iloc2Amd64 st (
                                             Ast2Iloc.ast2Iloc st ast))));
         closeOut ots
     end
 
 
+fun getFname path =
+    List.last (String.tokens (fn c => c = #"/")
+                             (hd (String.tokens (fn c => c = #".") path)))
+
+
 fun main () =
     let
-        val opts as {file=f, ...} = parseArgs ()
-        val fname = (hd (String.tokens (fn c => c = #".") f))
-        val ins = openIn f
+        val opts as {file=filepath, ...} = parseArgs ()
+        val fname = getFname filepath
+        val ins = openIn filepath
         val ast = json2AST ins
-        val st = SymbolTable.mkSymbolTable f ast
+        val st = SymbolTable.mkSymbolTable filepath ast
     in
-        Static.staticCheck f st ast;
+        Static.staticCheck filepath st ast;
         if #printAst opts then printAst fname ast
         else if #dumpIL opts then dumpIL fname st ast
         else if #noRegAlloc opts then printAsm fname st ast

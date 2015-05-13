@@ -16,7 +16,7 @@ ilocUtil.sml
 ast2Iloc.sml
 
 targetAmd64.sml
-cfg2Amd64.sml
+iloc2Amd64.sml
 
 unorderedSet.sml
 ifeGraph.sml
