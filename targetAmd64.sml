@@ -30,6 +30,9 @@ datatype opcode =
    | OP_SARQ
 
 
+(* Need to do a small rewrite of this...
+ add reg values for 8-15, and change N to V, so we can totally specify what's
+virtual and what's not*)
 datatype register =
      REG_RAX
    | REG_RBX

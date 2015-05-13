@@ -1,0 +1,43 @@
+
+fun forceSpill() void {
+   int a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p;
+
+   a = 1;
+   b = 2;
+   c = 3;
+   d = 4;
+   d = 5;
+   e = 6;
+   f = 7;
+   g = 8;
+   h = 9;
+   i = 10;
+   j = 11;
+   k = 12;
+   l = 13;
+   m = 14;
+   n = 15;
+   o = 16;
+   p = 17;
+   print p endl;
+   print o endl;
+   print n endl;
+   print m endl;
+   print l endl;
+   print k endl;
+   print j endl;
+   print i endl;
+   print h endl;
+   print g endl;
+   print f endl;
+   print e endl;
+   print d endl;
+   print c endl;
+   print b endl;
+   print a endl;
+}
+
+fun main() int {
+   forceSpill();
+   return 0;
+}

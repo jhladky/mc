@@ -9,10 +9,6 @@ open UnorderedSet
 (* Function should not be called on a register of this type. *)
 exception RegisterType of opcode
 
-(* There is no real register in the Virtual-To-Real register table.
- * Indicates that register coloring failed. *)
-exception NoRealRegister of register
-
 datatype live_analysis =
          LVA of {
              label: string,
@@ -114,6 +110,21 @@ fun getNode ife reg =
       | NONE => IfeGraph.mkNode ife reg
 
 
+fun addEdge ife r1 r2 =
+    let
+        val node1 = getNode ife r1
+        val node2 = getNode ife r2
+    in
+        IfeGraph.addEdge node1 node2
+    end
+
+
+fun addEdgeNoCreate ife node reg =
+    case IfeGraph.find ife reg of
+        SOME other => IfeGraph.addEdge node other
+      | NONE => ()
+
+
 (* Transformation functions. *)
 fun regToGK (gen, kill) ins =
     let
@@ -151,16 +162,6 @@ fun diffCheck1 diff [] = diff
 
 
 fun diffCheck cfg = diffCheck1 false (Cfg.toList cfg)
-
-
-
-fun addEdge ife r1 r2 =
-    let
-        val node1 = getNode ife r1
-        val node2 = getNode ife r2
-    in
-        IfeGraph.addEdge node1 node2
-    end
 
 
 fun insIfeGraph ife (ins, liveNow) =
@@ -211,19 +212,20 @@ fun addRealRegToSet vtr (REG_N n, used) =
 
 
 (* vtr : virtual to real mapping,
- adjs : list of virtual neighbor registers
- returns available registers*)
+ * adjs : list of virtual neighbor registers
+ * returns available registers *)
 fun getAvailRegs vtr adjs =
     difference (avail, List.foldr (addRealRegToSet vtr) (empty ()) adjs)
 
 
-fun spill () = (print "SPILL!\n"; OS.Process.exit OS.Process.failure)
-
-
-fun addEdgeNoCreate ife node reg =
-    case IfeGraph.find ife reg of
-        SOME other => IfeGraph.addEdge node other
-      | NONE => ()
+(* Anywhere where that register is a target or a source you are going
+ * to insert extra instructions
+ * Go back into the code and insert loads and stores.
+ * Wherever it's a target you add a store immediately after and
+ * wherever it's a source you add a load immediately before.
+ * Then stop coloring, insert spill code, and redo entire analysis. *)
+fun spill () =
+    (print "SPILL!\n"; OS.Process.exit OS.Process.failure)
 
 
 fun addToIfe vtr ife (REG_N n, adjs) =
@@ -246,9 +248,10 @@ fun replaceOffset vtr (SOME (reg, scalar)) = SOME (replace vtr reg, scalar)
   | replaceOffset vtr NONE = NONE
 
 
-(* TODO: later on, we have to track how many push/pops we did and adjust the
- * amount of space we allocated on the stack, and also make sure it's aligned
- * on the 16 byte boundary. TODOL [Do we have to do this? Check.]*)
+(* for the call instructions all the caller saved registers are considered targets,
+which means that any virtual registers that span the call will have an edge with
+the caller saved registers,
+forcing them into the callee saved registers. *)
 fun colorCall vtr label =
     let
         val save = intersection (addList (empty(), HashTable.listItems vtr),
