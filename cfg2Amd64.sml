@@ -100,23 +100,23 @@ fun new2Amd64 id fields dest Iloc.OP_NEW =
 
 fun rr2Amd64 r1 dest Iloc.OP_MOV =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_N dest}]
+  | rr2Amd64 r1 dest Iloc.OP_MOVEQ =
+    [INS_RR {opcode=OP_CMOVE, r1=REG_N r1, r2=REG_N dest}]
+  | rr2Amd64 r1 dest Iloc.OP_MOVNE =
+    [INS_RR {opcode=OP_CMOVNE, r1=REG_N r1, r2=REG_N dest}]
+  | rr2Amd64 r1 dest Iloc.OP_MOVLT =
+    [INS_RR {opcode=OP_CMOVL, r1=REG_N r1, r2=REG_N dest}]
+  | rr2Amd64 r1 dest Iloc.OP_MOVGT =
+    [INS_RR {opcode=OP_CMOVG, r1=REG_N r1, r2=REG_N dest}]
+  | rr2Amd64 r1 dest Iloc.OP_MOVLE =
+    [INS_RR {opcode=OP_CMOVLE, r1=REG_N r1, r2=REG_N dest}]
+  | rr2Amd64 r1 dest Iloc.OP_MOVGE =
+    [INS_RR {opcode=OP_CMOVGE, r1=REG_N r1, r2=REG_N dest}]
   | rr2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
 fun ir2Amd64 immed dest Iloc.OP_LOADI =
     [INS_IR {opcode=OP_MOVQ, immed=immed, r2=REG_N dest}]
-  | ir2Amd64 immed dest Iloc.OP_MOVEQ =
-    [INS_IR {opcode=OP_CMOVEQ, immed=immed, r2=REG_N dest}]
-  | ir2Amd64 immed dest Iloc.OP_MOVNE =
-    [INS_IR {opcode=OP_CMOVNEQ, immed=immed, r2=REG_N dest}]
-  | ir2Amd64 immed dest Iloc.OP_MOVLT =
-    [INS_IR {opcode=OP_CMOVLQ, immed=immed, r2=REG_N dest}]
-  | ir2Amd64 immed dest Iloc.OP_MOVGT =
-    [INS_IR {opcode=OP_CMOVGQ, immed=immed, r2=REG_N dest}]
-  | ir2Amd64 immed dest Iloc.OP_MOVLE =
-    [INS_IR {opcode=OP_CMOVLEQ, immed=immed, r2=REG_N dest}]
-  | ir2Amd64 immed dest Iloc.OP_MOVGE =
-    [INS_IR {opcode=OP_CMOVGEQ, immed=immed, r2=REG_N dest}]
   | ir2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
@@ -158,9 +158,9 @@ fun io2Amd64 r1 label funcName =
 
 
 fun r2Amd64 r1 Iloc.OP_LOADRET =
-    [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RAX}]
-  | r2Amd64 r1 Iloc.OP_STORERET =
     [INS_RR {opcode=OP_MOVQ, r1=REG_RAX, r2=REG_N r1}]
+  | r2Amd64 r1 Iloc.OP_STORERET =
+    [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RAX}]
   | r2Amd64 r1 Iloc.OP_PRINT = io2Amd64 r1 "L__s__" "printf"
   | r2Amd64 r1 Iloc.OP_PRINTLN = io2Amd64 r1 "L__sn__" "printf"
   | r2Amd64 r1 Iloc.OP_READ = io2Amd64 r1 "L__s__" "scanf"

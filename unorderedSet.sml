@@ -8,6 +8,7 @@ signature UORD_SET = sig
     val empty : unit -> ''a set
     val singleton : ''a -> ''a set
     val add : ''a set * ''a -> ''a set
+    val add' : ''a * ''a set -> ''a set
     val addList : ''a set * ''a list -> ''a set
     val delete : ''a set * ''a -> ''a set
     val member : ''a set * ''a -> bool
@@ -29,6 +30,8 @@ signature UORD_SET = sig
     val find : (''a -> bool) -> ''a set -> ''a option
 
     val toString : (''a -> string) -> ''a set -> string
+    (* Remove a "random" item from the set, return the item and the new set.*)
+    val pick : ''a set -> (''a * ''a set) option
 end
 
 (* TODO: Rework to take in an equality function instead of
@@ -38,7 +41,6 @@ structure UnorderedSet :> UORD_SET = struct
 exception NotFound
 
 datatype ''a set = SET of ''a list
-
 
 (* Helper function. O(n) *)
 fun has item L = List.exists (fn i => i = item) L
@@ -82,10 +84,12 @@ fun equal (SET L1, SET L2) =
     if equal1 L1 L2 andalso equal1 L2 L1 then true else false
 
 
+(* TODO: Change this to mkSet and add a param for an equality function. *)
 fun empty () = SET []
 fun singleton item = SET [item]
 fun add (s as SET L, item) = if has item L then s else SET (item::L)
 fun add' (item, s as SET L) = if has item L then s else SET (item::L)
+fun pick (SET L) = if length L = 0 then NONE else SOME (hd L, SET (tl L))
 fun member (SET L, item) = has item L
 fun isEmpty (SET L) = length L = 0
 fun numItems (SET L) = length L

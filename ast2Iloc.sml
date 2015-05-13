@@ -76,12 +76,17 @@ fun binExpr2Ins ii opr lft rht =
              @ lRht
              @ lLft)
         else
-            (dest,
-             [INS_IR {opcode=bop2Op opr, immed=1, dest=dest},
-              INS_RRC {opcode=OP_COMP, r1=rLft, r2=rRht},
-              INS_IR {opcode=OP_LOADI, immed=0, dest=dest}]
-             @ lRht
-             @ lLft)
+            let
+                val dest2 = nextReg ii
+            in
+                (dest2,
+                 [INS_RR {opcode=bop2Op opr, r1=dest, dest=dest2},
+                  INS_RRC {opcode=OP_COMP, r1=rLft, r2=rRht},
+                  INS_IR {opcode=OP_LOADI, immed=0, dest=dest2},
+                  INS_IR {opcode=OP_LOADI, immed=1, dest=dest}]
+                 @ lRht
+                 @ lLft)
+            end
     end
 
 

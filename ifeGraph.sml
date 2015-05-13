@@ -6,11 +6,10 @@ signature IFE_GRAPH = sig
 
     val mkGraph : unit -> ife_graph
     val toList : ife_graph -> TargetAmd64.register list
+    val toListRep : ife_graph -> (TargetAmd64.register * TargetAmd64.register list) list
     val mkNode : ife_graph -> TargetAmd64.register -> node
     val find : ife_graph -> TargetAmd64.register -> node option
     val remove : ife_graph -> node -> unit
-    (* Not sure about this one. *)
-    val filter : ife_graph -> (node -> bool) -> node list
 
     val addEdge : node -> node -> unit
     val numEdges : node -> int
@@ -54,9 +53,6 @@ fun delEdge toRemove (NODE {adj=adj, ...}) =
 fun delEdges (node as NODE {adj=adj, ...}) = List.app (delEdge node) (!adj)
 
 
-fun filter (IG {nodes=nodes}) f = List.filter f (!nodes)
-
-
 (* Remove the node from the graph.
  * Raises NotFound if the node does not belong to this graph. *)
 fun remove (ig as IG {nodes=nodes}) node =
@@ -72,6 +68,8 @@ fun mkGraph () = IG {nodes=ref []}
 fun getData (NODE {data=data, ...}) = data
 fun neighbors (NODE {adj=adj, ...}) = List.map getData (!adj)
 fun toList (IG {nodes=nodes}) = List.map getData (!nodes)
+fun getNodeRep (NODE {data=data, adj=adj}) = (data, List.map getData (!adj))
+fun toListRep (IG {nodes=nodes}) = List.map getNodeRep (!nodes)
 fun numEdges (NODE {adj=adj, ...}) = length (!adj)
 
 end

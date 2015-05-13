@@ -68,9 +68,10 @@ fun printAsm file st ast =
 fun compile file st ast =
     let
         (* val ots = openOut (file ^ ".s") *) val ots = stdOut
-        val asm = Cfg2Amd64.cfg2Amd64 st (Ast2Iloc.ast2Iloc st ast)
     in
-        RegAlloc.regAlloc asm;
+        output (ots, TargetAmd64.programToStr (
+                    RegAlloc.regAlloc (Cfg2Amd64.cfg2Amd64 st (
+                                            Ast2Iloc.ast2Iloc st ast))));
         closeOut ots
     end
 

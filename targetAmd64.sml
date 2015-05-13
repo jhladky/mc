@@ -21,12 +21,12 @@ datatype opcode =
    | OP_MOVQ
    | OP_CALL
    | OP_RET
-   | OP_CMOVEQ
-   | OP_CMOVGQ
-   | OP_CMOVGEQ
-   | OP_CMOVLQ
-   | OP_CMOVLEQ
-   | OP_CMOVNEQ
+   | OP_CMOVE
+   | OP_CMOVG
+   | OP_CMOVGE
+   | OP_CMOVL
+   | OP_CMOVLE
+   | OP_CMOVNE
    | OP_SARQ
 
 
@@ -88,12 +88,12 @@ val opToStr =
   | OP_MOVQ      => "movq "
   | OP_CALL      => "call "
   | OP_RET       => "ret "
-  | OP_CMOVEQ    => "cmoveq "
-  | OP_CMOVGQ    => "cmovgq "
-  | OP_CMOVGEQ   => "cmovgeq "
-  | OP_CMOVLQ    => "cmovlq "
-  | OP_CMOVLEQ   => "cmovleq "
-  | OP_CMOVNEQ   => "cmovneq "
+  | OP_CMOVE    => "cmove "
+  | OP_CMOVG    => "cmovg "
+  | OP_CMOVGE   => "cmovge "
+  | OP_CMOVL    => "cmovl "
+  | OP_CMOVLE   => "cmovle "
+  | OP_CMOVNE   => "cmovne "
   | OP_SARQ      => "shrq "
 
 
@@ -139,23 +139,26 @@ val insToStr =
   | INS_X {opcode=opc} => opToStr opc
 
 
+fun mainOr id = if id = "main" then "_main" else id
+
+
 fun bbToStr (l, L) =
-    l ^ ":\n" ^ (foldr (fn (ins, s) => "\t" ^ (insToStr ins) ^ "\n" ^ s) "" L)
+    mainOr l ^ ":\n" ^ (foldr (fn (ins, s) => "\t" ^ insToStr ins ^ "\n" ^ s)
+                              "" L)
 
 
 fun funcToStr (id, body) =
-    "\t.globl " ^ id ^ "\n\t.type " ^ id ^ ", @function\n" ^
-    (foldr (fn (bb, s) => (bbToStr bb) ^ s) "" (Cfg.toList body)) ^
-    "\t.size " ^ id ^ ", .-" ^ id ^ "\n\n"
+    "\t.globl " ^ mainOr id ^ "\n" ^
+    (foldr (fn (bb, s) => bbToStr bb ^ s) "" (Cfg.toList body)) ^ "\n"
 
 
 (*text is the functions, data is the globals*)
 fun programToStr (PROGRAM {text=text, data=data}) =
-    "\t.section text\n" ^
-    (foldr (fn (func, s) => (funcToStr func) ^ s) "" text) ^
-    "\t.section data\n" ^
-    (foldr (fn (id, s) => "\t.comm " ^ id ^ ", 8, 8\n" ^ s) "" data) ^
-    "\t.section rodata\nL__s__:\n\t.asciz \"%d\"\n" ^
+    "\t.text\n" ^
+    (foldr (fn (func, s) => funcToStr func ^ s) "" text) ^
+    "\t.data\n" ^
+    (foldr (fn (id, s) => "\t.globl " ^ id ^ "\n" ^ s) "" data) ^
+    "\t.text\nL__s__:\n\t.asciz \"%d\"\n" ^
     "L__sn__:\n\t.asciz \"%d\\n\"\n"
 
 
