@@ -173,7 +173,7 @@ fun programToStr (PROGRAM {text=text, data=data}) =
     "\t.data\n" ^
     "\t.comm rdest,8,8 \n" ^
     (foldr (fn (id, s) => "\t.comm " ^ id ^ ",8,8\n" ^ s) "" data) ^
-    "\t.section .rodata\nL__s__:\n\t.asciz \"%d\"\n" ^
+    "\t.section .rodata\nL__s__:\n\t.asciz \"%d \"\n" ^
     "L__sn__:\n\t.asciz \"%d\\n\"\n"
 
 

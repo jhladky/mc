@@ -5,23 +5,23 @@ end
 structure Main :> MAIN = struct
 open TextIO
 
+
 (*This should use an array at some point*)
 fun parseArgs () =
     let
         val args = CommandLine.arguments ()
-        val opt = hd args
     in
-        if opt = "-printAst"
-        then {printAst=true, dumpIL=false,
-              noRegAlloc=false, file=List.nth (args, 1)}
-        else if opt = "-dumpIL"
-        then {printAst=false, dumpIL=true,
-              noRegAlloc=false, file=List.nth (args, 1)}
-        else if opt = "-noRegAlloc"
-        then {printAst=false, dumpIL=false,
-              noRegAlloc=true, file=List.nth (args, 1)}
-        else {printAst=false, dumpIL=false,
-              noRegAlloc=false, file=hd args}
+        (hd args,
+         (case List.nth (args, 1) of
+              "-printAst" =>
+              {printAst=true, dumpIL=false, noRegAlloc=false}
+            | "-dumpIL" =>
+              {printAst=false, dumpIL=true, noRegAlloc=false}
+            | "-noRegAlloc" =>
+              {printAst=false, dumpIL=false, noRegAlloc=true}
+            | _ => raise Fail "Bad Arguments")
+         handle Subscript =>
+                {printAst=false, dumpIL=false, noRegAlloc=false})
     end
 
 
@@ -68,20 +68,14 @@ fun compile fname st ast =
     end
 
 
-fun getFname path =
-    List.last (String.tokens (fn c => c = #"/")
-                             (hd (String.tokens (fn c => c = #".") path)))
-
-
 fun main () =
     let
-        val opts as {file=filepath, ...} = parseArgs ()
-        val fname = getFname filepath
-        val ins = openIn filepath
+        val (fname, opts) = parseArgs ()
+        val ins = openIn (fname ^ ".json")
         val ast = json2AST ins
-        val st = SymbolTable.mkSymbolTable filepath ast
+        val st = SymbolTable.mkSymbolTable (fname ^ ".mini") ast
     in
-        Static.staticCheck filepath st ast;
+        Static.staticCheck (fname ^ ".mini") st ast;
         if #printAst opts then printAst fname ast
         else if #dumpIL opts then dumpIL fname st ast
         else if #noRegAlloc opts then printAsm fname st ast

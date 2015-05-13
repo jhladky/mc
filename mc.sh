@@ -35,7 +35,7 @@ if [ -n "$PARSER_OUPUT" ]; then
     exit 1
 fi
 
-./compiler $COMPILER_ARG "$NAME.json"
+./compiler $NAME $COMPILER_ARG
 
 if [ $? -ne 0 ]; then
     exit 1
