@@ -65,10 +65,11 @@ fun getSTir r OP_SUBQ    = ([r], [r])
   | getSTir r OP_XORQ    = ([r], [r])
   | getSTir r OP_CMP     = ([r], [])
   | getSTir r OP_MOVQ    = ([], [r])
+  | getSTir r OP_SARQ    = ([r], [r])
   | getSTir _ opc        = raise RegisterType opc
 
 
-fun getSTkr r OP_SARQ = ([r], [r]) | getSTkr _ opc = raise RegisterType opc
+(* fun getSTkr r OP_SARQ = ([r], [r]) | getSTkr _ opc = raise RegisterType opc *)
 fun getSTsr d OP_MOVQ = ([], [d]) | getSTsr _ opc = raise RegisterType opc
 fun getSTgr d OP_MOVQ = ([], [d]) | getSTgr _ opc = raise RegisterType opc
 fun getSTrg r OP_MOVQ = ([r], []) | getSTrg _ opc = raise RegisterType opc
@@ -91,7 +92,7 @@ fun getSTr r OP_PUSHQ = ([r], [])
 val getST =
  fn INS_RR {opcode=opc, r1=r1, r2=r2}                    => getSTrr r1 r2 opc
   | INS_IR {opcode=opc, r2=r2, ...}                      => getSTir r2 opc
-  | INS_KR {opcode=opc, r2=r2, ...}                      => getSTkr r2 opc
+  (* | INS_KR {opcode=opc, r2=r2, ...}                      => getSTkr r2 opc *)
   | INS_SR {opcode=opc, dest=d, ...}                     => getSTsr d opc
   | INS_GR {opcode=opc, dest=d, ...}                     => getSTgr d opc
   | INS_RG {opcode=opc, r1=r1, ...}                      => getSTrg r1 opc
@@ -284,8 +285,8 @@ fun colorIns vtr (INS_RR {opcode=opc, r1=r1, r2=r2}) =
     INS_RR {opcode=opc, r1=replace vtr r1, r2=replace vtr r2}
   | colorIns vtr (INS_IR {opcode=opc, immed=immed, r2=r2}) =
     INS_IR {opcode=opc, immed=immed, r2=replace vtr r2}
-  | colorIns vtr (INS_KR {opcode=opc, k=k, r2=r2}) =
-    INS_KR {opcode=opc, k=k, r2=replace vtr r2}
+  (* | colorIns vtr (INS_KR {opcode=opc, k=k, r2=r2}) = *)
+  (*   INS_KR {opcode=opc, k=k, r2=replace vtr r2} *)
   | colorIns vtr (INS_GR {opcode=opc, global=glob, dest=dest}) =
     INS_GR {opcode=opc, global=glob, dest=replace vtr dest}
   | colorIns vtr (INS_RG {opcode=opc, r1=r1, global=glob}) =

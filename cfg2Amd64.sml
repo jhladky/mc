@@ -35,7 +35,7 @@ fun rrr2Amd64 r1 r2 dest Iloc.OP_ADD =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r2, r2=REG_N dest},
      INS_RR {opcode=OP_IMULQ, r1=REG_N r1, r2=REG_N dest}]
   | rrr2Amd64 r1 r2 dest Iloc.OP_DIV =
-    [INS_KR {opcode=OP_SARQ, k=63, r2=REG_RDX},
+    [INS_IR {opcode=OP_SARQ, immed=63, r2=REG_RDX},
      INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_RAX},
      INS_R {opcode=OP_IDIVQ, r1= REG_N r2},
      INS_RR {opcode=OP_MOVQ, r1=REG_RAX, r2=REG_N dest}]
@@ -218,11 +218,14 @@ fun func2Amd64 (ST {funcs=funcs, ...}) (id, cfg) =
     end
 
 
+fun removeFuncs funcs id = not (List.exists (fn (fname, _) => fname = id) funcs)
+
 (*we have a list of *)
 fun cfg2Amd64 (st as ST {globals=globals, ...}) funcs =
     PROGRAM {
         text=map (func2Amd64 st) funcs,
-        data=map #1 (HashTable.listItemsi globals)
+        data=List.filter (removeFuncs funcs)
+                         (map #1 (HashTable.listItemsi globals))
     }
     handle BadOpcode _ =>
            (print "Bad ILOC instruction.\n"; OS.Process.exit OS.Process.failure)
