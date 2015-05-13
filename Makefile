@@ -2,14 +2,14 @@ MAIN_FILES=util.sml ast.sml ast2Iloc.sml cfg.sml iloc.sml json2Ast.sml main.sml 
 
 TEST_UNORDERED_SET_FILES=util.sml unorderedSet.sml testUnorderedSet.sml
 
-mc: $(MAIN_FILES)
-	mlton mc.mlb
+compiler: $(MAIN_FILES)
+	mlton compiler.mlb
 
 testUnorderedSet: $(TEST_UNORDERED_SET_FILES)
 	mlton testUnorderedSet.mlb
 
-all: mc
+all: compiler
 
 
 clean:
-	rm -f mc testUnorderedSet
+	rm -f compiler testUnorderedSet

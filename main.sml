@@ -5,19 +5,11 @@ end
 structure Main :> MAIN = struct
 open TextIO
 
-fun printUsage () =
-    (output (stdErr, "Usage: mc -printAst <filename>\n" ^
-                     "       mc -noRegAlloc <filename>\n" ^
-                     "       mc -dumpIL <filename>\n");
-     OS.Process.exit OS.Process.failure)
-
-
 (*This should use an array at some point*)
 fun parseArgs () =
     let
         val args = CommandLine.arguments ()
         val opt = hd args
-        val _ = if length args = 0 then printUsage () else ()
     in
         if opt = "-printAst"
         then {printAst=true, dumpIL=false,

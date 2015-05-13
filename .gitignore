@@ -28,15 +28,16 @@
 *.x86_64
 *.hex
 
-# Raw assembly files
+# Raw assembly files, compiler temoraries
 *.il
 *.s
+*.json
 
 # Debug files
 *.dSYM/
 
 # Application binaries
-mc
+compiler
 testUnorderedSet
 
 # Test JSON files
