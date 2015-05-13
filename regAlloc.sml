@@ -246,25 +246,42 @@ fun replaceOffset vtr (SOME (reg, scalar)) = SOME (replace vtr reg, scalar)
   | replaceOffset vtr NONE = NONE
 
 
+(* TODO: later on, we have to track how many push/pops we did and adjust the
+ * amount of space we allocated on the stack, and also make sure it's aligned
+ * on the 16 byte boundary. TODOL [Do we have to do this? Check.]*)
+fun colorCall vtr label =
+    let
+        val save = intersection (addList (empty(), HashTable.listItems vtr),
+                                 scratch)
+        val save = listItems save
+    in
+        List.map (fn reg => INS_R {opcode=OP_PUSHQ, r1=reg}) save
+        @ [INS_L {opcode=OP_CALL, label=label}]
+        @ List.rev (List.map (fn reg => INS_R {opcode=OP_POPQ, r1=reg}) save)
+    end
+
+
 fun colorIns vtr (INS_RR {opcode=opc, r1=r1, r2=r2}) =
-    INS_RR {opcode=opc, r1=replace vtr r1, r2=replace vtr r2}
+    [INS_RR {opcode=opc, r1=replace vtr r1, r2=replace vtr r2}]
   | colorIns vtr (INS_IR {opcode=opc, immed=immed, r2=r2}) =
-    INS_IR {opcode=opc, immed=immed, r2=replace vtr r2}
+    [INS_IR {opcode=opc, immed=immed, r2=replace vtr r2}]
   | colorIns vtr (INS_GR {opcode=opc, global=glob, dest=dest}) =
-    INS_GR {opcode=opc, global=glob, dest=replace vtr dest}
+    [INS_GR {opcode=opc, global=glob, dest=replace vtr dest}]
   | colorIns vtr (INS_RG {opcode=opc, r1=r1, global=glob}) =
-    INS_RG {opcode=opc, global=glob, r1=replace vtr r1}
+    [INS_RG {opcode=opc, global=glob, r1=replace vtr r1}]
   | colorIns vtr (INS_SR {opcode=opc, id=id, dest=dest}) =
-    INS_SR {opcode=opc, id=id, dest=replace vtr dest}
+    [INS_SR {opcode=opc, id=id, dest=replace vtr dest}]
   | colorIns vtr (INS_R {opcode=opc, r1=r1}) =
-    INS_R {opcode=opc, r1=replace vtr r1}
+    [INS_R {opcode=opc, r1=replace vtr r1}]
   | colorIns vtr (INS_MR {opcode=opc, immed=i, base=b, offset=off, dest=d}) =
-    INS_MR {opcode=opc, immed=i, base=replace vtr b,
-            offset=replaceOffset vtr off, dest=replace vtr d}
+    [INS_MR {opcode=opc, immed=i, base=replace vtr b,
+             offset=replaceOffset vtr off, dest=replace vtr d}]
   | colorIns vtr (INS_RM {opcode=opc, r1=r1, immed=i, base=b, offset=off}) =
-    INS_RM {opcode=opc, immed=i, r1=replace vtr r1, base=replace vtr b,
-            offset=replaceOffset vtr off}
-  | colorIns _ ins = ins
+    [INS_RM {opcode=opc, immed=i, r1=replace vtr r1, base=replace vtr b,
+             offset=replaceOffset vtr off}]
+  | colorIns vtr (ins as INS_L {opcode=opcode, label=label}) =
+    if opcode = OP_CALL then colorCall vtr label else [ins]
+  | colorIns _ (ins as INS_X {...}) = [ins]
 
 
 (* Iteratively recompute each liveOut set until there is no change. *)
@@ -273,20 +290,23 @@ fun mkLiveOutSets cfg =
     else cfg
 
 
+fun colorBB vtr (id, ins) =
+  (id, List.foldr (fn (ins, L) => colorIns vtr ins @ L) [] ins)
+
+
 fun color (func as (id, cfg)) =
     let
         val lva = mkLiveOutSets (Cfg.map bbToGK cfg)
         val oldIfe = IfeGraph.mkGraph ()
         val newIfe = IfeGraph.mkGraph ()
         val vtr = Util.mkHt ()
-        val colorBB = fn (id, ins) => (id, List.map (colorIns vtr) ins)
     in
         (* Build the interference graph. *)
         Cfg.apply (bbIfeGraph oldIfe) lva;
         (* Build the vtr. *)
         List.app (addToIfe vtr newIfe) (deconstruct oldIfe);
         (* Map the old registers to the new ones. *)
-        (id, Cfg.map colorBB cfg)
+        (id, Cfg.map (colorBB vtr) cfg)
     end
 
 

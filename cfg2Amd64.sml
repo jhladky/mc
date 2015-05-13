@@ -64,7 +64,7 @@ fun rri2Amd64 r1 r2 immed Iloc.OP_STOREAI =
 
 
 fun rrc2Amd64 r1 r2 Iloc.OP_COMP =
-  [INS_RR {opcode=OP_CMP, r1=REG_N r1, r2=REG_N r2}]
+    [INS_RR {opcode=OP_CMP, r1=REG_N r2, r2=REG_N r1}]
   | rrc2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
