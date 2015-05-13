@@ -1,5 +1,4 @@
 fun computeFib(int input) int {
-   print input endl;
    if (input == 0) {
       return 0;
    }

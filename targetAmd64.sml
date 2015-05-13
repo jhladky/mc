@@ -45,7 +45,6 @@ datatype register =
 datatype instruction =
      INS_RR of {opcode: opcode, r1: register, r2: register}
    | INS_IR of {opcode: opcode, immed: int, r2: register}
-   (* | INS_KR of {opcode: opcode, k: int, r2: register} *)
    | INS_SR of {opcode: opcode, id: string, dest: register}
    | INS_GR of {opcode: opcode, global: string, dest: register}
    | INS_RG of {opcode: opcode, r1: register, global: string}
@@ -114,8 +113,6 @@ val insToStr =
     opToStr opc ^ regToStr r1 ^ ", " ^ regToStr r2
   | INS_IR {opcode=opc, immed=immed, r2=r2} =>
     opToStr opc ^ "$" ^ Int.toString immed ^ ", " ^ regToStr r2
-  (* | INS_KR {opcode=opc, k=k, r2=r2} => *)
-  (*   opToStr opc ^ " " ^ Int.toString k ^ ", " ^ regToStr r2 *)
   | INS_GR {opcode=opc, global=global, dest=dest} =>
     opToStr opc ^ global ^ "(%rip), " ^ regToStr dest
   | INS_SR {opcode=opc, id=id, dest=dest} =>
@@ -139,17 +136,14 @@ val insToStr =
   | INS_X {opcode=opc} => opToStr opc
 
 
-fun mainOr id = if id = "main" then "_main" else id
-
-
 fun bbToStr (l, L) =
-    mainOr l ^ ":\n" ^ (foldr (fn (ins, s) => "\t" ^ insToStr ins ^ "\n" ^ s)
-                              "" L)
+  l ^ ":\n" ^ (foldr (fn (ins, s) => "\t" ^ insToStr ins ^ "\n" ^ s) "" L)
 
 
 fun funcToStr (id, body) =
-    "\t.globl " ^ mainOr id ^ "\n" ^
-    (foldr (fn (bb, s) => bbToStr bb ^ s) "" (Cfg.toList body)) ^ "\n"
+  "\t.globl " ^ id ^ "\n" ^
+  (foldr (fn (bb, s) => bbToStr bb ^ s) "" (Cfg.toList body)) ^
+  "\t.size " ^ id ^ ", .-" ^ id ^ "\n\n"
 
 
 (*text is the functions, data is the globals*)
@@ -159,7 +153,7 @@ fun programToStr (PROGRAM {text=text, data=data}) =
     "\t.data\n" ^
     "\t.comm rdest,8,8 \n" ^
     (foldr (fn (id, s) => "\t.globl " ^ id ^ "\n" ^ s) "" data) ^
-    "\t.text\nL__s__:\n\t.asciz \"%d\"\n" ^
+    "\t.section .rodata\nL__s__:\n\t.asciz \"%d\"\n" ^
     "L__sn__:\n\t.asciz \"%d\\n\"\n"
 
 

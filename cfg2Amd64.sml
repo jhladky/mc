@@ -28,9 +28,9 @@ fun genEpilogue len =
 fun rrr2Amd64 r1 r2 dest Iloc.OP_ADD =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r2, r2=REG_N dest},
      INS_RR {opcode=OP_ADDQ, r1=REG_N r1, r2=REG_N dest}]
-  | rrr2Amd64 r1 r2 dest Iloc.OP_SUB =
-    [INS_RR {opcode=OP_MOVQ, r1=REG_N r2, r2=REG_N dest},
-     INS_RR {opcode=OP_SUBQ, r1=REG_N r1, r2=REG_N dest}]
+  | rrr2Amd64 r1 r2 dest Iloc.OP_SUB = (*r1 - r2 => dest*)
+    [INS_RR {opcode=OP_MOVQ, r1=REG_N r1, r2=REG_N dest},
+     INS_RR {opcode=OP_SUBQ, r1=REG_N r2, r2=REG_N dest}]
   | rrr2Amd64 r1 r2 dest Iloc.OP_MULT =
     [INS_RR {opcode=OP_MOVQ, r1=REG_N r2, r2=REG_N dest},
      INS_RR {opcode=OP_IMULQ, r1=REG_N r1, r2=REG_N dest}]
@@ -64,12 +64,12 @@ fun rri2Amd64 r1 r2 immed Iloc.OP_STOREAI =
 
 
 fun rrc2Amd64 r1 r2 Iloc.OP_COMP =
-    [INS_RR {opcode=OP_CMP, r1=REG_N r1, r2=REG_N r2}]
+  [INS_RR {opcode=OP_CMP, r1=REG_N r1, r2=REG_N r2}]
   | rrc2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
 fun ric2Amd64 r1 immed Iloc.OP_COMPI =
-    [INS_IR {opcode=OP_CMP, immed=immed, r2=REG_N r1}]
+  [INS_IR {opcode=OP_CMP, immed=immed, r2=REG_N r1}]
   | ric2Amd64 _ _ opcode = raise BadOpcode opcode
 
 

@@ -32,6 +32,13 @@ val avail = addList (empty (), [REG_N 8, REG_N 9, REG_N 10, REG_N 11,
                                 REG_RAX, REG_RBX, REG_RCX, REG_RDX,
                                 REG_RSI, REG_RDI, REG_RBP])
 
+(* Registers that must be preserved in the function i.e. callee saved. *)
+val preserved = addList (empty (), [REG_RBX, REG_RSP, REG_RBP,
+                                    REG_N 12, REG_N 13, REG_N 14, REG_N 15])
+
+(* Registers that can be used as scratch i.e. caller saved. *)
+val scratch = addList (empty (), [REG_RAX, REG_RDI, REG_RSI, REG_RDX, REG_RCX,
+                                  REG_N 8, REG_N 9, REG_N 10, REG_N 11])
 
 (* Helper functions. *)
 fun condAdd kill (reg, gen) =
@@ -92,7 +99,6 @@ fun getSTr r OP_PUSHQ = ([r], [])
 val getST =
  fn INS_RR {opcode=opc, r1=r1, r2=r2}                    => getSTrr r1 r2 opc
   | INS_IR {opcode=opc, r2=r2, ...}                      => getSTir r2 opc
-  (* | INS_KR {opcode=opc, r2=r2, ...}                      => getSTkr r2 opc *)
   | INS_SR {opcode=opc, dest=d, ...}                     => getSTsr d opc
   | INS_GR {opcode=opc, dest=d, ...}                     => getSTgr d opc
   | INS_RG {opcode=opc, r1=r1, ...}                      => getSTrg r1 opc
@@ -126,10 +132,6 @@ fun bbToGK (id, bb) =
     end
 
 
-(* Function level.*)
-fun funcToGK (id, cfg) = (id, Cfg.map bbToGK cfg)
-
-
 fun bbLiveOut1 (LVA {gk=(gen, kill), liveOut=liveOut, ...}) =
     union (gen, difference (liveOut, kill))
 
@@ -150,12 +152,6 @@ fun diffCheck1 diff [] = diff
 
 fun diffCheck cfg = diffCheck1 false (Cfg.toList cfg)
 
-
-(* This is where we have to keep doing the liveOut thing
- * Iteratively recompute liveout until there is no change *)
-fun funcLiveOut (id, cfg) =
-    if diffCheck cfg then (Cfg.apply bbLiveOut cfg; funcLiveOut (id, cfg))
-    else (id, cfg)
 
 
 fun addEdge ife r1 r2 =
@@ -185,16 +181,6 @@ fun bbIfeGraph ife _ (lva as LVA {bb=bb, liveOut=liveOut, ...}) =
     (List.foldr (insIfeGraph ife) liveOut bb; lva)
 
 
-(*build the interferance graph here*)
-fun funcIfeGraph (id, cfg) =
-    let
-        val ife = IfeGraph.mkGraph ()
-    in
-        Cfg.apply (bbIfeGraph ife) cfg;
-        ife
-    end
-
-
 fun uncReq (reg, adjs) = length adjs < numItems avail andalso
                          not (member (actual, reg))
 
@@ -216,10 +202,6 @@ fun deconstruct ife =
         @ List.filter uncReq rep
     end
 
-(*
-Take nodes off of the stack and put them back into the graph, but as we do so create a mapping from the FAKE register to the REAL register mapping. we're going to have to encode the integer as a string (hacky) to make life easier.
-we're also going to have to deal with that spill issue when we get to it
-*)
 
 fun addRealRegToSet vtr (REG_N n, used) =
     (case HashTable.find vtr (Int.toString n) of
@@ -247,30 +229,13 @@ fun addEdgeNoCreate ife node reg =
 fun addToIfe vtr ife (REG_N n, adjs) =
     (*here we're dealing with a virtual register*)
     (case pick (getAvailRegs vtr adjs) of
-         SOME (reg, _) => (* Pick also returns the rest of the list,
+         SOME (reg, _) => (* `Pick` also returns the rest of the list,
                            * we're not going to use it right now.*)
          (List.app (addEdgeNoCreate ife (IfeGraph.mkNode ife reg)) adjs;
           HashTable.insert vtr (Int.toString n, reg))
        | NONE => spill ()) (*do the SPILL stuff here*)
   | addToIfe vtr ife (reg, adjs) =
     List.app (addEdgeNoCreate ife (IfeGraph.mkNode ife reg)) adjs
-
-
-fun reconstruct oldIfe =
-    let
-        val stack = deconstruct oldIfe
-        val newIfe = IfeGraph.mkGraph ()
-        val vtr = Util.mkHt ()
-    in
-        List.app (addToIfe vtr newIfe) stack;
-        vtr
-    end
-
-(* Remove this later. *)
-fun printVtr vtr =
-    (List.app (fn (virt, real) => print (virt ^ " " ^ regToStr real ^ "\n"))
-             (HashTable.listItemsi vtr);
-     print "\n")
 
 
 fun replace vtr (REG_N n) = HashTable.lookup vtr (Int.toString n)
@@ -285,8 +250,6 @@ fun colorIns vtr (INS_RR {opcode=opc, r1=r1, r2=r2}) =
     INS_RR {opcode=opc, r1=replace vtr r1, r2=replace vtr r2}
   | colorIns vtr (INS_IR {opcode=opc, immed=immed, r2=r2}) =
     INS_IR {opcode=opc, immed=immed, r2=replace vtr r2}
-  (* | colorIns vtr (INS_KR {opcode=opc, k=k, r2=r2}) = *)
-  (*   INS_KR {opcode=opc, k=k, r2=replace vtr r2} *)
   | colorIns vtr (INS_GR {opcode=opc, global=glob, dest=dest}) =
     INS_GR {opcode=opc, global=glob, dest=replace vtr dest}
   | colorIns vtr (INS_RG {opcode=opc, r1=r1, global=glob}) =
@@ -304,24 +267,30 @@ fun colorIns vtr (INS_RR {opcode=opc, r1=r1, r2=r2}) =
   | colorIns _ ins = ins
 
 
-fun colorBB vtr (id, ins) = (id, List.map (colorIns vtr) ins )
+(* Iteratively recompute each liveOut set until there is no change. *)
+fun mkLiveOutSets cfg =
+    if diffCheck cfg then (Cfg.apply bbLiveOut cfg; mkLiveOutSets cfg)
+    else cfg
 
 
-fun colorFunc ((id, cfg), vtr) = (id, Cfg.map (colorBB vtr) cfg)
-
-
-(* We're heading for a huge reconstruction pretty soon here... *)
-fun regAlloc (p as PROGRAM {text=text, data=data}) =
+fun color (func as (id, cfg)) =
     let
-        val funcs = List.map funcLiveOut (List.map funcToGK text)
-        val ifes = List.map funcIfeGraph funcs
-        val vtrs = List.map reconstruct ifes
+        val lva = mkLiveOutSets (Cfg.map bbToGK cfg)
+        val oldIfe = IfeGraph.mkGraph ()
+        val newIfe = IfeGraph.mkGraph ()
+        val vtr = Util.mkHt ()
+        val colorBB = fn (id, ins) => (id, List.map (colorIns vtr) ins)
     in
-        (* List.app printVtr vtrs; *)
-        PROGRAM {
-            text=List.map colorFunc (ListPair.zipEq (text, vtrs)),
-            data=data
-        }
+        (* Build the interference graph. *)
+        Cfg.apply (bbIfeGraph oldIfe) lva;
+        (* Build the vtr. *)
+        List.app (addToIfe vtr newIfe) (deconstruct oldIfe);
+        (* Map the old registers to the new ones. *)
+        (id, Cfg.map colorBB cfg)
     end
+
+
+fun regAlloc (PROGRAM {text=text, data=data}) =
+    PROGRAM {text=List.map color text, data=data}
 
 end
