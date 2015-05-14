@@ -210,9 +210,9 @@ fun addRealRegToSet vtr (REG_V n, used) =
   | addRealRegToSet vtr (reg, used) = add (used, reg)
 
 
-(* vtr : virtual to real mapping,
- * adjs : list of virtual neighbor registers
- * returns available registers *)
+(* vtr  : Virtual-to-real register mapping,
+ * adjs : List of virtual neighbor registers.
+ *        Returns available registers.*)
 fun getAvailRegs vtr adjs =
     difference (avail, List.foldr (addRealRegToSet vtr) (empty ()) adjs)
 
@@ -300,16 +300,41 @@ fun mkLiveOutSets cfg =
     else cfg
 
 
-fun colorBB funcId vtr (id, ins) =
-  if id = funcId then (*this is the entry BB*)
-      (id,
-       List.map (fn reg => INS_R {opcode=OP_PUSHQ, r1=reg}) (getSaveList vtr)
-       @ List.foldr (fn (ins, L) => colorIns vtr ins @ L) [] ins)
-  else
-      (id, List.foldr (fn (ins, L) => colorIns vtr ins @ L) [] ins)
+(* Calculate how much spill space we need. Make sure it is 16-byte aligned. *)
+fun calcStackOffset existing n =
+  let
+      val new = existing div Util.WORD_SIZE + n
+  in
+      (if new mod 2 = 0 then new + 1 else new) * Util.WORD_SIZE
+  end
 
 
-fun color (func as (id, cfg)) =
+(* Update the top-of-stack modifying instructions to make sure we
+ * reserved enough spill space. *)
+fun updatePP n (INS_IR {opcode=OP_SUBQ, r2=REG_RSP, immed=immed}) =
+    INS_IR {opcode=OP_SUBQ, r2=REG_RSP, immed=calcStackOffset immed n}
+  | updatePP n (INS_IR {opcode=OP_ADDQ, r2=REG_RSP, immed=immed}) =
+    INS_IR {opcode=OP_ADDQ, r2=REG_RSP, immed=calcStackOffset immed n}
+  | updatePP _ ins = ins
+
+
+(* n      : Number of times we've spilled.
+ * funcId : Name of the function. We use it to find the entry BB.
+ * vtr    : Virtual-to-real register mapping*)
+fun colorBB n funcId vtr (id, ins) =
+    let
+        val L = if id = funcId
+                then List.map (fn reg => INS_R {opcode=OP_PUSHQ, r1=reg})
+                              (getSaveList vtr)
+                else []
+        val L = L @ List.foldr (fn (ins, L) => colorIns vtr ins @ L) [] ins
+    in
+        (id, List.map (updatePP n) L)
+    end
+
+
+(* n is the number of times we've had to spill. *)
+fun color n (func as (id, cfg)) =
     let
         val lva = mkLiveOutSets (Cfg.map bbToGK cfg)
         val oldIfe = IfeGraph.mkGraph ()
@@ -321,11 +346,11 @@ fun color (func as (id, cfg)) =
         (* Build the vtr. *)
         List.app (addToIfe vtr newIfe) (deconstruct oldIfe);
         (* Map the old registers to the new ones. *)
-        (id, Cfg.map (colorBB id vtr) cfg)
+        (id, Cfg.map (colorBB n id vtr) cfg)
     end
 
 
 fun regAlloc (PROGRAM {text=text, data=data}) =
-    PROGRAM {text=List.map color text, data=data}
+    PROGRAM {text=List.map (fn func => color 0 func) text, data=data}
 
 end

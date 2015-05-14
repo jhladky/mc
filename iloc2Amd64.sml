@@ -207,9 +207,7 @@ fun getPLen funcs (FUNC_INFO {calls=calls, ...}) =
     let
         val max = (foldr (getPLen1 funcs) 0 calls) - 6
     in
-        (if max <= 0 then 1
-         else if max mod 2 = 0 then max + 1
-         else max) * Util.WORD_SIZE
+        (if max < 0 then 0 else max) * Util.WORD_SIZE
     end
 
 
