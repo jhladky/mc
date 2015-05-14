@@ -34,8 +34,9 @@ fun rrr2Amd64 r1 r2 dest Iloc.OP_ADD =
   | rrr2Amd64 r1 r2 dest Iloc.OP_MULT =
     [INS_RR {opcode=OP_MOVQ, r1=REG_V r2, r2=REG_V dest},
      INS_RR {opcode=OP_IMULQ, r1=REG_V r1, r2=REG_V dest}]
-  | rrr2Amd64 r1 r2 dest Iloc.OP_DIV =
-    [INS_IR {opcode=OP_SARQ, immed=63, r2=REG_RDX},
+  | rrr2Amd64 r1 r2 dest Iloc.OP_DIV = (*r1 / r2 => dest*)
+    [INS_RR {opcode=OP_MOVQ, r1=REG_V r1, r2=REG_RDX},
+     INS_IR {opcode=OP_SARQ, immed=63, r2=REG_RDX},
      INS_RR {opcode=OP_MOVQ, r1=REG_V r1, r2=REG_RAX},
      INS_R {opcode=OP_IDIVQ, r1= REG_V r2},
      INS_RR {opcode=OP_MOVQ, r1=REG_RAX, r2=REG_V dest}]
@@ -69,7 +70,7 @@ fun rrc2Amd64 r1 r2 Iloc.OP_COMP =
 
 
 fun ric2Amd64 r1 immed Iloc.OP_COMPI =
-  [INS_IR {opcode=OP_CMP, immed=immed, r2=REG_V r1}]
+    [INS_IR {opcode=OP_CMP, immed=immed, r2=REG_V r1}]
   | ric2Amd64 _ _ opcode = raise BadOpcode opcode
 
 
