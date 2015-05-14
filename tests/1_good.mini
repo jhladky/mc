@@ -64,6 +64,7 @@ fun main() int
          print 7;
       }
       f(g(1,new B),new B);
+      print 4 endl;
       print f(g(1,new B),new B).i endl;
    }
    return 0;

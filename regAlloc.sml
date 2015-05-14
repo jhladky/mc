@@ -247,10 +247,15 @@ fun replaceOffset vtr (SOME (reg, scalar)) = SOME (replace vtr reg, scalar)
   | replaceOffset vtr NONE = NONE
 
 
-(* for the call instructions all the caller saved registers are considered targets,
-which means that any virtual registers that span the call will have an edge with
-the caller saved registers,
-forcing them into the callee saved registers. *)
+fun getSaveList vtr =
+  listItems (intersection (addList (empty(), HashTable.listItems vtr),
+                           preserved))
+
+
+(* for the call instructions all the caller saved registers are considered
+ * targets, which means that any virtual registers that span the call will
+ * have an edge with the caller saved registers, forcing them into the callee
+ * saved registers. *)
 fun colorCall vtr label =
     let
         val save = intersection (addList (empty(), HashTable.listItems vtr),
@@ -281,9 +286,12 @@ fun colorIns vtr (INS_RR {opcode=opc, r1=r1, r2=r2}) =
   | colorIns vtr (INS_RM {opcode=opc, r1=r1, immed=i, base=b, offset=off}) =
     [INS_RM {opcode=opc, immed=i, r1=replace vtr r1, base=replace vtr b,
              offset=replaceOffset vtr off}]
-  | colorIns vtr (ins as INS_L {opcode=opcode, label=label}) =
-    if opcode = OP_CALL then colorCall vtr label else [ins]
-  | colorIns _ (ins as INS_X {...}) = [ins]
+  | colorIns vtr (INS_L {opcode=OP_CALL, label=label}) =
+    colorCall vtr label
+  | colorIns vtr (INS_X {opcode=OP_RET}) =
+    List.rev (List.map (fn reg => INS_R {opcode=OP_POPQ, r1=reg})
+                       (getSaveList vtr)) @ [INS_X {opcode=OP_RET}]
+  | colorIns _ ins = [ins]
 
 
 (* Iteratively recompute each liveOut set until there is no change. *)
@@ -292,8 +300,13 @@ fun mkLiveOutSets cfg =
     else cfg
 
 
-fun colorBB vtr (id, ins) =
-  (id, List.foldr (fn (ins, L) => colorIns vtr ins @ L) [] ins)
+fun colorBB funcId vtr (id, ins) =
+  if id = funcId then (*this is the entry BB*)
+      (id,
+       List.map (fn reg => INS_R {opcode=OP_PUSHQ, r1=reg}) (getSaveList vtr)
+       @ List.foldr (fn (ins, L) => colorIns vtr ins @ L) [] ins)
+  else
+      (id, List.foldr (fn (ins, L) => colorIns vtr ins @ L) [] ins)
 
 
 fun color (func as (id, cfg)) =
@@ -308,7 +321,7 @@ fun color (func as (id, cfg)) =
         (* Build the vtr. *)
         List.app (addToIfe vtr newIfe) (deconstruct oldIfe);
         (* Map the old registers to the new ones. *)
-        (id, Cfg.map (colorBB vtr) cfg)
+        (id, Cfg.map (colorBB id vtr) cfg)
     end
 
 

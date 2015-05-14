@@ -163,7 +163,7 @@ fun r2Amd64 r1 Iloc.OP_LOADRET =
     [INS_RR {opcode=OP_MOVQ, r1=REG_V r1, r2=REG_RAX}]
   | r2Amd64 r1 Iloc.OP_PRINT = io2Amd64 r1 "L__s__" "printf"
   | r2Amd64 r1 Iloc.OP_PRINTLN = io2Amd64 r1 "L__sn__" "printf"
-  | r2Amd64 r1 Iloc.OP_READ = io2Amd64 r1 "L__s__" "scanf"
+  | r2Amd64 r1 Iloc.OP_READ = io2Amd64 r1 "L__ss__" "scanf"
   | r2Amd64 r1 Iloc.OP_DEL =
     [INS_RR {opcode=OP_MOVQ, r1=REG_V r1, r2=REG_RDI},
      INS_L {opcode=OP_CALL, label="free"}]
@@ -193,12 +193,22 @@ fun iloc2Amd64 len =
   | Iloc.INS_X   {opcode=opc}                           => x2Amd64 len opc
 
 
-fun getPLen funcs (call, max) =
+fun getPLen1 funcs (call, max) =
     let
         val FUNC_INFO {params=ps, ...} = HashTable.lookup funcs call
         val new = length ps
     in
         if new > max then new else max
+    end
+
+
+fun getPLen funcs (FUNC_INFO {calls=calls, ...}) =
+    let
+        val max = (foldr (getPLen1 funcs) 0 calls) - 6
+    in
+        (if max <= 0 then 1
+         else if max mod 2 = 0 then max + 1
+         else max) * Util.WORD_SIZE
     end
 
 
@@ -210,15 +220,11 @@ fun bb2Amd64 id len (l, L) =
 
 (* This is the function level. *)
 fun func2Amd64 (ST {funcs=funcs, ...}) (id, cfg) =
-    let
-        val (FUNC_INFO {calls=calls, ...}) = HashTable.lookup funcs id
-        val max = foldr (getPLen funcs) 0 calls * Util.WORD_SIZE
-    in
-        (id, Cfg.map (bb2Amd64 id max) cfg)
-    end
+    (id, Cfg.map (bb2Amd64 id (getPLen funcs (HashTable.lookup funcs id))) cfg)
 
 
-fun removeFuncs funcs id = not (List.exists (fn (fname, _) => fname = id) funcs)
+fun removeFuncs funcs id =
+    not (List.exists (fn (fname, _) => fname = id) funcs)
 
 
 fun iloc2Amd64 (st as ST {globals=globals, ...}) funcs =

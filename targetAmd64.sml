@@ -30,9 +30,6 @@ datatype opcode =
    | OP_SARQ
 
 
-(* Need to do a small rewrite of this...
- add reg values for 8-15, and change N to V, so we can totally specify what's
-virtual and what's not*)
 datatype register =
      REG_RAX
    | REG_RBX
@@ -171,10 +168,11 @@ fun programToStr (PROGRAM {text=text, data=data}) =
     "\t.text\n" ^
     (foldr (fn (func, s) => funcToStr func ^ s) "" text) ^
     "\t.data\n" ^
-    "\t.comm rdest,8,8 \n" ^
+    "\t.comm rdest,8,8\n" ^
     (foldr (fn (id, s) => "\t.comm " ^ id ^ ",8,8\n" ^ s) "" data) ^
-    "\t.section .rodata\nL__s__:\n\t.asciz \"%d \"\n" ^
+    "\t.section .rodata\n" ^
+    "L__ss__:\n\t.asciz \"%d\"\n" ^
+    "L__s__:\n\t.asciz \"%d \"\n" ^
     "L__sn__:\n\t.asciz \"%d\\n\"\n"
-
 
 end
