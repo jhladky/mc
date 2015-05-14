@@ -217,26 +217,19 @@ fun getAvailRegs vtr adjs =
     difference (avail, List.foldr (addRealRegToSet vtr) (empty ()) adjs)
 
 
-(* Anywhere where that register is a target or a source you are going
- * to insert extra instructions
- * Go back into the code and insert loads and stores.
- * Wherever it's a target you add a store immediately after and
- * wherever it's a source you add a load immediately before.
- * Then stop coloring, insert spill code, and redo entire analysis. *)
-fun spill () =
-    (print "SPILL!\n"; OS.Process.exit OS.Process.failure)
-
-
+(* Return a reg option, it is SOME reg then we have to spill. *)
 fun addToIfe vtr ife (REG_V n, adjs) =
-    (*here we're dealing with a virtual register*)
+    (* Here we're dealing with a virtual register. *)
     (case pick (getAvailRegs vtr adjs) of
-         SOME (reg, _) => (* `Pick` also returns the rest of the list,
-                           * we're not going to use it right now.*)
+         (* `Pick` also returns the rest of the list,
+          * we're not going to use it right now.*)
+         SOME (reg, _) =>
          (List.app (addEdgeNoCreate ife (IfeGraph.mkNode ife reg)) adjs;
-          HashTable.insert vtr (Int.toString n, reg))
-       | NONE => spill ()) (*do the SPILL stuff here*)
+          HashTable.insert vtr (Int.toString n, reg);
+          NONE)
+       | NONE => SOME (REG_V n))
   | addToIfe vtr ife (reg, adjs) =
-    List.app (addEdgeNoCreate ife (IfeGraph.mkNode ife reg)) adjs
+    (List.app (addEdgeNoCreate ife (IfeGraph.mkNode ife reg)) adjs; NONE)
 
 
 fun replace vtr (REG_V n) = HashTable.lookup vtr (Int.toString n)
@@ -252,7 +245,7 @@ fun getSaveList vtr =
                            preserved))
 
 
-(* for the call instructions all the caller saved registers are considered
+(* TODO: for the call instructions all the caller saved registers are considered
  * targets, which means that any virtual registers that span the call will
  * have an edge with the caller saved registers, forcing them into the callee
  * saved registers. *)
@@ -333,6 +326,32 @@ fun colorBB n funcId vtr (id, ins) =
     end
 
 
+fun buildVtr f [] = NONE
+  | buildVtr f (node::nodes) =
+    case f node of SOME reg => SOME reg | NONE => buildVtr f nodes
+
+
+fun spillReg n reg ins =
+    let
+        val (sources, targets) = getST ins
+    in
+        if List.exists (fn r => r = reg) sources then
+            [INS_MR {opcode=OP_MOVQ, immed=(~((n + 1) * Util.WORD_SIZE)),
+                     base=REG_RBP, dest=reg, offset=NONE},
+             ins]
+        else if List.exists (fn r => r = reg) targets then
+            [ins,
+             INS_RM {opcode=OP_MOVQ, immed=(~((n + 1) * Util.WORD_SIZE)),
+                     base=REG_RBP, offset=NONE, r1=reg}]
+        else
+            [ins]
+  end
+
+
+fun spill n reg (id, ins) =
+    (id, List.foldr (fn (ins, L) => spillReg n reg ins @ L) [] ins)
+
+
 (* n is the number of times we've had to spill. *)
 fun color n (func as (id, cfg)) =
     let
@@ -343,10 +362,11 @@ fun color n (func as (id, cfg)) =
     in
         (* Build the interference graph. *)
         Cfg.apply (bbIfeGraph oldIfe) lva;
-        (* Build the vtr. *)
-        List.app (addToIfe vtr newIfe) (deconstruct oldIfe);
-        (* Map the old registers to the new ones. *)
-        (id, Cfg.map (colorBB n id vtr) cfg)
+        (* Build the vtr. If we can color the registers then map them
+         * to the old ones, otherwise generate spill code and try again. *)
+        case buildVtr (addToIfe vtr newIfe) (deconstruct oldIfe) of
+            SOME reg => color (n + 1) (id, Cfg.map (spill n reg) cfg)
+          | NONE => (id, Cfg.map (colorBB n id vtr) cfg)
     end
 
 
