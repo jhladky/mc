@@ -2,6 +2,7 @@ signature UTIL = sig
     val mkHt : unit -> (string, 'a) HashTable.hash_table
     val fail : string -> int -> string -> unit
     val foldd : string -> ('a -> string) -> 'a list -> string
+    val iToS : int -> string (* Handles negatives properly. *)
     val WORD_SIZE : int
 end
 
@@ -19,6 +20,9 @@ fun fail file l msg =
 fun foldd sep f [] = ""
   | foldd sep f (x::[]) = f x
   | foldd sep f (x::xs) = (f x) ^ sep ^ (foldd sep f xs)
+
+
+fun iToS n = if n < 0 then "-" ^ Int.toString (~n) else Int.toString n
 
 
 val WORD_SIZE = 8;

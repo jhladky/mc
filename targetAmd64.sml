@@ -125,15 +125,11 @@ val regToStr =
   | REG_V n      => "%rv" ^ Int.toString n
 
 
-fun immedToStr n =
-    if n < 0 then "-" ^ Int.toString (~n) else Int.toString n
-
-
 val insToStr =
  fn INS_RR {opcode=opc, r1=r1, r2=r2} =>
     opToStr opc ^ regToStr r1 ^ ", " ^ regToStr r2
   | INS_IR {opcode=opc, immed=immed, r2=r2} =>
-    opToStr opc ^ "$" ^ immedToStr immed ^ ", " ^ regToStr r2
+    opToStr opc ^ "$" ^ Util.iToS immed ^ ", " ^ regToStr r2
   | INS_GR {opcode=opc, global=global, dest=dest} =>
     opToStr opc ^ global ^ "(%rip), " ^ regToStr dest
   | INS_SR {opcode=opc, id=id, dest=dest} =>
@@ -143,15 +139,15 @@ val insToStr =
   | INS_R {opcode=opc, r1=r1} => opToStr opc ^ regToStr r1
   | INS_L {opcode=opc, label=label} => opToStr opc ^ label
   | INS_MR {opcode=opc, immed=i, base=base, offset=offset, dest=d} =>
-    opToStr opc ^ immedToStr i ^ "(" ^ regToStr base ^
+    opToStr opc ^ Util.iToS i ^ "(" ^ regToStr base ^
     (case offset of
-         SOME (reg, s) => ", " ^ regToStr reg ^ ", " ^ immedToStr s
+         SOME (reg, s) => ", " ^ regToStr reg ^ ", " ^ Util.iToS s
        | NONE => "")
     ^ "), " ^ regToStr d
   | INS_RM {opcode=opc, r1=r1, immed=i, base=base, offset=offset} =>
-    opToStr opc ^ regToStr r1 ^ ", " ^  immedToStr i ^ "(" ^ regToStr base ^
+    opToStr opc ^ regToStr r1 ^ ", " ^  Util.iToS i ^ "(" ^ regToStr base ^
     (case offset of
-         SOME (reg, s) => ", " ^ regToStr reg ^ ", " ^ immedToStr s
+         SOME (reg, s) => ", " ^ regToStr reg ^ ", " ^ Util.iToS s
        | NONE => "")
     ^ ")"
   | INS_X {opcode=opc} => opToStr opc
