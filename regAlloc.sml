@@ -254,9 +254,17 @@ fun colorCall vtr label =
         val save = intersection (addList (empty(), HashTable.listItems vtr),
                                  scratch)
         val save = listItems save
+        (* At this point the stack is already aligned. *)
+        val doAlign = (length save) mod 2 <> 0
     in
         List.map (fn reg => INS_R {opcode=OP_PUSHQ, r1=reg}) save
+        @ (if doAlign
+           then [INS_IR {opcode=OP_SUBQ, immed=Util.WORD_SIZE, r2=REG_RSP}]
+           else [])
         @ [INS_L {opcode=OP_CALL, label=label}]
+        @ (if doAlign
+           then [INS_IR {opcode=OP_ADDQ, immed=Util.WORD_SIZE, r2=REG_RSP}]
+           else [])
         @ List.rev (List.map (fn reg => INS_R {opcode=OP_POPQ, r1=reg}) save)
     end
 
@@ -293,22 +301,29 @@ fun mkLiveOutSets cfg =
     else cfg
 
 
-(* Calculate how much spill space we need. Make sure it is 16-byte aligned. *)
-fun calcStackOffset existing n =
-  let
-      val new = existing div Util.WORD_SIZE + n
-  in
-      (if new mod 2 = 0 then new + 1 else new) * Util.WORD_SIZE
-  end
+(* Calculate how much spill space we need. Make sure it is 16-byte aligned.
+ * Check the existing amount of space as well as how many registers we have to
+ * save at the top.*)
+fun calcStackOffset existing vtr n =
+    let
+        val numSaves = length (getSaveList vtr) + 1
+        val new = existing div Util.WORD_SIZE + n
+    in
+        (* Then branch: we might need to align the stack. *)
+        if numSaves mod 2 = 0 then (if new mod 2 = 0 then new + 1
+                                    else new) * Util.WORD_SIZE
+        (* Else branch: we don't need to align the stack. *)
+        else new * Util.WORD_SIZE
+    end
 
 
 (* Update the top-of-stack modifying instructions to make sure we
  * reserved enough spill space. *)
-fun updatePP n (INS_IR {opcode=OP_SUBQ, r2=REG_RSP, immed=immed}) =
-    INS_IR {opcode=OP_SUBQ, r2=REG_RSP, immed=calcStackOffset immed n}
-  | updatePP n (INS_IR {opcode=OP_ADDQ, r2=REG_RSP, immed=immed}) =
-    INS_IR {opcode=OP_ADDQ, r2=REG_RSP, immed=calcStackOffset immed n}
-  | updatePP _ ins = ins
+fun updatePP vtr n (INS_IR {opcode=OP_SUBQ, r2=REG_RSP, immed=immed}) =
+    INS_IR {opcode=OP_SUBQ, r2=REG_RSP, immed=calcStackOffset immed vtr n}
+  | updatePP vtr n (INS_IR {opcode=OP_ADDQ, r2=REG_RSP, immed=immed}) =
+    INS_IR {opcode=OP_ADDQ, r2=REG_RSP, immed=calcStackOffset immed vtr n}
+  | updatePP _ _ ins = ins
 
 
 (* n      : Number of times we've spilled.
@@ -322,7 +337,7 @@ fun colorBB n funcId vtr (id, ins) =
                 else []
         val L = L @ List.foldr (fn (ins, L) => colorIns vtr ins @ L) [] ins
     in
-        (id, List.map (updatePP n) L)
+        (id, List.map (updatePP vtr n) L)
     end
 
 
