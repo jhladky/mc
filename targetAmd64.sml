@@ -125,52 +125,72 @@ val regToStr =
   | REG_V n      => "%rv" ^ Int.toString n
 
 
+fun nameToStr platform id = if platform = Util.OS_X then "_" ^ id else id
+
+
 val insToStr =
- fn INS_RR {opcode=opc, r1=r1, r2=r2} =>
-    opToStr opc ^ regToStr r1 ^ ", " ^ regToStr r2
-  | INS_IR {opcode=opc, immed=immed, r2=r2} =>
-    opToStr opc ^ "$" ^ Util.iToS immed ^ ", " ^ regToStr r2
-  | INS_GR {opcode=opc, global=global, dest=dest} =>
-    opToStr opc ^ global ^ "(%rip), " ^ regToStr dest
-  | INS_SR {opcode=opc, id=id, dest=dest} =>
-    opToStr opc ^ "$" ^ id ^ ", " ^ regToStr dest
-  | INS_RG {opcode=opc, r1=r1, global=global} =>
-    opToStr opc ^ regToStr r1 ^ ", " ^ global ^ "(%rip)"
-  | INS_R {opcode=opc, r1=r1} => opToStr opc ^ regToStr r1
-  | INS_L {opcode=opc, label=label} => opToStr opc ^ label
-  | INS_MR {opcode=opc, immed=i, base=base, offset=offset, dest=d} =>
-    opToStr opc ^ Util.iToS i ^ "(" ^ regToStr base ^
-    (case offset of
-         SOME (reg, s) => ", " ^ regToStr reg ^ ", " ^ Util.iToS s
-       | NONE => "")
-    ^ "), " ^ regToStr d
-  | INS_RM {opcode=opc, r1=r1, immed=i, base=base, offset=offset} =>
-    opToStr opc ^ regToStr r1 ^ ", " ^  Util.iToS i ^ "(" ^ regToStr base ^
-    (case offset of
-         SOME (reg, s) => ", " ^ regToStr reg ^ ", " ^ Util.iToS s
-       | NONE => "")
-    ^ ")"
-  | INS_X {opcode=opc} => opToStr opc
+ fn platform =>
+    (fn INS_RR {opcode=opc, r1=r1, r2=r2} =>
+        opToStr opc ^ regToStr r1 ^ ", " ^ regToStr r2
+    | INS_IR {opcode=opc, immed=immed, r2=r2} =>
+      opToStr opc ^ "$" ^ Util.iToS immed ^ ", " ^ regToStr r2
+    | INS_GR {opcode=opc, global=g, dest=dest} =>
+      opToStr opc ^ nameToStr platform g ^ "(%rip), " ^ regToStr dest
+    | INS_SR {opcode=opc, id=id, dest=dest} =>
+      if platform = Util.OS_X
+      then "leaq " ^ (if hd (explode id) <> #"L" then nameToStr platform id
+                      else id) ^ "(%rip), " ^ regToStr dest
+      else opToStr opc ^ "$" ^ id ^ ", " ^ regToStr dest
+    | INS_RG {opcode=opc, r1=r1, global=g} =>
+      opToStr opc ^ regToStr r1 ^ ", " ^ nameToStr platform g ^ "(%rip)"
+    | INS_R {opcode=opc, r1=r1} => opToStr opc ^ regToStr r1
+    | INS_L {opcode=opc, label=label} =>
+      if opc = OP_CALL then opToStr opc ^ nameToStr platform label
+      else opToStr opc ^ label
+    | INS_MR {opcode=opc, immed=i, base=base, offset=offset, dest=d} =>
+      opToStr opc ^ Util.iToS i ^ "(" ^ regToStr base ^
+      (case offset of
+           SOME (reg, s) => ", " ^ regToStr reg ^ ", " ^ Util.iToS s
+         | NONE => "")
+      ^ "), " ^ regToStr d
+    | INS_RM {opcode=opc, r1=r1, immed=i, base=base, offset=offset} =>
+      opToStr opc ^ regToStr r1 ^ ", " ^  Util.iToS i ^ "(" ^ regToStr base ^
+      (case offset of
+           SOME (reg, s) => ", " ^ regToStr reg ^ ", " ^ Util.iToS s
+         | NONE => "")
+      ^ ")"
+    | INS_X {opcode=opc} => opToStr opc)
 
 
-fun bbToStr (l, L) =
-  l ^ ":\n" ^ (foldr (fn (ins, s) => "\t" ^ insToStr ins ^ "\n" ^ s) "" L)
+fun bbToStr platform (l, L) =
+    (if hd (explode l) <> #"L" then nameToStr platform l else l) ^
+    ":\n" ^ (foldr (fn (ins, s) => "\t" ^ insToStr platform ins
+                                   ^ "\n" ^ s) "" L)
 
 
-fun funcToStr (id, body) =
-  "\t.globl " ^ id ^ "\n" ^
-  (foldr (fn (bb, s) => bbToStr bb ^ s) "" (Cfg.toList body)) ^
-  "\t.size " ^ id ^ ", .-" ^ id ^ "\n\n"
+fun funcToStr platform (id, body) =
+    "\t.globl " ^ nameToStr platform id ^ "\n" ^
+    (foldr (fn (bb, s) => bbToStr platform bb ^ s) "" (Cfg.toList body)) ^
+    (if platform = Util.OS_X then "" else "\t.size " ^ id ^ ", .-" ^ id
+                                          ^ "\n") ^ "\n"
+
+fun globalToStr platform id =
+    if platform = Util.OS_X
+    then "\t.globl _" ^ id ^ "\n_" ^ id ^ ":\n\t.quad 0\n\n"
+    else "\t.comm " ^ id ^ ",8,8\n"
 
 
 (*text is the functions, data is the globals*)
-fun programToStr (PROGRAM {text=text, data=data}) =
-    "\t.text\n" ^
-    (foldr (fn (func, s) => funcToStr func ^ s) "" text) ^
-    "\t.data\n" ^
-    "\t.comm rdest,8,8\n" ^
-    (foldr (fn (id, s) => "\t.comm " ^ id ^ ",8,8\n" ^ s) "" data) ^
-    "\t.section .rodata\n" ^
+fun programToStr platform (PROGRAM {text=text, data=data}) =
+    (if platform = Util.OS_X then "\t.section __TEXT,__text\n"
+     else "\t.text\n") ^
+    (foldr (fn (func, s) => funcToStr platform func ^ s) "" text) ^
+    (if platform = Util.OS_X then "\t.section __DATA,__data\n"
+     else "\t.data\n") ^
+    globalToStr platform "rdest" ^
+    (foldr (fn (id, s) => globalToStr platform id ^ s) "" data) ^
+    (if platform = Util.OS_X then "\n\t.section __TEXT,__cstring\n"
+     else "\n\t.section .rodata\n") ^
     "L__ss__:\n\t.asciz \"%lld\"\n" ^
     "L__s__:\n\t.asciz \"%lld \"\n" ^
     "L__sn__:\n\t.asciz \"%lld\\n\"\n"

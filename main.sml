@@ -4,25 +4,7 @@ end
 
 structure Main :> MAIN = struct
 open TextIO
-
-
-(*This should use an array at some point*)
-fun parseArgs () =
-    let
-        val args = CommandLine.arguments ()
-    in
-        (hd args,
-         (case List.nth (args, 1) of
-              "-printAst" =>
-              {printAst=true, dumpIL=false, noRegAlloc=false}
-            | "-dumpIL" =>
-              {printAst=false, dumpIL=true, noRegAlloc=false}
-            | "-noRegAlloc" =>
-              {printAst=false, dumpIL=false, noRegAlloc=true}
-            | _ => raise Fail "Bad Arguments")
-         handle Subscript =>
-                {printAst=false, dumpIL=false, noRegAlloc=false})
-    end
+open Util
 
 
 fun printAst fname ast =
@@ -47,39 +29,43 @@ fun dumpIL fname st ast =
     end
 
 
-fun printAsm fname st ast =
+fun printAsm fname platform st ast =
     let
         val ots = openOut (fname ^ ".s")
     in
-        output (ots, TargetAmd64.programToStr
+        output (ots, TargetAmd64.programToStr platform
                          (Iloc2Amd64.iloc2Amd64 st (Ast2Iloc.ast2Iloc st ast)));
         closeOut ots
     end
 
 
-fun compile fname st ast =
+fun compile fname platform st ast =
     let
         val ots = openOut (fname ^ ".s")
     in
-        output (ots, TargetAmd64.programToStr (
-                    RegAlloc.regAlloc (Iloc2Amd64.iloc2Amd64 st (
-                                            Ast2Iloc.ast2Iloc st ast))));
+        output (ots, (TargetAmd64.programToStr platform
+                      o RegAlloc.regAlloc
+                      o Iloc2Amd64.iloc2Amd64 st
+                      o Ast2Iloc.ast2Iloc st) ast);
         closeOut ots
     end
 
 
 fun main () =
     let
-        val (fname, opts) = parseArgs ()
+        val args = CommandLine.arguments ()
+        val fname = hd args
+        val mode = List.nth (args, 1)
+        val platform = if List.nth (args, 2) = "Darwin" then OS_X else LINUX
         val ins = openIn (fname ^ ".json")
         val ast = json2AST ins
         val st = SymbolTable.mkSymbolTable (fname ^ ".mini") ast
     in
         Static.staticCheck (fname ^ ".mini") st ast;
-        if #printAst opts then printAst fname ast
-        else if #dumpIL opts then dumpIL fname st ast
-        else if #noRegAlloc opts then printAsm fname st ast
-        else compile fname st ast;
+        if mode = "-printAst" then printAst fname ast
+        else if mode = "-dumpIL" then dumpIL fname st ast
+        else if mode = "-noRegAlloc" then printAsm fname platform st ast
+        else compile fname platform st ast;
         closeIn ins;
         OS.Process.exit OS.Process.success
     end

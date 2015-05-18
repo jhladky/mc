@@ -3,6 +3,7 @@ signature UTIL = sig
     val fail : string -> int -> string -> unit
     val foldd : string -> ('a -> string) -> 'a list -> string
     val iToS : int -> string (* Handles negatives properly. *)
+    datatype platform = LINUX | OS_X
     val WORD_SIZE : int
 end
 
@@ -25,6 +26,8 @@ fun foldd sep f [] = ""
 fun iToS n = if n < 0 then "-" ^ Int.toString (~n) else Int.toString n
 
 
-val WORD_SIZE = 8;
+datatype platform = LINUX | OS_X
+
+val WORD_SIZE = 8
 
 end

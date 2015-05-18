@@ -2,6 +2,7 @@
 
 NAME=""
 S_MODE=false
+COMPILE_MODE="_"
 
 get_file_name () {
     NAME=`basename $1`
@@ -10,26 +11,30 @@ get_file_name () {
     NAME=${arr[0]}
 }
 
-if [ $# -eq 0 ] || [ $# -gt 2 ]; then
-    printf "Usage: mc -printAst <filename>\n"
-    printf "       mc -noRegAlloc <filename>\n"
-    printf "       mc -dumpIL <filename>\n"
-    printf "       mc -S <filename>\n"
+print_usage () {
+    printf -- "Usage: mc [options] <filename>\n"
+    printf -- "\n"
+    printf -- "Options:\n"
+    printf -- "-printAst    Print the program's source as interpreted by the parser.\n"
+    printf -- "-dumpIL      Print the ILOC representation of the program.\n"
+    printf -- "-noRegAlloc  Don't run the register allocation algorithm.\n"
+    printf -- "-S           Generate the target assembly and stop.\n"
     exit 1
+}
+
+if [ $# -eq 0 ] || [ $# -gt 5 ]; then
+    print_usage
 fi
 
 if [[ ${1:0:1} == "-" ]]; then
-    if [ $1 = "-S" ]; then
-        COMPILER_ARG=""
-        FPATH=$2
+    if [[ $1 == "-S" ]]; then
         S_MODE=true
     else
-        COMPILER_ARG=$1
-        FPATH=$2
+        COMPILE_MODE=$1
     fi
 
+    FPATH=$2
 else
-    COMPILER_ARG=""
     FPATH=$1
 fi
 
@@ -44,7 +49,7 @@ if [ -n "$PARSER_OUPUT" ]; then
     exit 1
 fi
 
-./compiler $NAME $COMPILER_ARG
+./compiler $NAME $COMPILE_MODE `uname`
 
 if [ $? -ne 0 ]; then
     exit 1
