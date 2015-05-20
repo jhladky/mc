@@ -10,7 +10,10 @@ json2Ast.sml
 symbolTable.sml
 static.sml
 
+(* Generic data structures. *)
 cfg.sml
+unorderedSet.sml
+
 iloc.sml
 ilocUtil.sml
 ast2Iloc.sml
@@ -21,7 +24,7 @@ copyProp.sml
 targetAmd64.sml
 iloc2Amd64.sml
 
-unorderedSet.sml
+
 ifeGraph.sml
 regAlloc.sml
 

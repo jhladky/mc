@@ -3,6 +3,24 @@
  / / / / / / /__
 /_/ /_/ /_/\___/
 
-* A compiler for the "mini" toy language
-* Uses an ANTLR parser
-* Targets amd64
+A compiler for the "mini" toy language
+
+Targets:
+* amd64 on OS X (MachO binaries)
+* amd64 on GNU/Linux (ELF binaries)
+
+Requirements:
+* make
+* ANTLR requires jdk 1.5 or greater
+* jars for the following must be in the CLASSPATH for the parser to build
+   - ANTLR 3.5.2 or greater
+   - javax-json 1.0.4 or greater
+* mlton 20130715 or greater
+* as and ld must be in the PATH
+
+To build mc:
+1. Clone this repo and all sub-modules.
+2. `cd` into the "mini-parser" directory and run `make`.
+3. In the parent directory run `make`.
+
+To run the benchmarks use the "runTests.sh" script. The script takes a single argument, the number of times to run each test to obtain time averages. The default is 10.

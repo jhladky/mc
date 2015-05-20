@@ -9,7 +9,7 @@ open UnorderedSet
 (* Function should not be called on a register of this type. *)
 exception RegisterType of opcode
 
-datatype live_analysis =
+datatype live_variable_analysis =
          LVA of {
              label: string,
              bb: instruction list,
@@ -137,13 +137,14 @@ fun regToGK (gen, kill) ins =
     end
 
 
-fun bbToGK (id, bb) =
-    let
-        val gk = List.foldl (fn (ins, gk) => regToGK gk ins)
-                            (empty (), empty ()) bb
-    in
-        LVA {label=id, bb=bb, gk=gk, liveOut=empty (), loDiff=true}
-    end
+fun bbToGK (id, ins) =
+    LVA {
+        label=id,
+        bb=ins,
+        gk=List.foldl (fn (ins, gk) => regToGK gk ins) (empty (), empty ()) ins,
+        liveOut=empty (),
+        loDiff=true
+    }
 
 
 fun bbLiveOut1 (LVA {gk=(gen, kill), liveOut=liveOut, ...}) =
