@@ -7,67 +7,65 @@ open TextIO
 open Util
 
 
-fun printAst fname ast =
+fun exit () = OS.Process.exit OS.Process.success
+fun getBool pair = valOf (Bool.fromString (Array.sub pair))
+
+
+fun stage3 st iloc fname noRegAlloc platform =
     let
-        val ots = openOut (fname ^ ".ast")
+        val asm = Iloc2Amd64.iloc2Amd64 st iloc
+        val asm = if noRegAlloc then asm else RegAlloc.regAlloc asm
+        val ots = openOut (fname ^ ".s")
     in
-        output (ots, Ast.programToStr ast);
+        output (ots, TargetAmd64.programToStr platform asm);
         closeOut ots
     end
 
 
-fun dumpIL fname st ast =
+fun doDumpIl fname iloc =
     let
         val ots = openOut (fname ^ ".il")
-        val printDecl = fn (id, _) => output (ots, "@function " ^ id ^ "\n")
-        val iloc = Ast2Iloc.ast2Iloc st ast
+        val outDecl = fn (id, _) => output (ots, "@function " ^ id ^ "\n")
     in
-        app printDecl iloc;
+        app outDecl iloc;
         output (ots, "\n");
         output (ots, Iloc.programToStr iloc);
-        closeOut ots
+        closeOut ots;
+        exit ()
     end
 
 
-fun printAsm fname platform st ast =
+fun stage2 st ast fname dumpIl noOpt noCopyProp noRegAlloc platform =
     let
-        val ots = openOut (fname ^ ".s")
+        val iloc = Ast2Iloc.ast2Iloc st ast
+        val iloc = if not noOpt andalso not noCopyProp
+                   then CopyProp.copyProp iloc
+                   else iloc
     in
-        output (ots, TargetAmd64.programToStr platform
-                         (Iloc2Amd64.iloc2Amd64 st (Ast2Iloc.ast2Iloc st ast)));
-        closeOut ots
-    end
-
-
-fun compile fname platform st ast =
-    let
-        val ots = openOut (fname ^ ".s")
-    in
-        output (ots, (TargetAmd64.programToStr platform
-                      o RegAlloc.regAlloc
-                      o Iloc2Amd64.iloc2Amd64 st
-                      o Ast2Iloc.ast2Iloc st) ast);
-        closeOut ots
+        if dumpIl then doDumpIl fname iloc
+        else stage3 st iloc fname noRegAlloc platform
     end
 
 
 fun main () =
     let
-        val args = CommandLine.arguments ()
-        val fname = hd args
-        val mode = List.nth (args, 1)
-        val platform = if List.nth (args, 2) = "Darwin" then OS_X else LINUX
+        val args = Array.fromList (CommandLine.arguments ())
+        val fname = Array.sub (args, 0)
+        val dumpIl = getBool (args, 1)
+        val noOpt = getBool (args, 2)
+        val noCopyProp = getBool (args, 3)
+        val noRegAlloc = getBool (args, 4)
+        val staticCheck = getBool (args, 5)
+        val platform = if Array.sub (args, 6) = "Darwin" then OS_X else LINUX
         val ins = openIn (fname ^ ".json")
         val ast = json2AST ins
         val st = SymbolTable.mkSymbolTable (fname ^ ".mini") ast
     in
         Static.staticCheck (fname ^ ".mini") st ast;
-        if mode = "-printAst" then printAst fname ast
-        else if mode = "-dumpIL" then dumpIL fname st ast
-        else if mode = "-noRegAlloc" then printAsm fname platform st ast
-        else compile fname platform st ast;
+        if staticCheck then exit () else ();
+        stage2 st ast fname dumpIl noOpt noCopyProp noRegAlloc platform;
         closeIn ins;
-        OS.Process.exit OS.Process.success
+        exit ()
     end
 
 end

@@ -21,15 +21,16 @@ for dir in benchmarks/*; do
             echo "Failed to compile."
             head .tmp
         else
-            ./a.out < $dir/input > $dir/output.myout
+            TIME_OUTPUT="$((time -p ./a.out < $dir/input > $dir/output.myout) 2>&1)"
             diff $dir/output $dir/output.myout > .tmp 2>&1
 
             if [ $? -eq 0 ]; then
-                echo "pass"
+                printf "pass\n$TIME_OUTPUT\n\n"
             else
                 echo "fail"
                 head .tmp
             fi
+
         fi
         N=$((N + 1))
     done

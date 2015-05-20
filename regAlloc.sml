@@ -91,6 +91,10 @@ fun getSTr r OP_PUSHQ = ([r], [])
   | getSTr _ opc      = raise RegisterType opc
 
 
+(* TODO: for the call instructions all the caller saved registers are considered
+ * targets, which means that any virtual registers that span the call will
+ * have an edge with the caller saved registers, forcing them into the callee
+ * saved registers. *)
 val getST =
  fn INS_RR {opcode=opc, r1=r1, r2=r2}                    => getSTrr r1 r2 opc
   | INS_IR {opcode=opc, r2=r2, ...}                      => getSTir r2 opc
@@ -177,7 +181,6 @@ fun insIfeGraph ife (ins, liveNow) =
 (* This function will be passed the successors of the node as part of
  * how Cfg.apply is written, but we don't need them here. *)
 fun bbIfeGraph ife _ (lva as LVA {bb=bb, liveOut=liveOut, ...}) =
-    (*liveOut comes out of here*)
     (List.foldr (insIfeGraph ife) liveOut bb; lva)
 
 
@@ -189,10 +192,10 @@ fun conReq (reg, adjs) = length adjs >= numItems avail andalso
                          not (member (actual, reg))
 
 
-(*TODO: Make this much better, by actually using the heuristic and by
+(* TODO: Make this much better, by actually using the heuristic and by
  * reanalyzing the graph every time.*)
 fun deconstruct ife =
-    (*Right now we need to get the adjacency information for each node.*)
+    (* Right now we need to get the adjacency information for each node. *)
     let
         val rep = IfeGraph.toListRep ife
     in
@@ -241,14 +244,10 @@ fun replaceOffset vtr (SOME (reg, scalar)) = SOME (replace vtr reg, scalar)
 
 
 fun getSaveList vtr =
-  listItems (intersection (addList (empty(), HashTable.listItems vtr),
-                           preserved))
+    listItems (intersection (addList (empty(), HashTable.listItems vtr),
+                             preserved))
 
 
-(* TODO: for the call instructions all the caller saved registers are considered
- * targets, which means that any virtual registers that span the call will
- * have an edge with the caller saved registers, forcing them into the callee
- * saved registers. *)
 fun colorCall vtr label =
     let
         val save = intersection (addList (empty(), HashTable.listItems vtr),

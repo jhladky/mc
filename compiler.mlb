@@ -15,6 +15,9 @@ iloc.sml
 ilocUtil.sml
 ast2Iloc.sml
 
+(* Optimizations *)
+copyProp.sml
+
 targetAmd64.sml
 iloc2Amd64.sml
 

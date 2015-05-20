@@ -19,6 +19,7 @@ datatype opcode =
    | OP_JLE
    | OP_JNE
    | OP_MOVQ
+   | OP_LEAQ
    | OP_CALL
    | OP_RET
    | OP_CMOVE
@@ -93,14 +94,15 @@ val opToStr =
   | OP_JLE       => "jle "
   | OP_JNE       => "jne "
   | OP_MOVQ      => "movq "
+  | OP_LEAQ      => "leaq "
   | OP_CALL      => "call "
   | OP_RET       => "ret "
-  | OP_CMOVE    => "cmove "
-  | OP_CMOVG    => "cmovg "
-  | OP_CMOVGE   => "cmovge "
-  | OP_CMOVL    => "cmovl "
-  | OP_CMOVLE   => "cmovle "
-  | OP_CMOVNE   => "cmovne "
+  | OP_CMOVE     => "cmove "
+  | OP_CMOVG     => "cmovg "
+  | OP_CMOVGE    => "cmovge "
+  | OP_CMOVL     => "cmovl "
+  | OP_CMOVLE    => "cmovle "
+  | OP_CMOVNE    => "cmovne "
   | OP_SARQ      => "sarq "
 
 
