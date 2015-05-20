@@ -20,7 +20,7 @@ Options:
                Disable copy propagation optimization.
 -no-reg-alloc  Don't run the register allocation algorithm.
 -o <file>      Specify name of output binary. Default is \"a.out\".
--S             Generate the target assembly and stop.\n
+-S             Generate the target assembly and stop.
 -static-check  Run the static checker and stop.\n"
     exit 1
 }
@@ -88,6 +88,8 @@ else
     if [[ `uname` == "Darwin" ]]; then
         ld -lc -e _main -macosx_version_min 10.10 -o "$O" "$NAME.o"
     else
+        # I'm using gcc to link the object file b.c I can't
+        # figure out how to get ld to do it on Linux!
         gcc -o "$O" "$NAME.o"
     fi
 

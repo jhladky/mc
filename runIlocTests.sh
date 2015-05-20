@@ -1,8 +1,8 @@
 #!/bin/bash
 
 ####################################################
-# NOTE: This script it basically broken right now. #
-#       Fix later if we fix the problem w Mochi.   #
+# NOTE: This script is broken right now.           #
+#       Fix later if we fix the problem w. Mochi.  #
 ####################################################
 
 NAME=""
