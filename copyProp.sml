@@ -17,6 +17,7 @@ datatype live_variable_analysis =
              ciDiff: bool
          }
 
+(*we are going to need to change copies to a list and this remove this! *)
 val nextCopy = ref 0
 
 (* Just do this right now:

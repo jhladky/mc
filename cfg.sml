@@ -3,12 +3,18 @@ signature CFG = sig
     type 'a cfg
 
     val mkCfg : 'a -> 'a -> 'a node * 'a node * 'a cfg
+
     val toList : 'a cfg -> 'a list
+    val toListRep : 'a cfg -> ('a * 'a list) list
+    val mkNode : 'a cfg -> 'a -> 'a node
+    val addEdge : 'a node -> 'a node -> unit
+
     val map : ('a -> 'b) -> 'a cfg -> 'b cfg
+    val fold : ('a * 'b -> 'b) -> 'b -> 'a cfg -> 'b
+
+    (* TODO: Fix this function. *)
     val apply : ('a list -> 'a -> 'a) -> 'a cfg -> unit
 
-    val mkNode : 'a -> 'a node
-    val link : 'a node -> 'a node -> unit (* Rename to addEdge *)
     val update : 'a node -> 'a -> unit
     val getData : 'a node -> 'a
     val successors : 'a node -> 'a list
@@ -20,89 +26,96 @@ structure Cfg :> CFG = struct
 
 datatype 'a node = NODE of {id: int ref, next: 'a node list ref, data: 'a ref}
 
-datatype 'a cfg = CFG of {entry: 'a node, exit: 'a node}
+datatype 'a cfg =
+         CFG of {
+             nodes: 'a node list ref,
+             entry: 'a node,
+             exit: 'a node
+         }
 
 
-fun mkNode data = NODE {id=ref 0, next=ref [], data=ref data}
+fun mkNode (CFG {nodes=nodes, ...}) data =
+    let
+        val node = NODE {id=ref 0, next=ref [], data=ref data}
+    in
+        nodes := node::(!nodes);
+        node
+    end
 
 
 fun mkCfg enData exData =
     let
-        val entry = mkNode enData
-        val exit = mkNode exData
+        val entry = NODE {id=ref 0, next=ref [], data=ref enData}
+        val exit = NODE {id=ref 0, next=ref [], data=ref exData}
     in
-        (entry, exit, CFG {entry=entry, exit=exit}) (*this is bad*)
+        (entry, exit, CFG {nodes=ref [entry, exit], entry=entry, exit=exit})
     end
 
 
 (*mmmm mutation... delicious*)
 fun update (NODE {data=data, ...}) newData = data := newData
-fun link (NODE {next=next, ...}) node2 = next := node2::(!next)
+fun addEdge (NODE {next=next, ...}) node2 = next := node2::(!next)
 fun getExit (CFG {exit=exit, ...}) = exit
 fun getData (NODE {data=data, ...}) = !data
+fun successors (NODE {next=next, ...}) = map getData (!next)
+fun find nId nodes = List.find (fn NODE {id=id, ...} => id = nId) nodes
 
 
-fun successors (NODE {next=next, ...}) =
-    map (fn NODE {data=data, ...} => !data) (!next)
-
-
-fun toList1 (node as NODE {id=nId, next=next, ...}, L) =
-    if not (isSome (List.find (fn NODE {id=id, ...} => id = nId) L)) then
-        foldr toList1 (L @ [node]) (!next)
-    else L
-
-
-fun toList (CFG {entry=en as NODE {id=enId, ...},
+fun toList (CFG {nodes=nodes, entry=en as NODE {id=enId, ...},
                  exit=ex as NODE {id=exId, ...}}) =
     let
         val L = List.filter (fn NODE {id=id, ...} =>
-                                id <> enId andalso id <> exId)
-                            (toList1 (en, []))
+                                id <> enId andalso id <> exId) (!nodes)
     in
         List.map getData ([en] @ L @ [ex])
     end
 
 
-fun map1 f L (NODE {id=nId, data=data, next=next}) =
-    case List.find (fn NODE {id=id, ...} => id = nId) (!L) of
+fun getNodeRep (NODE {data=data, next=next, ...}) =
+    (!data, List.map getData (!next))
+
+
+fun toListRep (CFG {nodes=nodes, ...}) = List.map getNodeRep (!nodes)
+
+
+fun map1 f L (NODE {id=id, data=data, next=next}) =
+    case find id (!L) of
         SOME newNode => newNode
       | NONE =>
         let
             val newNext = ref []
-            val newNode = NODE {id=nId, data=ref (f (!data)), next=newNext}
+            val newNode = NODE {id=id, data=ref (f (!data)), next=newNext}
         in
-            (*might be a problem area here...*)
             L := newNode::(!L);
             newNext := List.map (map1 f L) (!next);
             newNode
         end
 
 
-(* This is bad. *)
-fun findExit exitId node =
+fun map f (CFG {entry=entry, exit=NODE {id=id, ...}, ...}) =
     let
-        val L = toList1 (node, [])
+        val nodes = ref []
+        val newEntry = map1 f nodes entry
     in
-        valOf (List.find (fn NODE {id=id, ...} => id = exitId) L)
-    end
-
-
-fun map f (CFG {entry=entry, exit=NODE {id=id, ...}}) =
-    let
-        val newEntry = map1 f (ref []) entry
-    in
-        CFG {entry=newEntry, exit=findExit id newEntry}
+        CFG {entry=newEntry, exit=valOf (find id (!nodes)), nodes=nodes}
     end
 
 
 (* There's a lot of duplication going on here...
  * find a way to fix it in the future. *)
-fun apply1 f L (node as NODE {id=nId, data=data, next=next}) =
-    case List.find (fn NODE {id=id, ...} => id = nId) (!L) of
+fun apply2 (node as NODE {id=id, next=next, ...}, L) =
+    if not (isSome (find id L)) then foldr apply2 (node::L) (!next) else L
+
+
+fun fold f init cfg = foldl f init (toList cfg)
+
+
+fun apply1 f L (node as NODE {id=id, data=data, next=next}) =
+    case find id (!L) of
         SOME _ => ()
       | NONE =>
         let
-            val succs = List.map getData (foldr toList1 [] (!next))
+            val succs = List.map getData (foldr apply2 [] (!next))
         in
             L := node::(!L);
             update node (f succs (!data));

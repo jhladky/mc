@@ -48,32 +48,32 @@ fun mkIi st cfg (Ast.FUNCTION {params=params, decls=decls, id=id, ...})=
     end
 
 
-fun mkIf node =
+fun mkIf cfg node =
     let
-        val exitNode = Cfg.mkNode (nextLabel (), [])
-        val thenNode = Cfg.mkNode (nextLabel (), [])
-        val elseNode = Cfg.mkNode (nextLabel (), [])
+        val exitNode = Cfg.mkNode cfg (nextLabel (), [])
+        val thenNode = Cfg.mkNode cfg (nextLabel (), [])
+        val elseNode = Cfg.mkNode cfg (nextLabel (), [])
     in
-        Cfg.link node elseNode;
-        Cfg.link node thenNode;
+        Cfg.addEdge node elseNode;
+        Cfg.addEdge node thenNode;
         (thenNode, elseNode, exitNode)
     end
 
 
-fun mkWhile node =
+fun mkWhile cfg node =
     let
-        val guard = Cfg.mkNode (nextLabel (), [])
-        val body = Cfg.mkNode (nextLabel (), [])
-        val exit = Cfg.mkNode (nextLabel (), [])
+        val guard = Cfg.mkNode cfg (nextLabel (), [])
+        val body = Cfg.mkNode cfg (nextLabel (), [])
+        val exit = Cfg.mkNode cfg (nextLabel (), [])
     in
-        Cfg.link node guard;
-        Cfg.link guard body;
-        Cfg.link guard exit;
+        Cfg.addEdge node guard;
+        Cfg.addEdge guard body;
+        Cfg.addEdge guard exit;
         (guard, body, exit)
     end
 
 
-fun mkReturn cfg = (Cfg.getExit cfg, Cfg.mkNode (nextLabel (), []))
+fun mkReturn cfg = (Cfg.getExit cfg, Cfg.mkNode cfg (nextLabel (), []))
 
 
 fun fill node L =

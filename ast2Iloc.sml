@@ -190,7 +190,7 @@ fun returnStmt2BB (II {cfg=cfg, ...}) node NONE =
         val (exitNode, newNode) = mkReturn cfg
     in
         fill node (genJump exitNode);
-        Cfg.link node exitNode;
+        Cfg.addEdge node exitNode;
         newNode
     end
   | returnStmt2BB (ii as II {cfg=cfg, ...}) node (SOME exp) =
@@ -201,7 +201,7 @@ fun returnStmt2BB (II {cfg=cfg, ...}) node NONE =
         fill node (List.rev L
                    @ [INS_R {opcode=OP_STORERET, r1=dest}]
                    @ genJump exitNode);
-        Cfg.link node exitNode;
+        Cfg.addEdge node exitNode;
         newNode
     end
 
@@ -234,28 +234,29 @@ fun stmt2BB ii node (ST_BLOCK stmts) =
         fill node L;
         node
     end
-  | stmt2BB ii node (ST_IF {guard=guard, thenBlk=thenBlk,
-                            elseBlk=elseBlk, ...}) =
+  | stmt2BB (ii as II {cfg=cfg, ...}) node
+            (ST_IF {guard=guard, thenBlk=thenBlk, elseBlk=elseBlk, ...}) =
     let
-        val (thenNode, elseNode, exitNode) = mkIf node
+        val (thenNode, elseNode, exitNode) = mkIf cfg node
         val thenResNode = stmt2BB ii thenNode thenBlk
         val elseResNode = stmt2BB ii elseNode elseBlk
         val (dest, L) = expr2Ins ii guard
     in
-        Cfg.link elseResNode exitNode;
-        Cfg.link thenResNode exitNode;
+        Cfg.addEdge elseResNode exitNode;
+        Cfg.addEdge thenResNode exitNode;
         fill node (List.rev L @ genBrnIns dest thenNode elseNode);
         fill thenResNode (genJump exitNode);
         fill elseResNode (genJump exitNode);
         exitNode
     end
-  | stmt2BB ii node (ST_WHILE {guard=guard, body=body, ...}) =
+  | stmt2BB (ii as II {cfg=cfg, ...}) node
+            (ST_WHILE {guard=guard, body=body, ...}) =
     let
-        val (guardNode, bodyNode, exitNode) = mkWhile node
+        val (guardNode, bodyNode, exitNode) = mkWhile cfg node
         val bodyResNode = stmt2BB ii bodyNode body
         val (dest, L) = expr2Ins ii guard
     in
-        Cfg.link bodyResNode guardNode;
+        Cfg.addEdge bodyResNode guardNode;
         fill guardNode (List.rev L @ genBrnIns dest bodyNode exitNode);
         fill node (genJump guardNode);
         fill bodyResNode (genJump guardNode);
@@ -295,7 +296,7 @@ fun func2Cfg st (func as FUNCTION {id=id, body=body, params=params, ...}) =
         val _ = fill exit [INS_X {opcode=OP_RET}]
         val res = foldl (fn (s, node) => stmt2BB ii node s) entry body
     in
-        Cfg.link res exit;
+        Cfg.addEdge res exit;
         fill res (genJump exit);
         (id, cfg)
     end

@@ -101,13 +101,13 @@ in
       | INS_RRI {r1=r1, r2=r2, ...}         => ([r1], [r2])
       | INS_RRC {r1=r1, r2=r2, ...}         => ([r1, r2], [])
       | INS_RIC {r1=r1, ...}                => ([r1], [])
-      | INS_SIR {opcode=opc, r1=r1, ...}    => ([], [r1])
-      | INS_NEW {opcode=opc, dest=d, ...}   => ([], [d])
+      | INS_SIR {r1=r1, ...}                => ([], [r1])
+      | INS_NEW {dest=d, ...}               => ([], [d])
+      | INS_IR  {dest=d, ...}               => ([], [d])
+      | INS_RI  {dest=d, ...}               => ([d], [])
+      | INS_SR  {r1=r1, ...}                => ([], [r1])
+      | INS_RS  {r1=r1, ...}                => ([r1], [])
       | INS_RR  {opcode=opc, dest=d, r1=r1} => getSTrr r1 d opc
-      | INS_IR  {opcode=opc, dest=d, ...}   => ([], [d])
-      | INS_RI  {opcode=opc, dest=d, ...}   => ([d], [])
-      | INS_SR  {opcode=opc, r1=r1, ...}    => ([], [r1])
-      | INS_RS  {opcode=opc, r1=r1, ...}    => ([r1], [])
       | INS_R   {opcode=opc, r1=r1}         => getSTr r1 opc
       | _                                   => ([], [])
 end
