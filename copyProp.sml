@@ -17,8 +17,6 @@ datatype live_variable_analysis =
              ciDiff: bool
          }
 
-(*we are going to need to change copies to a list and this remove this! *)
-val nextCopy = ref 0
 
 (* Just do this right now:
  * Pass through the entire function to determine what are the copies.
@@ -27,19 +25,12 @@ val nextCopy = ref 0
  * • Copy(i) is a set of pairs (u,v) such that v ← u is a copy
  * int * int * string * int source of copy, target of copy *)
 
-fun findCopiesIns' copies (INS_RR {opcode=OP_MOV, r1=r1, dest=dest}) =
-    (HashTable.insert copies (Int.toString (!nextCopy), (r1, dest));
-     nextCopy := (!nextCopy) + 1)
-  | findCopiesIns' _ _ = ()
+fun findCopiesIns (INS_RR {opcode=OP_MOV, r1=r1, dest=dest}, copies) =
+    (r1, dest)::copies
+  | findCopiesIns (ins, copies) = copies
 
 
-fun findCopiesIns _ [] = ()
-  | findCopiesIns copies (x::xs) =
-    (findCopiesIns' copies x; findCopiesIns copies xs)
-
-
-fun findCopiesBB copies _ (id, ins) =
-    (findCopiesIns copies ins; (id, ins))
+fun findCopiesBB ((id, ins), cps) = cps @ List.foldr findCopiesIns [] ins
 
 
 (*copyin depends on predecessors, or PUSH information down to successors. *)
@@ -76,8 +67,7 @@ fun bbToGK copies (id, ins) =
 
 fun optFunc (id, cfg) =
     let
-        (* val copies = Util.mkHt () *)
-        (* val _ = Cfg.apply (findCopiesBB copies) cfg; *)
+        val copies = List.foldr findCopiesBB [] (Cfg.toList cfg)
         (* val lva = Cfg.map (bbToGK copies) cfg; *)
     in
         (id, cfg)
