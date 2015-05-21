@@ -11,8 +11,7 @@ exception RegisterType of opcode
 
 datatype live_variable_analysis =
          LVA of {
-             label: string,
-             bb: instruction list,
+             ins: instruction list,
              gk: register set * register set,
              liveOut: register set,
              loDiff: bool
@@ -128,8 +127,7 @@ fun addEdgeNoCreate ife node reg =
       | NONE => ()
 
 
-(* Transformation functions. *)
-fun regToGK (gen, kill) ins =
+fun regToGK (ins, (gen, kill)) =
     let
         val (sources, targets) = getST ins
     in
@@ -139,33 +137,24 @@ fun regToGK (gen, kill) ins =
 
 fun bbToGK (id, ins) =
     LVA {
-        label=id,
-        bb=ins,
-        gk=List.foldl (fn (ins, gk) => regToGK gk ins) (empty (), empty ()) ins,
+        ins=ins,
+        gk=List.foldl regToGK (empty (), empty ()) ins,
         liveOut=empty (),
         loDiff=true
     }
 
 
-fun bbLiveOut1 (LVA {gk=(gen, kill), liveOut=liveOut, ...}) =
-    union (gen, difference (liveOut, kill))
+fun bbLiveOut1 (LVA {gk=(gen, kill), liveOut=liveOut, ...}, s) =
+    union (s, union (gen, difference (liveOut, kill)))
 
 
-fun bbLiveOut succs (LVA {label=id, bb=bb, gk=gk, liveOut=liveOut, ...}) =
+fun bbLiveOut (LVA {ins=ins, gk=gk, liveOut=liveOut, ...}, succs) =
     let
-        val lo = List.foldr (fn (bb, s) => union (s, bbLiveOut1 bb))
-                            (empty ()) succs
+        val lo = List.foldr bbLiveOut1 (empty ()) succs
+        val loDiff = not (equal (liveOut, lo))
     in
-        LVA {label=id, bb=bb, gk=gk, liveOut=lo, loDiff=not (equal (liveOut, lo))}
+        (LVA {ins=ins, gk=gk, liveOut=lo, loDiff=loDiff}, succs)
     end
-
-
-fun diffCheck1 diff [] = diff
-  | diffCheck1 diff (LVA {loDiff=loDiff, ...}::lvas) =
-    if loDiff then diffCheck1 true lvas else diffCheck1 diff lvas
-
-
-fun diffCheck cfg = diffCheck1 false (Cfg.toList cfg)
 
 
 fun insIfeGraph ife (ins, liveNow) =
@@ -179,10 +168,8 @@ fun insIfeGraph ife (ins, liveNow) =
     end
 
 
-(* This function will be passed the successors of the node as part of
- * how Cfg.apply is written, but we don't need them here. *)
-fun bbIfeGraph ife _ (lva as LVA {bb=bb, liveOut=liveOut, ...}) =
-    (List.foldr (insIfeGraph ife) liveOut bb; lva)
+fun bbIfeGraph ife (LVA {ins=ins, liveOut=liveOut, ...}) =
+    ignore (List.foldr (insIfeGraph ife) liveOut ins)
 
 
 fun uncReq (reg, adjs) = length adjs < numItems avail andalso
@@ -295,10 +282,14 @@ fun colorIns vtr (INS_RR {opcode=opc, r1=r1, r2=r2}) =
   | colorIns _ ins = [ins]
 
 
+fun diffCheck ((LVA {loDiff=loD, ...}, _), diff) = if loD then true else diff
+
+
 (* Iteratively recompute each liveOut set until there is no change. *)
-fun mkLiveOutSets cfg =
-    if diffCheck cfg then (Cfg.apply bbLiveOut cfg; mkLiveOutSets cfg)
-    else cfg
+fun mkLiveOutSets lvas =
+    if List.foldr diffCheck false lvas
+    then mkLiveOutSets (List.map bbLiveOut lvas)
+    else lvas
 
 
 (* Calculate how much spill space we need. Make sure it is 16-byte aligned.
@@ -368,15 +359,15 @@ fun spill n reg (id, ins) =
 
 
 (* n is the number of times we've had to spill. *)
-fun color n (func as (id, cfg)) =
+fun color n (id, cfg) =
     let
-        val lva = mkLiveOutSets (Cfg.map bbToGK cfg)
+        val lvas = mkLiveOutSets (Cfg.toListRep (Cfg.map bbToGK cfg))
         val oldIfe = IfeGraph.mkGraph ()
         val newIfe = IfeGraph.mkGraph ()
         val vtr = Util.mkHt ()
     in
         (* Build the interference graph. *)
-        Cfg.apply (bbIfeGraph oldIfe) lva;
+        List.app (bbIfeGraph oldIfe) (List.map #1 lvas);
         (* Build the vtr. If we can color the registers then map them
          * to the old ones, otherwise generate spill code and try again. *)
         case buildVtr (addToIfe vtr newIfe) (deconstruct oldIfe) of

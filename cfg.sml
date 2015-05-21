@@ -12,12 +12,9 @@ signature CFG = sig
     val map : ('a -> 'b) -> 'a cfg -> 'b cfg
     val fold : ('a * 'b -> 'b) -> 'b -> 'a cfg -> 'b
 
-    (* TODO: Fix this function. *)
-    val apply : ('a list -> 'a -> 'a) -> 'a cfg -> unit
-
+    (* TODO: Get rid of this. *)
     val update : 'a node -> 'a -> unit
     val getData : 'a node -> 'a
-    val successors : 'a node -> 'a list
 
     val getExit : 'a cfg -> 'a node (* Remove later *)
 end
@@ -57,7 +54,6 @@ fun update (NODE {data=data, ...}) newData = data := newData
 fun addEdge (NODE {next=next, ...}) node2 = next := node2::(!next)
 fun getExit (CFG {exit=exit, ...}) = exit
 fun getData (NODE {data=data, ...}) = !data
-fun successors (NODE {next=next, ...}) = map getData (!next)
 fun find nId nodes = List.find (fn NODE {id=id, ...} => id = nId) nodes
 
 
@@ -69,13 +65,6 @@ fun toList (CFG {nodes=nodes, entry=en as NODE {id=enId, ...},
     in
         List.map getData ([en] @ L @ [ex])
     end
-
-
-fun getNodeRep (NODE {data=data, next=next, ...}) =
-    (!data, List.map getData (!next))
-
-
-fun toListRep (CFG {nodes=nodes, ...}) = List.map getNodeRep (!nodes)
 
 
 fun map1 f L (NODE {id=id, data=data, next=next}) =
@@ -101,29 +90,25 @@ fun map f (CFG {entry=entry, exit=NODE {id=id, ...}, ...}) =
     end
 
 
-(* There's a lot of duplication going on here...
- * find a way to fix it in the future. *)
+fun fold f init cfg = foldl f init (toList cfg)
+
+
+(* TODO: Rework this. *)
 fun apply2 (node as NODE {id=id, next=next, ...}, L) =
     if not (isSome (find id L)) then foldr apply2 (node::L) (!next) else L
 
 
-fun fold f init cfg = foldl f init (toList cfg)
+fun getNodeRep (NODE {data=data, next=next, ...}) =
+    (!data, List.map getData (foldr apply2 [] (!next)))
 
 
-fun apply1 f L (node as NODE {id=id, data=data, next=next}) =
-    case find id (!L) of
-        SOME _ => ()
-      | NONE =>
-        let
-            val succs = List.map getData (foldr apply2 [] (!next))
-        in
-            L := node::(!L);
-            update node (f succs (!data));
-            List.app (apply1 f L) (!next)
-        end
-
-
-fun apply f (CFG {entry=entry, ...}) = apply1 f (ref []) entry
-
+fun toListRep (CFG {nodes=nodes, entry=en as NODE {id=enId, ...},
+                    exit=ex as NODE {id=exId, ...}}) =
+    let
+        val L = List.filter (fn NODE {id=id, ...} =>
+                                id <> enId andalso id <> exId) (!nodes)
+    in
+        List.map getNodeRep ([en] @ L @ [ex])
+    end
 
 end

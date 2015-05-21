@@ -76,9 +76,9 @@ fun bbToGK copies (id, ins) =
 
 fun optFunc (id, cfg) =
     let
-        val copies = Util.mkHt ()
-        val _ = Cfg.apply (findCopiesBB copies) cfg;
-        val lva = Cfg.map (bbToGK copies) cfg;
+        (* val copies = Util.mkHt () *)
+        (* val _ = Cfg.apply (findCopiesBB copies) cfg; *)
+        (* val lva = Cfg.map (bbToGK copies) cfg; *)
     in
         (id, cfg)
     end
