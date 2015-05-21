@@ -55,6 +55,7 @@ fun addEdge (NODE {next=next, ...}) node2 = next := node2::(!next)
 fun getExit (CFG {exit=exit, ...}) = exit
 fun getData (NODE {data=data, ...}) = !data
 fun find nId nodes = List.find (fn NODE {id=id, ...} => id = nId) nodes
+fun getNodeRep (NODE {data=d, next=n, ...}) = (!d, List.map getData (!n))
 
 
 fun toList (CFG {nodes=nodes, entry=en as NODE {id=enId, ...},
@@ -91,15 +92,6 @@ fun map f (CFG {entry=entry, exit=NODE {id=id, ...}, ...}) =
 
 
 fun fold f init cfg = foldl f init (toList cfg)
-
-
-(* TODO: Rework this. *)
-fun apply2 (node as NODE {id=id, next=next, ...}, L) =
-    if not (isSome (find id L)) then foldr apply2 (node::L) (!next) else L
-
-
-fun getNodeRep (NODE {data=data, next=next, ...}) =
-    (!data, List.map getData (foldr apply2 [] (!next)))
 
 
 fun toListRep (CFG {nodes=nodes, entry=en as NODE {id=enId, ...},

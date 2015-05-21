@@ -11,6 +11,7 @@ exception RegisterType of opcode
 
 datatype live_variable_analysis =
          LVA of {
+             id: string,
              ins: instruction list,
              gk: register set * register set,
              liveOut: register set,
@@ -137,6 +138,7 @@ fun regToGK (ins, (gen, kill)) =
 
 fun bbToGK (id, ins) =
     LVA {
+        id=id,
         ins=ins,
         gk=List.foldl regToGK (empty (), empty ()) ins,
         liveOut=empty (),
@@ -148,12 +150,12 @@ fun bbLiveOut1 (LVA {gk=(gen, kill), liveOut=liveOut, ...}, s) =
     union (s, union (gen, difference (liveOut, kill)))
 
 
-fun bbLiveOut (LVA {ins=ins, gk=gk, liveOut=liveOut, ...}, succs) =
+fun bbLiveOut (LVA {id=id, ins=ins, gk=gk, liveOut=liveOut, ...}, succs) =
     let
         val lo = List.foldr bbLiveOut1 (empty ()) succs
         val loDiff = not (equal (liveOut, lo))
     in
-        (LVA {ins=ins, gk=gk, liveOut=lo, loDiff=loDiff}, succs)
+        (LVA {id=id, ins=ins, gk=gk, liveOut=lo, loDiff=loDiff}, succs)
     end
 
 
@@ -285,10 +287,24 @@ fun colorIns vtr (INS_RR {opcode=opc, r1=r1, r2=r2}) =
 fun diffCheck ((LVA {loDiff=loD, ...}, _), diff) = if loD then true else diff
 
 
+(*find the newLva the succ corresponds to and replace it with the new lva*)
+fun updateSucc newLvas (LVA {id=id, ...}) =
+    valOf (List.find (fn LVA {id=lId, ...} => id = lId) newLvas)
+
+
+fun updateLvas lvas =
+    let
+        val newLvas = List.map bbLiveOut lvas
+        val updateSucc = updateSucc (List.map #1 newLvas)
+    in
+        List.map (fn (lva, succs) => (lva, List.map updateSucc succs)) newLvas
+    end
+
+
 (* Iteratively recompute each liveOut set until there is no change. *)
 fun mkLiveOutSets lvas =
     if List.foldr diffCheck false lvas
-    then mkLiveOutSets (List.map bbLiveOut lvas)
+    then mkLiveOutSets (updateLvas lvas)
     else lvas
 
 
