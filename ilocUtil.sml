@@ -74,6 +74,7 @@ fun mkWhile cfg node =
 
 
 fun mkReturn cfg = (Cfg.getExit cfg, Cfg.mkNode cfg (nextLabel (), []))
+fun getLabel (n: (string * Iloc.instruction list) Cfg.node) = #1 (Cfg.getData n)
 
 
 fun fill node L =
@@ -81,14 +82,6 @@ fun fill node L =
         val (label, oldL) = Cfg.getData node
     in
         Cfg.update node (label, oldL @ L)
-    end
-
-
-fun getLabel node =
-    let
-        val (label, _) = Cfg.getData node
-    in
-        label
     end
 
 
@@ -103,6 +96,7 @@ end
 
 
 val getVDId = fn (Ast.VAR_DECL {id=s, ...}) => s
+
 
 fun addType types (Ast.TYPE_DECL {id=id, decls=decls, ...}) =
     HashTable.insert types (id, List.map getVDId decls)

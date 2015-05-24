@@ -12,7 +12,7 @@ signature CFG = sig
     val map : ('a -> 'b) -> 'a cfg -> 'b cfg
     val fold : ('a * 'b -> 'b) -> 'b -> 'a cfg -> 'b
 
-    (* TODO: Get rid of this. *)
+    (* TODO: Get rid of this (use the ref in the ilocUtil struct). *)
     val update : 'a node -> 'a -> unit
     val getData : 'a node -> 'a
 

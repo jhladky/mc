@@ -287,17 +287,15 @@ fun colorIns vtr (INS_RR {opcode=opc, r1=r1, r2=r2}) =
 fun diffCheck ((LVA {loDiff=loD, ...}, _), diff) = if loD then true else diff
 
 
-(*find the newLva the succ corresponds to and replace it with the new lva*)
 fun updateSucc newLvas (LVA {id=id, ...}) =
-    valOf (List.find (fn LVA {id=lId, ...} => id = lId) newLvas)
+    #1 (valOf (List.find (fn (LVA {id=lId, ...}, _) => id = lId) newLvas))
 
 
 fun updateLvas lvas =
     let
         val newLvas = List.map bbLiveOut lvas
-        val updateSucc = updateSucc (List.map #1 newLvas)
     in
-        List.map (fn (lva, succs) => (lva, List.map updateSucc succs)) newLvas
+        List.map (fn (l, ss) => (l, List.map (updateSucc newLvas) ss)) newLvas
     end
 
 
