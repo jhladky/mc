@@ -307,9 +307,9 @@ fun updateLvas lvas =
 
 
 (* Iteratively recompute each liveOut set until there is no change. *)
-fun mkLiveOutSets lvas =
+fun mkLoSets lvas =
     if List.foldr diffCheck false lvas
-    then mkLiveOutSets (updateLvas lvas)
+    then mkLoSets (updateLvas lvas)
     else lvas
 
 
@@ -379,18 +379,17 @@ fun spill n reg (id, ins) =
     (id, List.foldr (fn (ins, L) => spillReg n reg ins @ L) [] ins)
 
 
-(* n is the number of times we've had to spill. *)
+(* Build the interference graph. Then build the vtr. If we can color the
+ * registers then map them the old ones, otherwise spill and try again.
+ * n is the number of times we've had to spill. *)
 fun color n (id, cfg) =
     let
-        val lvas = mkLiveOutSets (Cfg.toListRep (Cfg.map bbToGK cfg))
+        val lvas = List.map #1 (mkLoSets (Cfg.toListRep (Cfg.map bbToGK cfg)))
         val oldIfe = IfeGraph.mkGraph ()
         val newIfe = IfeGraph.mkGraph ()
         val vtr = Util.mkHt ()
     in
-        (* Build the interference graph. *)
-        List.app (bbIfeGraph oldIfe) (List.map #1 lvas);
-        (* Build the vtr. If we can color the registers then map them
-         * to the old ones, otherwise generate spill code and try again. *)
+        List.app (bbIfeGraph oldIfe) lvas;
         case buildVtr (addToIfe vtr newIfe) (deconstruct oldIfe) of
             SOME reg => color (n + 1) (id, Cfg.map (spill n reg) cfg)
           | NONE => (id, Cfg.map (colorBB n id vtr) cfg)

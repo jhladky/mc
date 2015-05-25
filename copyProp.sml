@@ -21,19 +21,6 @@ datatype live_variable_analysis =
 fun has thing L = List.exists (fn t => t = thing) L
 
 
-local
-    fun has (LVA {id=lvaId, ...}) L =
-        List.exists (fn LVA {id=id, ...} => id = lvaId) L
-
-
-    fun mkPredRep1 reps (lva, _) =
-        (lva, List.map #1 (List.filter (fn (_, succs) => has lva succs) reps))
-
-in
-    fun mkPredRep reps = List.map (mkPredRep1 reps) reps
-end
-
-
 (* If an instruction IS a copy and HAS NOT been killed add it to the gen set. *)
 (* If the register target of an instruction HAS been involved in a copy
  * then add it to the kill set. *)
@@ -193,8 +180,7 @@ fun optFunc (id, cfg) =
         val copies = List.foldr findCopies [] (Cfg.toList cfg)
         val lvas = (List.map #1
                     o mkCopyInSets
-                    o mkPredRep (*TODO: Move to cfg structure, "toPredRep". *)
-                    o Cfg.toListRep (*  Then we can replace two funcs w one. *)
+                    o Cfg.toPredRep
                     o Cfg.map (bbToGK copies)) cfg
     in
         (id, Cfg.map (replaceCopies lvas) cfg)

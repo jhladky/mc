@@ -23,7 +23,11 @@ for dir in mini-benchmarks/*/; do
         SUM=0
         get_dir_name $dir
         printf "test %-24s (%02d/19): " "$NAME" $N
-        ./mc.sh $f > .tmp 2>&1
+        if [ -n "$2" ]; then
+            ./mc.sh "$2" $f > .tmp 2>&1
+        else
+            ./mc.sh $f > .tmp 2>&1
+        fi
 
         if [ $? -ne 0 ]; then
             printf "\n!!!failed to compile!!!\n"
