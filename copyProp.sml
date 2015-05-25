@@ -95,84 +95,80 @@ fun replaceReg copyIn ins reg =
     end
 
 
-local
-    fun bbCopyIn1 (LVA {gk=(gen, kill), copyIn=copyIn, ...}, preds) =
-        intersection (preds, union (gen, difference (copyIn, kill)))
+fun bbCopyIn1 (LVA {gk=(gen, kill), copyIn=copyIn, ...}, preds) =
+    intersection (preds, union (gen, difference (copyIn, kill)))
 
 
-    fun transform1 (i, (ins, copyIn)) =
-        let
-            val (_, targets) = getST i
-            val copyIn = filter (fn (src, tgt) => not (has src targets orelse
-                                                       has tgt targets)) copyIn
-        in
-            (ins @ [replaceIns (replaceReg copyIn) i],
-            case i of
-                INS_RR {opcode=OP_MOV, r1=r1, dest=d} => add (copyIn, (r1, d))
-              | i => copyIn)
-        end
+fun transform1 (i, (ins, copyIn)) =
+    let
+        val (_, targets) = getST i
+        val copyIn = filter (fn (src, tgt) => not (has src targets orelse
+                                                   has tgt targets)) copyIn
+    in
+        (ins @ [replaceIns (replaceReg copyIn) i],
+         case i of
+             INS_RR {opcode=OP_MOV, r1=r1, dest=d} => add (copyIn, (r1, d))
+           | i => copyIn)
+    end
 
 
-    fun transform copyIn ins = #1 (List.foldl transform1 ([], copyIn) ins)
-
-in
-
-    fun bbCopyIn (LVA {id=id, ins=ins, gk=gk, copyIn=copyIn, ...}, preds) =
-        let
-            val ci = List.foldr bbCopyIn1 (empty ()) preds
-        in
-            (LVA {
-                  id=id,
-                  ins=transform (empty ()) ins,
-                  gk=gk,
-                  copyIn=ci,
-                  ciDiff=not (equal (copyIn, ci))
-              },
-             preds)
-        end
-end
+fun transform copyIn ins = #1 (List.foldl transform1 ([], copyIn) ins)
 
 
-local
-    fun diffCheck ((LVA {ciDiff=ciD, ...}, _), diff) =
-        if ciD then true else diff
+fun bbCopyIn (LVA {id=id, ins=ins, gk=gk, copyIn=copyIn, ...}, preds) =
+    let
+        val ci = List.foldr bbCopyIn1 (empty ()) preds
+    in
+        (LVA {
+              id=id,
+              ins=transform (empty ()) ins,
+              gk=gk,
+              copyIn=ci,
+              ciDiff=not (equal (copyIn, ci))
+          },
+         preds)
+    end
 
 
-    fun update1 newLvas (LVA {id=id, ...}) =
-        #1 (valOf (List.find (fn (LVA {id=lId, ...}, _) => id = lId) newLvas))
+fun diffCheck ((LVA {ciDiff=ciD, ...}, _), diff) =
+    if ciD then true else diff
 
 
-    fun updateLvas lvas =
-        let
-            val newLvas = List.map bbCopyIn lvas
-        in
-            List.map (fn (l, ps) => (l, List.map (update1 newLvas) ps)) newLvas
-        end
-in
-    fun mkCopyInSets lvas =
-        if List.foldr diffCheck false lvas
-        then mkCopyInSets (updateLvas lvas)
-        else lvas
-end
+fun update1 newLvas (LVA {id=id, ...}) =
+    #1 (valOf (List.find (fn (LVA {id=lId, ...}, _) => id = lId) newLvas))
+
+
+fun updateLvas lvas =
+    let
+        val newLvas = List.map bbCopyIn lvas
+    in
+        List.map (fn (l, ps) => (l, List.map (update1 newLvas) ps)) newLvas
+    end
+
+
+fun mkCopyInSets lvas =
+    if List.foldr diffCheck false lvas
+    then mkCopyInSets (updateLvas lvas)
+    else lvas
 
 
 fun replaceCopies lvas (id, _) =
     let
-        (* Get the copyIn set corresponding with this bb.  *)
+        (* Get the copyIn set corresponding with this bb. *)
         val LVA {copyIn=copyIn, ins=ins, ...} =
             valOf (List.find (fn LVA {id=lId, ...} => id = lId) lvas)
     in
-        (* (id, List.map (replaceIns (replaceReg copyIn)) ins) *)
-        (id, ins)
+        (* comment this out to disable most of the optimization *)
+        (id, List.map (replaceIns (replaceReg copyIn)) ins)
+        (* (id, ins) *)
     end
 
 
-local
-    fun findCopies1 (INS_RR {opcode=OP_MOV, r1=r1, dest=d}, cps) = (r1, d)::cps
-      | findCopies1 (ins, copies) = copies
-in
-    fun findCopies ((_, ins), cps) = cps @ List.foldr findCopies1 [] ins
-end
+fun findCopies1 (INS_RR {opcode=OP_MOV, r1=r1, dest=d}, cps) = (r1, d)::cps
+  | findCopies1 (ins, copies) = copies
+
+
+fun findCopies ((_, ins), cps) = cps @ List.foldr findCopies1 [] ins
 
 
 fun optFunc (id, cfg) =

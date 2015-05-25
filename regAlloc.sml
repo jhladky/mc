@@ -241,13 +241,13 @@ fun replaceOffset vtr (SOME (reg, scalar)) = SOME (replace vtr reg, scalar)
 
 
 fun getSaveList vtr =
-    listItems (intersection (addList (empty(), HashTable.listItems vtr),
+    listItems (intersection (addList (empty (), HashTable.listItems vtr),
                              preserved))
 
 
 fun colorCall vtr label =
     let
-        val save = intersection (addList (empty(), HashTable.listItems vtr),
+        val save = intersection (addList (empty (), HashTable.listItems vtr),
                                  scratch)
         val save = listItems save
         (* At this point the stack is already aligned. *)

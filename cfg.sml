@@ -5,7 +5,7 @@ signature CFG = sig
     val mkCfg : 'a -> 'a -> 'a node * 'a node * 'a cfg
 
     val toList : 'a cfg -> 'a list
-    val toListRep : 'a cfg -> ('a * 'a list) list
+    val toListRep : 'a cfg -> ('a * 'a list) list (* TODO: Consider removal. *)
     val toPredRep : 'a cfg -> ('a * 'a list) list
     val mkNode : 'a cfg -> 'a -> 'a node
     val addEdge : 'a node -> 'a node -> unit
@@ -13,9 +13,11 @@ signature CFG = sig
     val map : ('a -> 'b) -> 'a cfg -> 'b cfg
     val fold : ('a * 'b -> 'b) -> 'b -> 'a cfg -> 'b
 
-    (* TODO: Get rid of this (use the ref in the ilocUtil struct). *)
     val update : 'a node -> 'a -> unit
+    val app : ('a node -> 'a) -> 'a cfg -> unit
     val getData : 'a node -> 'a
+    val getSuccs : 'a node -> 'a list
+    val getPreds : 'a node -> 'a list
 
     val getExit : 'a cfg -> 'a node (* Remove later *)
 end
@@ -65,8 +67,8 @@ fun update (NODE {data=data, ...}) newData = data := newData
 fun getExit (CFG {exit=exit, ...}) = exit
 fun getData (NODE {data=data, ...}) = !data
 fun find nId nodes = List.find (fn NODE {id=id, ...} => id = nId) nodes
-fun getSuccRep (NODE {data=d, next=n, ...}) = (!d, List.map getData (!n))
-fun getPredRep (NODE {data=d, prev=p, ...}) = (!d, List.map getData (!p))
+fun getSuccs (NODE {next=next, ...}) = List.map getData (!next)
+fun getPreds (NODE {prev=prev, ...}) = List.map getData (!prev)
 
 
 fun toRep f (CFG {nodes=nodes, entry=en as NODE {id=enId, ...},
@@ -80,8 +82,9 @@ fun toRep f (CFG {nodes=nodes, entry=en as NODE {id=enId, ...},
 
 
 fun toList cfg = toRep getData cfg
-fun toListRep cfg = toRep getSuccRep cfg
-fun toPredRep cfg = toRep getPredRep cfg
+fun toListRep cfg = toRep (fn n as NODE {data=d, ...} => (!d, getSuccs n)) cfg
+fun toPredRep cfg = toRep (fn n as NODE {data=d, ...} => (!d, getPreds n)) cfg
+fun fold f init cfg = foldl f init (toList cfg)
 
 
 fun map1 f L (NODE {id=id, data=data, next=next, prev=prev}) =
@@ -110,7 +113,7 @@ fun map f (CFG {entry=entry, exit=NODE {id=id, ...}, ...}) =
     end
 
 
-fun fold f init cfg = foldl f init (toList cfg)
-
+fun app f (CFG {nodes=nodes, ...}) =
+    List.app (fn n as NODE {data=data, ...} => data := f n) (!nodes)
 
 end
