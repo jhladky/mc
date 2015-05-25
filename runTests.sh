@@ -18,7 +18,7 @@ N=0
 
 echo "Running tests, average of $REPEAT trials..."
 
-for dir in benchmarks/*; do
+for dir in mini-benchmarks/*/; do
     for f in $dir/*.mini; do
         SUM=0
         get_dir_name $dir

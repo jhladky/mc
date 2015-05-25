@@ -23,7 +23,7 @@ N=0
 
 echo "Testing benchmarks..."
 
-for dir in benchmarks/*; do
+for dir in mini-benchmarks/*/; do
     for f in $dir/*.mini; do
         get_dir_name $dir
         printf "test %-24s (%02d/19): " "$NAME" $N

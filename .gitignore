@@ -43,7 +43,7 @@ testUnorderedSet
 # Test JSON files
 tests/*.json
 tests/*.il
-benchmarks/**/*.json
-benchmarks/**/*.il
-benchmarks/**/*.myout
+# benchmarks/**/*.json
+# benchmarks/**/*.il
+# benchmarks/**/*.myout
 .tmp
