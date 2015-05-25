@@ -15,6 +15,7 @@ print_usage () {
 "Usage: mc [options] <file>
 Options:
 -dump-il       Generate the ILOC and stop.
+-mochi-compat  Make generated ILOC runnable by the Mochi simulator.
 -no-opt        Disable all optimizations.
 -no-opt-copy-propagation
                Disable copy propagation optimization.
@@ -26,6 +27,7 @@ Options:
 }
 
 DUMP_IL=false
+MOCHI_COMPAT=false
 NO_OPT=false
 NO_OPT_COPY_PROPAGATION=false
 NO_REG_ALLOC=false
@@ -40,6 +42,7 @@ key="$1"
 case $key in
     -dump-il)                 DUMP_IL=true;;
     -h|-help)                 print_usage;;
+    -mochi-compat)            MOCHI_COMPAT=true;;
     -no-opt)                  NO_OPT=true;;
     -no-opt-copy-propagation) NO_OPT_COPY_PROPAGATION=true;;
     -no-reg-alloc)            NO_REG_ALLOC=true;;
@@ -75,7 +78,7 @@ if [ -n "$PARSER_OUPUT" ]; then
     exit 1
 fi
 
-./compiler "$NAME" "$DUMP_IL" "$NO_OPT" "$NO_OPT_COPY_PROPAGATION" "$NO_REG_ALLOC" "$STATIC_CHECK" `uname`
+./compiler "$NAME" "$DUMP_IL" "$MOCHI_COMPAT" "$NO_OPT" "$NO_OPT_COPY_PROPAGATION" "$NO_REG_ALLOC" "$STATIC_CHECK" `uname`
 
 if [ $? -ne 0 ]; then
     exit 1

@@ -34,15 +34,6 @@ in
 end
 
 
-local
-    fun findCopies1 (INS_RR {opcode=OP_MOV, r1=r1, dest=dest}, copies) =
-        (r1, dest)::copies
-      | findCopies1 (ins, copies) = copies
-in
-    fun findCopies ((id, ins), cps) = cps @ List.foldr findCopies1 [] ins
-end
-
-
 (* If an instruction IS a copy and HAS NOT been killed add it to the gen set. *)
 (* If the register target of an instruction HAS been involved in a copy
  * then add it to the kill set. *)
@@ -74,48 +65,46 @@ fun bbToGK copies (id, ins) =
         ciDiff=true
     }
 
-val replaceIns =
- fn f =>
-    (fn ins as INS_RRR {opcode=opc, dest=d, r1=r1, r2=r2} =>
-        INS_RRR {opcode=opc, dest=f ins d, r1=f ins r1, r2=f ins r2}
-      | ins as INS_RIR {opcode=opc, dest=d, r1=r1, immed=i} =>
-        INS_RIR {opcode=opc, dest=d, r1=f ins r1, immed=i}
-      | ins as INS_RRI {opcode=opc, r1=r1, r2=r2, immed=i} =>
-        INS_RRI {opcode=opc, r1=f ins r1, r2=f ins r2, immed=i}
-      | ins as INS_RRC {opcode=opc, r1=r1, r2=r2} =>
-        INS_RRC {opcode=opc, r1=f ins r1, r2=f ins r2}
-      | ins as INS_RIC {opcode=opc, r1=r1, immed=i} =>
-        INS_RIC {opcode=opc, r1=f ins r1, immed=i}
-      | ins as INS_SIR {opcode=opc, id=id, immed=i, r1=r1} =>
-        INS_SIR {opcode=opc, id=id, immed=i, r1=f ins r1}
-      | ins as INS_NEW {opcode=opc, dest=d, id=id, fields=fs} =>
-        INS_NEW {opcode=opc, dest=f ins d, id=id, fields=fs}
-      | ins as INS_RR  {opcode=opc, dest=d, r1=r1} =>
-        INS_RR {opcode=opc, dest=f ins d, r1=f ins r1}
-      | ins as INS_IR {opcode=opc, dest=d, immed=i} =>
-        INS_IR {opcode=opc, dest=f ins d, immed=i}
-      | ins as INS_RI {opcode=opc, dest=d, immed=i} =>
-        INS_RI {opcode=opc, dest=f ins d, immed=i}
-      | ins as INS_SR {opcode=opc, id=id, r1=r1} =>
-        INS_SR {opcode=opc, id=id, r1=f ins r1}
-      | ins as INS_RS {opcode=opc, id=id, r1=r1} =>
-        INS_RS {opcode=opc, id=id, r1=f ins r1}
-      | ins as INS_R {opcode=opc, r1=r1} =>
-        INS_R {opcode=opc, r1=f ins r1}
-      | ins => ins)
 
-
-fun replaceSource copyIn reg =
-    case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of
-        SOME ((src, _), _) => src
-      | NONE => reg
+fun replaceIns f ins =
+    case ins of
+        INS_RRR {opcode=c, dest=d, r1=r1, r2=r2} =>
+        INS_RRR {opcode=c, dest=f ins d, r1=f ins r1, r2=f ins r2}
+      | INS_RIR {opcode=c, dest=d, r1=r1, immed=i} =>
+        INS_RIR {opcode=c, dest=f ins d, r1=f ins r1, immed=i}
+      | INS_RRI {opcode=c, r1=r1, r2=r2, immed=i} =>
+        INS_RRI {opcode=c, r1=f ins r1, r2=f ins r2, immed=i}
+      | INS_RRC {opcode=c, r1=r1, r2=r2} =>
+        INS_RRC {opcode=c, r1=f ins r1, r2=f ins r2}
+      | INS_RIC {opcode=c, r1=r1, immed=i} =>
+        INS_RIC {opcode=c, r1=f ins r1, immed=i}
+      | INS_SIR {opcode=c, id=id, immed=i, r1=r1} =>
+        INS_SIR {opcode=c, id=id, immed=i, r1=f ins r1}
+      | INS_NEW {opcode=c, dest=d, id=id, fields=fs} =>
+        INS_NEW {opcode=c, dest=f ins d, id=id, fields=fs}
+      | INS_RR  {opcode=c, dest=d, r1=r1} =>
+        INS_RR  {opcode=c, dest=f ins d, r1=f ins r1}
+      | INS_IR  {opcode=c, dest=d, immed=i} =>
+        INS_IR  {opcode=c, dest=f ins d, immed=i}
+      | INS_RI  {opcode=c, dest=d, immed=i} =>
+        INS_RI  {opcode=c, dest=f ins d, immed=i}
+      | INS_SR  {opcode=c, id=id, r1=r1} =>
+        INS_SR  {opcode=c, id=id, r1=f ins r1}
+      | INS_RS  {opcode=c, id=id, r1=r1} =>
+        INS_RS  {opcode=c, id=id, r1=f ins r1}
+      | INS_R   {opcode=c, r1=r1} => INS_R {opcode=c, r1=f ins r1}
+      | _ => ins
 
 
 fun replaceReg copyIn ins reg =
     let
         val (sources, _) = getST ins
     in
-        if has reg sources then replaceSource copyIn reg else reg
+        if has reg sources
+        then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of
+                 SOME ((src, _), _) => src
+               | NONE => reg
+        else reg
     end
 
 
@@ -137,12 +126,7 @@ local
         end
 
 
-    fun transform copyIn ins =
-        let
-            val (newIns, _) = List.foldl transform1 ([], copyIn) ins
-        in
-            newIns
-        end
+    fun transform copyIn ins = #1 (List.foldl transform1 ([], copyIn) ins)
 
 in
 
@@ -152,7 +136,7 @@ in
         in
             (LVA {
                   id=id,
-                  ins=transform ci ins,
+                  ins=transform (empty ()) ins,
                   gk=gk,
                   copyIn=ci,
                   ciDiff=not (equal (copyIn, ci))
@@ -185,14 +169,23 @@ in
 end
 
 
-fun replaceCopiesBB lvas (id, _) =
+fun replaceCopies lvas (id, _) =
     let
         (* Get the copyIn set corresponding with this bb.  *)
         val LVA {copyIn=copyIn, ins=ins, ...} =
             valOf (List.find (fn LVA {id=lId, ...} => id = lId) lvas)
     in
-        (id, List.map (replaceIns (replaceReg copyIn)) ins)
+        (* (id, List.map (replaceIns (replaceReg copyIn)) ins) *)
+        (id, ins)
     end
+
+
+local
+    fun findCopies1 (INS_RR {opcode=OP_MOV, r1=r1, dest=d}, cps) = (r1, d)::cps
+      | findCopies1 (ins, copies) = copies
+in
+    fun findCopies ((_, ins), cps) = cps @ List.foldr findCopies1 [] ins
+end
 
 
 fun optFunc (id, cfg) =
@@ -204,7 +197,7 @@ fun optFunc (id, cfg) =
                     o Cfg.toListRep (*  Then we can replace two funcs w one. *)
                     o Cfg.map (bbToGK copies)) cfg
     in
-        (id, Cfg.map (replaceCopiesBB lvas) cfg)
+        (id, Cfg.map (replaceCopies lvas) cfg)
     end
 
 

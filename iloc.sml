@@ -87,7 +87,7 @@ local
 
     fun getSTr r1 OP_PRINT    = ([r1], [])
       | getSTr r1 OP_PRINTLN  = ([r1], [])
-      | getSTr r1 OP_READ     = ([], [r1])
+      | getSTr r1 OP_READ     = ([r1], [])
       | getSTr r1 OP_STORERET = ([r1], [])
       | getSTr r1 OP_LOADRET  = ([], [r1])
       | getSTr r1 OP_DEL      = ([r1], [])

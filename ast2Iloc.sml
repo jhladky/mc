@@ -1,5 +1,6 @@
 signature AST2ILOC = sig
-    val ast2Iloc : SymbolTable.symbol_table -> Ast.program -> Iloc.program
+    val ast2Iloc : SymbolTable.symbol_table -> Ast.program -> bool
+                   -> Iloc.program
 end
 
 structure Ast2Iloc :> AST2ILOC = struct
@@ -63,6 +64,7 @@ fun binExpr2Ins ii opr lft rht =
         val (rLft, lLft) = expr2Ins ii lft
         val (rRht, lRht) = expr2Ins ii rht
         val dest = nextReg ii
+        val II {mochiCompat=mochiCompat, ...} = ii
     in
         if opr = BOP_PLUS orelse
            opr = BOP_MINUS orelse
@@ -76,17 +78,25 @@ fun binExpr2Ins ii opr lft rht =
              @ lRht
              @ lLft)
         else
-            let
-                val dest2 = nextReg ii
-            in
-                (dest2,
-                 [INS_RR {opcode=bop2Op opr, r1=dest, dest=dest2},
-                  INS_RRC {opcode=OP_COMP, r1=rLft, r2=rRht},
-                  INS_IR {opcode=OP_LOADI, immed=0, dest=dest2},
-                  INS_IR {opcode=OP_LOADI, immed=1, dest=dest}]
-                 @ lRht
-                 @ lLft)
-            end
+            if mochiCompat then
+                (dest,
+                 [INS_IR {opcode=bop2Op opr, immed=1, dest=dest},
+                 INS_RRC {opcode=OP_COMP, r1=rLft, r2=rRht},
+                 INS_IR {opcode=OP_LOADI, immed=0, dest=dest}]
+                @ lRht
+                @ lLft)
+            else
+                let
+                    val dest2 = nextReg ii
+                in
+                    (dest2,
+                     [INS_RR {opcode=bop2Op opr, r1=dest, dest=dest2},
+                      INS_RRC {opcode=OP_COMP, r1=rLft, r2=rRht},
+                      INS_IR {opcode=OP_LOADI, immed=0, dest=dest2},
+                      INS_IR {opcode=OP_LOADI, immed=1, dest=dest}]
+                    @ lRht
+                    @ lLft)
+                end
     end
 
 
@@ -288,10 +298,10 @@ fun mkFuncEntry _ _ [] = []
     ::mkFuncEntry (n + 1) ii xs
 
 
-fun func2Cfg st (func as FUNCTION {id=id, body=body, params=params, ...}) =
+fun func2Cfg st mc (func as FUNCTION {id=id, body=body, params=params, ...}) =
     let
         val (entry, exit, cfg) = Cfg.mkCfg (id, []) (nextLabel (), [])
-        val ii = mkIi st cfg func
+        val ii = mkIi st cfg func mc
         val _ = fill entry (mkFuncEntry 0 ii params)
         val _ = fill exit [INS_X {opcode=OP_RET}]
         val res = foldl (fn (s, node) => stmt2BB ii node s) entry body
@@ -302,7 +312,9 @@ fun func2Cfg st (func as FUNCTION {id=id, body=body, params=params, ...}) =
     end
 
 
-fun ast2Iloc st (PROGRAM {funcs=fs, types=ts, ...}) =
-    (app (addType types) ts; app (calcOffsets offsets) ts; map (func2Cfg st) fs)
+fun ast2Iloc st (PROGRAM {funcs=fs, types=ts, ...}) mochiCompat =
+    (app (addType types) ts;
+     app (calcOffsets offsets) ts;
+     map (func2Cfg st mochiCompat) fs)
 
 end

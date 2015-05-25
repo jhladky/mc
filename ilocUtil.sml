@@ -6,7 +6,8 @@ datatype iloc_info =
              st: SymbolTable.symbol_table,
              cfg: Iloc.basic_block Cfg.cfg,
              regs: (string, int) HashTable.hash_table,
-             nextReg: int ref
+             nextReg: int ref,
+             mochiCompat: bool
          }
 
 
@@ -30,7 +31,7 @@ fun nextReg (II {nextReg=nextReg, ...}) =
     !nextReg before nextReg := 1 + (!nextReg)
 
 
-fun mkIi st cfg (Ast.FUNCTION {params=params, decls=decls, id=id, ...})=
+fun mkIi st cfg (Ast.FUNCTION {params=params, decls=decls, id=id, ...}) compat =
     let
         val ht = Util.mkHt ()
         val addVD = (fn (Ast.VAR_DECL {id=s, typ=t, ...}) =>
@@ -43,7 +44,8 @@ fun mkIi st cfg (Ast.FUNCTION {params=params, decls=decls, id=id, ...})=
             st=st,
             cfg=cfg,
             regs=assignRegs ht,
-            nextReg=ref (HashTable.numItems ht)
+            nextReg=ref (HashTable.numItems ht),
+            mochiCompat=compat
         }
     end
 

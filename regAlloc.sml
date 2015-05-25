@@ -20,7 +20,9 @@ datatype live_variable_analysis =
 
 (* Set of all the actual i.e. not virtual, registers. *)
 val actual = addList (empty (), [REG_RAX, REG_RBX, REG_RCX, REG_RDX,
-                                 REG_RSI, REG_RDI, REG_RBP, REG_RSP])
+                                 REG_RSI, REG_RDI, REG_RBP, REG_RSP,
+                                 REG_8, REG_9, REG_10, REG_11,
+                                 REG_12, REG_13, REG_14, REG_15])
 
 (* Set of all the registers we have available for coloring. *)
 val avail = addList (empty (), [REG_8, REG_9, REG_10, REG_11,
@@ -95,6 +97,10 @@ fun getSTr r OP_PUSHQ = ([r], [])
  * targets, which means that any virtual registers that span the call will
  * have an edge with the caller saved registers, forcing them into the callee
  * saved registers. *)
+fun getSTCall () = ([], [REG_RAX, REG_RDI, REG_RSI, REG_RDX, REG_RCX,
+                         REG_8, REG_9, REG_10, REG_11])
+
+
 val getST =
  fn INS_RR {opcode=opc, r1=r1, r2=r2}                    => getSTrr r1 r2 opc
   | INS_IR {opcode=opc, r2=r2, ...}                      => getSTir r2 opc
@@ -104,6 +110,7 @@ val getST =
   | INS_MR {opcode=opc, base=b, dest=d, offset=off, ...} => getSTmr b off d opc
   | INS_RM {opcode=opc, r1=r, base=b, offset=off, ...}   => getSTrm r b off opc
   | INS_R  {opcode=opc, r1=r1}                           => getSTr r1 opc
+  | INS_L  {opcode=OP_CALL, ...}                         => getSTCall ()
   | _                                                    => ([], [])
 
 

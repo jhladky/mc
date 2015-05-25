@@ -35,9 +35,10 @@ fun doDumpIl fname iloc =
     end
 
 
-fun stage2 st ast fname dumpIl noOpt noCopyProp noRegAlloc platform =
+fun stage2 st ast fname dumpIl mochiCompat noOpt
+           noCopyProp noRegAlloc platform =
     let
-        val iloc = Ast2Iloc.ast2Iloc st ast
+        val iloc = Ast2Iloc.ast2Iloc st ast mochiCompat
         val iloc = if not noOpt andalso not noCopyProp
                    then CopyProp.copyProp iloc
                    else iloc
@@ -52,18 +53,20 @@ fun main () =
         val args = Array.fromList (CommandLine.arguments ())
         val fname = Array.sub (args, 0)
         val dumpIl = getBool (args, 1)
-        val noOpt = getBool (args, 2)
-        val noCopyProp = getBool (args, 3)
-        val noRegAlloc = getBool (args, 4)
-        val staticCheck = getBool (args, 5)
-        val platform = if Array.sub (args, 6) = "Darwin" then OS_X else LINUX
+        val mochiCompat = getBool (args, 2)
+        val noOpt = getBool (args, 3)
+        val noCopyProp = getBool (args, 4)
+        val noRegAlloc = getBool (args, 5)
+        val staticCheck = getBool (args, 6)
+        val platform = if Array.sub (args, 7) = "Darwin" then OS_X else LINUX
         val ins = openIn (fname ^ ".json")
         val ast = json2AST ins
         val st = SymbolTable.mkSymbolTable (fname ^ ".mini") ast
     in
         Static.staticCheck (fname ^ ".mini") st ast;
         if staticCheck then exit () else ();
-        stage2 st ast fname dumpIl noOpt noCopyProp noRegAlloc platform;
+        stage2 st ast fname dumpIl mochiCompat noOpt
+               noCopyProp noRegAlloc platform;
         closeIn ins;
         exit ()
     end
