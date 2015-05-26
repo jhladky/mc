@@ -20,10 +20,10 @@ ast2Iloc.sml
 
 (* Optimizations *)
 copyProp.sml
+stripDeadCode.sml
 
 targetAmd64.sml
 iloc2Amd64.sml
-
 
 ifeGraph.sml
 regAlloc.sml
