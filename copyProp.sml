@@ -27,9 +27,9 @@ fun has thing L = List.exists (fn t => t = thing) L
 fun insToGK copies (gen, kill) (INS_RR {opcode=OP_MOV, r1=r1, dest=d}) =
     let
         val c = (r1, d)
-        val gen = if not (member (kill, c)) then add (gen, c) else gen
     in
-        (gen, add (kill, c))
+        (if not (member (kill, c)) then add (gen, c) else gen,
+         add (kill, c))
     end
   | insToGK copies (gen, kill) ins =
     let
@@ -89,21 +89,17 @@ fun replaceReg copyIn ins reg =
     in
         if has reg sources
         then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of
-                 SOME ((src, _), _) => src
+                 SOME ((src, _), _) => (print ("Replaced [" ^ Util.iToS reg ^ "] with [" ^ Util.iToS src ^ "]\n"); src)
                | NONE => reg
         else reg
     end
 
 
-fun bbCopyIn1 (LVA {gk=(gen, kill), copyIn=copyIn, ...}, preds) =
-    intersection (preds, union (gen, difference (copyIn, kill)))
-
-
 fun transform1 (i, (ins, copyIn)) =
     let
         val (_, targets) = getST i
-        val copyIn = filter (fn (src, tgt) => not (has src targets orelse
-                                                   has tgt targets)) copyIn
+        val copyIn = filter (fn (src, tgt) => not (has src targets) andalso
+                                              not (has tgt targets)) copyIn
     in
         (ins @ [replaceIns (replaceReg copyIn) i],
          case i of
@@ -115,53 +111,36 @@ fun transform1 (i, (ins, copyIn)) =
 fun transform copyIn ins = #1 (List.foldl transform1 ([], copyIn) ins)
 
 
-fun bbCopyIn (LVA {id=id, ins=ins, gk=gk, copyIn=copyIn, ...}, preds) =
+fun bbCopyIn1 (LVA {gk=(gen, kill), copyIn=copyIn, ...}, preds) =
+    intersection (preds, union (gen, difference (copyIn, kill)))
+
+
+fun bbCopyIn node =
     let
-        val ci = List.foldr bbCopyIn1 (empty ()) preds
+        val LVA {id=id, ins=ins, gk=gk, copyIn=copyIn, ...} = Cfg.getData node
+        val ci = List.foldr bbCopyIn1 (empty ()) (Cfg.getPreds node)
     in
-        (LVA {
-              id=id,
-              ins=transform (empty ()) ins,
-              gk=gk,
-              copyIn=ci,
-              ciDiff=not (equal (copyIn, ci))
-          },
-         preds)
+        LVA {
+            id=id,
+            ins=transform ci ins,
+            gk=gk,
+            copyIn=ci,
+            ciDiff=not (equal (copyIn, ci))
+        }
     end
 
 
-fun diffCheck ((LVA {ciDiff=ciD, ...}, _), diff) =
-    if ciD then true else diff
+fun diffCheck (LVA {ciDiff=ciD, ...}, diff) = if ciD then true else diff
 
 
-fun update1 newLvas (LVA {id=id, ...}) =
-    #1 (valOf (List.find (fn (LVA {id=lId, ...}, _) => id = lId) newLvas))
+fun buildLvas cfg =
+    if Cfg.fold diffCheck false cfg
+    then (Cfg.app bbCopyIn cfg; buildLvas cfg)
+    else cfg
 
 
-fun updateLvas lvas =
-    let
-        val newLvas = List.map bbCopyIn lvas
-    in
-        List.map (fn (l, ps) => (l, List.map (update1 newLvas) ps)) newLvas
-    end
-
-
-fun mkCopyInSets lvas =
-    if List.foldr diffCheck false lvas
-    then mkCopyInSets (updateLvas lvas)
-    else lvas
-
-
-fun replaceCopies lvas (id, _) =
-    let
-        (* Get the copyIn set corresponding with this bb. *)
-        val LVA {copyIn=copyIn, ins=ins, ...} =
-            valOf (List.find (fn LVA {id=lId, ...} => id = lId) lvas)
-    in
-        (* comment this out to disable most of the optimization *)
-        (id, List.map (replaceIns (replaceReg copyIn)) ins)
-        (* (id, ins) *)
-    end
+fun replaceCopies (LVA {id=id, ins=ins, copyIn=copyIn, ...}) =
+    (id, List.map (replaceIns (replaceReg copyIn)) ins)
 
 
 fun findCopies1 (INS_RR {opcode=OP_MOV, r1=r1, dest=d}, cps) = (r1, d)::cps
@@ -174,12 +153,9 @@ fun findCopies ((_, ins), cps) = cps @ List.foldr findCopies1 [] ins
 fun optFunc (id, cfg) =
     let
         val copies = List.foldr findCopies [] (Cfg.toList cfg)
-        val lvas = (List.map #1
-                    o mkCopyInSets
-                    o Cfg.toPredRep
-                    o Cfg.map (bbToGK copies)) cfg
+        val lvas = buildLvas (Cfg.map (bbToGK copies) cfg)
     in
-        (id, Cfg.map (replaceCopies lvas) cfg)
+        (id, Cfg.map replaceCopies lvas)
     end
 
 

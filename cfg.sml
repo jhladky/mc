@@ -5,8 +5,6 @@ signature CFG = sig
     val mkCfg : 'a -> 'a -> 'a node * 'a node * 'a cfg
 
     val toList : 'a cfg -> 'a list
-    val toListRep : 'a cfg -> ('a * 'a list) list (* TODO: Consider removal. *)
-    val toPredRep : 'a cfg -> ('a * 'a list) list
     val mkNode : 'a cfg -> 'a -> 'a node
     val addEdge : 'a node -> 'a node -> unit
 
@@ -82,8 +80,6 @@ fun toRep f (CFG {nodes=nodes, entry=en as NODE {id=enId, ...},
 
 
 fun toList cfg = toRep getData cfg
-fun toListRep cfg = toRep (fn n as NODE {data=d, ...} => (!d, getSuccs n)) cfg
-fun toPredRep cfg = toRep (fn n as NODE {data=d, ...} => (!d, getPreds n)) cfg
 fun fold f init cfg = foldl f init (toList cfg)
 
 

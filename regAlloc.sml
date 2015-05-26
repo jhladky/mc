@@ -157,12 +157,13 @@ fun bbLiveOut1 (LVA {gk=(gen, kill), liveOut=liveOut, ...}, s) =
     union (s, union (gen, difference (liveOut, kill)))
 
 
-fun bbLiveOut (LVA {id=id, ins=ins, gk=gk, liveOut=liveOut, ...}, succs) =
+fun bbLiveOut node =
     let
-        val lo = List.foldr bbLiveOut1 (empty ()) succs
+        val LVA {id=id, ins=ins, gk=gk, liveOut=liveOut, ...} = Cfg.getData node
+        val lo = List.foldr bbLiveOut1 (empty ()) (Cfg.getSuccs node)
         val loDiff = not (equal (liveOut, lo))
     in
-        (LVA {id=id, ins=ins, gk=gk, liveOut=lo, loDiff=loDiff}, succs)
+        LVA {id=id, ins=ins, gk=gk, liveOut=lo, loDiff=loDiff}
     end
 
 
@@ -177,8 +178,13 @@ fun insIfeGraph ife (ins, liveNow) =
     end
 
 
-fun bbIfeGraph ife (LVA {ins=ins, liveOut=liveOut, ...}) =
-    ignore (List.foldr (insIfeGraph ife) liveOut ins)
+fun bbIfeGraph ife node =
+    let
+        val lva as LVA {ins=ins, liveOut=liveOut, ...} = Cfg.getData node
+    in
+        List.foldr (insIfeGraph ife) liveOut ins;
+        lva
+    end
 
 
 fun uncReq (reg, adjs) = length adjs < numItems avail andalso
@@ -291,29 +297,16 @@ fun colorIns vtr (INS_RR {opcode=opc, r1=r1, r2=r2}) =
   | colorIns _ ins = [ins]
 
 
-fun diffCheck ((LVA {loDiff=loD, ...}, _), diff) = if loD then true else diff
+fun diffCheck (LVA {loDiff=loD, ...}, diff) = if loD then true else diff
 
 
-fun updateSucc newLvas (LVA {id=id, ...}) =
-    #1 (valOf (List.find (fn (LVA {id=lId, ...}, _) => id = lId) newLvas))
+fun buildLvas cfg =
+    if Cfg.fold diffCheck false cfg
+    then (Cfg.app bbLiveOut cfg; buildLvas cfg)
+    else cfg
 
 
-fun updateLvas lvas =
-    let
-        val newLvas = List.map bbLiveOut lvas
-    in
-        List.map (fn (l, ss) => (l, List.map (updateSucc newLvas) ss)) newLvas
-    end
-
-
-(* Iteratively recompute each liveOut set until there is no change. *)
-fun mkLoSets lvas =
-    if List.foldr diffCheck false lvas
-    then mkLoSets (updateLvas lvas)
-    else lvas
-
-
-(* Calculate how much spill space we need. Make sure it is 16-byte aligned.
+(* calculate how much spill space we need. Make sure it is 16-byte aligned.
  * Check the existing amount of space as well as how many registers we have to
  * save at the top.*)
 fun calcStackOffset existing vtr n =
@@ -384,12 +377,12 @@ fun spill n reg (id, ins) =
  * n is the number of times we've had to spill. *)
 fun color n (id, cfg) =
     let
-        val lvas = List.map #1 (mkLoSets (Cfg.toListRep (Cfg.map bbToGK cfg)))
+        val lvas = buildLvas (Cfg.map bbToGK cfg)
         val oldIfe = IfeGraph.mkGraph ()
         val newIfe = IfeGraph.mkGraph ()
         val vtr = Util.mkHt ()
     in
-        List.app (bbIfeGraph oldIfe) lvas;
+        Cfg.app (bbIfeGraph oldIfe) lvas;
         case buildVtr (addToIfe vtr newIfe) (deconstruct oldIfe) of
             SOME reg => color (n + 1) (id, Cfg.map (spill n reg) cfg)
           | NONE => (id, Cfg.map (colorBB n id vtr) cfg)
