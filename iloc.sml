@@ -205,11 +205,12 @@ local
 
 
     fun funcToStr (id, body) =
-        (foldr (fn (bb, s) => bbToStr bb ^ s) "" (Cfg.toList body)) ^ "\n"
+        Cfg.fold (fn (bb, s) => bbToStr bb ^ s) "" body ^ "\n"
 
 in
     fun programToStr funcs =
         foldr (fn (func, s) => (funcToStr func) ^ s) "" funcs
+
 end
 
 end

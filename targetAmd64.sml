@@ -172,7 +172,7 @@ fun bbToStr platform (l, L) =
 
 fun funcToStr platform (id, body) =
     "\t.globl " ^ nameToStr platform id ^ "\n" ^
-    (foldr (fn (bb, s) => bbToStr platform bb ^ s) "" (Cfg.toList body)) ^
+    Cfg.fold (fn (bb, s) => bbToStr platform bb ^ s) "" body ^
     (if platform = Util.OS_X then "" else "\t.size " ^ id ^ ", .-" ^ id
                                           ^ "\n") ^ "\n"
 
@@ -186,11 +186,11 @@ fun globalToStr platform id =
 fun programToStr platform (PROGRAM {text=text, data=data}) =
     (if platform = Util.OS_X then "\t.section __TEXT,__text\n"
      else "\t.text\n") ^
-    (foldr (fn (func, s) => funcToStr platform func ^ s) "" text) ^
+    foldr (fn (func, s) => funcToStr platform func ^ s) "" text ^
     (if platform = Util.OS_X then "\t.section __DATA,__data\n"
      else "\t.data\n") ^
     globalToStr platform "rdest" ^
-    (foldr (fn (id, s) => globalToStr platform id ^ s) "" data) ^
+    foldr (fn (id, s) => globalToStr platform id ^ s) "" data ^
     (if platform = Util.OS_X then "\n\t.section __TEXT,__cstring\n"
      else "\n\t.section .rodata\n") ^
     "L__ss__:\n\t.asciz \"%lld\"\n" ^

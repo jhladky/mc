@@ -3,20 +3,17 @@ signature CFG = sig
     type 'a cfg
 
     val mkCfg : 'a -> 'a -> 'a node * 'a node * 'a cfg
-
-    val toList : 'a cfg -> 'a list
     val mkNode : 'a cfg -> 'a -> 'a node
     val addEdge : 'a node -> 'a node -> unit
 
     val map : ('a -> 'b) -> 'a cfg -> 'b cfg
-    val fold : ('a * 'b -> 'b) -> 'b -> 'a cfg -> 'b
-
-    val update : 'a node -> 'a -> unit
     val app : ('a node -> 'a) -> 'a cfg -> unit
+    val fold : ('a * 'b -> 'b) -> 'b -> 'a cfg -> 'b
+    val update : 'a node -> 'a -> unit
+
     val getData : 'a node -> 'a
     val getSuccs : 'a node -> 'a list
     val getPreds : 'a node -> 'a list
-
     val getExit : 'a cfg -> 'a node (* Remove later *)
 end
 
@@ -69,17 +66,16 @@ fun getSuccs (NODE {next=next, ...}) = List.map getData (!next)
 fun getPreds (NODE {prev=prev, ...}) = List.map getData (!prev)
 
 
-fun toRep f (CFG {nodes=nodes, entry=en as NODE {id=enId, ...},
-                  exit=ex as NODE {id=exId, ...}}) =
+fun toList (CFG {nodes=nodes, entry=en as NODE {id=enId, ...},
+                 exit=ex as NODE {id=exId, ...}}) =
     let
         val L = List.filter (fn NODE {id=id, ...} => id <> enId andalso
                                                      id <> exId) (!nodes)
     in
-        List.map f ([en] @ L @ [ex])
+        List.map getData ([en] @ L @ [ex])
     end
 
 
-fun toList cfg = toRep getData cfg
 fun fold f init cfg = foldl f init (toList cfg)
 
 

@@ -83,32 +83,25 @@ fun replaceIns f ins =
       | _ => ins
 
 
+fun isCondMove (INS_RR {opcode=opc, ...}) =
+    has opc [OP_MOVEQ, OP_MOVNE, OP_MOVLT, OP_MOVGT, OP_MOVLE, OP_MOVGE]
+  | isCondMove ins = false
+
+
 fun replaceReg copyIn ins reg =
     let
         val (sources, _) = getST ins
     in
-        if has reg sources
+        if has reg sources andalso not (isCondMove ins)
         then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of
-                 SOME ((src, _), _) => (print ("Replaced [" ^ Util.iToS reg ^ "] with [" ^ Util.iToS src ^ "]\n"); src)
+                 SOME ((src, _), _) => (* ( *)
+                  (* print ("Replaced [" ^ Util.iToS reg ^ "] with [" ^ Util.iToS src ^ "]\n"); *)
+                  (* print (insToStr ins ^ "\n"); *)
+                  src
+               (* ) *)
                | NONE => reg
         else reg
     end
-
-
-fun transform1 (i, (ins, copyIn)) =
-    let
-        val (_, targets) = getST i
-        val copyIn = filter (fn (src, tgt) => not (has src targets) andalso
-                                              not (has tgt targets)) copyIn
-    in
-        (ins @ [replaceIns (replaceReg copyIn) i],
-         case i of
-             INS_RR {opcode=OP_MOV, r1=r1, dest=d} => add (copyIn, (r1, d))
-           | i => copyIn)
-    end
-
-
-fun transform copyIn ins = #1 (List.foldl transform1 ([], copyIn) ins)
 
 
 fun bbCopyIn1 (LVA {gk=(gen, kill), copyIn=copyIn, ...}, preds) =
@@ -119,14 +112,9 @@ fun bbCopyIn node =
     let
         val LVA {id=id, ins=ins, gk=gk, copyIn=copyIn, ...} = Cfg.getData node
         val ci = List.foldr bbCopyIn1 (empty ()) (Cfg.getPreds node)
+        val ciDiff = not (equal (copyIn, ci))
     in
-        LVA {
-            id=id,
-            ins=transform ci ins,
-            gk=gk,
-            copyIn=ci,
-            ciDiff=not (equal (copyIn, ci))
-        }
+        LVA {id=id, ins=ins, gk=gk, copyIn=ci, ciDiff=ciDiff}
     end
 
 
@@ -139,10 +127,6 @@ fun buildLvas cfg =
     else cfg
 
 
-fun replaceCopies (LVA {id=id, ins=ins, copyIn=copyIn, ...}) =
-    (id, List.map (replaceIns (replaceReg copyIn)) ins)
-
-
 fun findCopies1 (INS_RR {opcode=OP_MOV, r1=r1, dest=d}, cps) = (r1, d)::cps
   | findCopies1 (ins, copies) = copies
 
@@ -150,9 +134,26 @@ fun findCopies1 (INS_RR {opcode=OP_MOV, r1=r1, dest=d}, cps) = (r1, d)::cps
 fun findCopies ((_, ins), cps) = cps @ List.foldr findCopies1 [] ins
 
 
+fun replaceCopies1 (i, (ins, copyIn)) =
+    let
+        val (_, targets) = getST i
+        val copyIn = filter (fn (src, tgt) => not (has src targets) andalso
+                                              not (has tgt targets)) copyIn
+    in
+        (ins @ [replaceIns (replaceReg copyIn) i],
+         case i of
+             INS_RR {opcode=OP_MOV, r1=r1, dest=d} => add (copyIn, (r1, d))
+           | i => copyIn)
+    end
+
+
+fun replaceCopies (LVA {id=id, ins=ins, copyIn=copyIn, ...}) =
+    (id, #1 (List.foldl replaceCopies1 ([], copyIn) ins))
+
+
 fun optFunc (id, cfg) =
     let
-        val copies = List.foldr findCopies [] (Cfg.toList cfg)
+        val copies = Cfg.fold findCopies [] cfg
         val lvas = buildLvas (Cfg.map (bbToGK copies) cfg)
     in
         (id, Cfg.map replaceCopies lvas)
