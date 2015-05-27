@@ -172,7 +172,7 @@ fun bbToStr platform (l, L) =
 
 fun funcToStr platform (id, body) =
     "\t.globl " ^ nameToStr platform id ^ "\n" ^
-    Cfg.fold (fn (bb, s) => bbToStr platform bb ^ s) "" body ^
+    Cfg.fold (fn (bb, s) => s ^ bbToStr platform bb) "" body ^
     (if platform = Util.OS_X then "" else "\t.size " ^ id ^ ", .-" ^ id
                                           ^ "\n") ^ "\n"
 

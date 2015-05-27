@@ -98,7 +98,7 @@ in
     val getST =
      fn INS_RRR {dest=d, r1=r1, r2=r2, ...} => ([r1, r2], [d])
       | INS_RIR {dest=d, r1=r1, ...}        => ([r1], [d])
-      | INS_RRI {r1=r1, r2=r2, ...}         => ([r1], [r2])
+      | INS_RRI {r1=r1, r2=r2, ...}         => ([r1, r2], [])
       | INS_RRC {r1=r1, r2=r2, ...}         => ([r1, r2], [])
       | INS_RIC {r1=r1, ...}                => ([r1], [])
       | INS_SIR {r1=r1, ...}                => ([], [r1])
@@ -205,12 +205,14 @@ local
 
 
     fun funcToStr (id, body) =
-        Cfg.fold (fn (bb, s) => bbToStr bb ^ s) "" body ^ "\n"
+        Cfg.fold (fn (bb, s) => s ^ bbToStr bb) "" body ^ "\n"
 
 in
     fun programToStr funcs =
         foldr (fn (func, s) => (funcToStr func) ^ s) "" funcs
 
+    val rToStr = rToStr
+    val insToStr = insToStr
 end
 
 end

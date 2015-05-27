@@ -15,6 +15,7 @@ else
 fi
 
 N=0
+FAIL=false
 
 echo "Running tests, average of $REPEAT trials..."
 
@@ -45,13 +46,17 @@ for dir in mini-benchmarks/*/; do
             if [ $? -ne 0 ]; then
                 echo "fail"
                 head .tmp
+                FAIL=true
                 break
             fi
-
             SUM=`echo $SUM + $TIME_OUTPUT | bc`
         done
 
-        echo "scale=4; $SUM / $REPEAT" | bc
+        if [ "$FAIL" = false ]; then
+            echo "scale=4; $SUM / $REPEAT" | bc
+        fi
+        FAIL=false
+
         N=$((N + 1))
     done
 done

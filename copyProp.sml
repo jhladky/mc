@@ -8,17 +8,30 @@ open UnorderedSet
 
 type copy = int * int
 
-datatype live_variable_analysis =
-         LVA of {
+datatype dataflow_analysis =
+         DFA of {
              id: string,
              ins: instruction list,
              gk: copy set * copy set,
              copyIn: copy set,
-             ciDiff: bool
+             diff: bool
          }
 
 
 fun has thing L = List.exists (fn t => t = thing) L
+
+
+(* DEBUGGING FUNCTIONS *)
+fun copyToStr (src, dest) = "(" ^ rToStr src ^ ", " ^ rToStr dest ^ ")"
+
+
+fun printGK id (gen, kill) =
+    (print (id ^ "\ngen: [");
+     print (Util.foldd ", " copyToStr (listItems gen));
+     print "]\nkill: [";
+     print (Util.foldd ", " copyToStr (listItems kill));
+     print "]\n")
+(* /DEBUGGING FUNCTIONS *)
 
 
 (* If an instruction IS a copy and HAS NOT been killed add it to the gen set. *)
@@ -35,22 +48,34 @@ fun insToGK copies (gen, kill) (INS_RR {opcode=OP_MOV, r1=r1, dest=d}) =
     let
         (* The instruction IS NOT a copy so we add nothing to the gen set. *)
         val (_, targets) = getST ins
-        val copies = List.filter (fn (src, tgt) => has src targets orelse
-                                                   has tgt targets) copies
+        val copies = filter (fn (src, tgt) => has src targets orelse
+                                              has tgt targets) copies
     in
-        (gen, addList (kill, copies))
+        (gen, union (kill, copies))
     end
 
 
-fun bbToGK copies (id, ins) =
-    LVA {
-        id=id,
-        ins=ins,
-        gk=List.foldr (fn (ins, gk) => insToGK copies gk ins)
-                      (empty (), empty ()) ins,
-        copyIn=empty (),
-        ciDiff=true
-    }
+(* fun bbToDFA copies (id, ins) = *)
+(*     DFA { *)
+(*         id=id, *)
+(*         ins=ins, *)
+(*         gk=List.foldr (fn (ins, gk) => insToGK copies gk ins) *)
+(*                       (empty (), empty ()) ins, *)
+(*         copyIn=empty (), *)
+(*         diff=true *)
+(*     } *)
+
+
+fun bbToDFA copies (id, ins) =
+    let
+        val _ = print "/--------------\\\n";
+        val gk = List.foldr (fn (i, gk) => insToGK copies gk i)
+                            (empty (), empty ()) ins
+    in
+        printGK id gk;
+        print "\\--------------/\n";
+        DFA {id=id, ins=ins, gk=gk, copyIn=copies, diff=true}
+    end
 
 
 fun replaceIns f ins =
@@ -94,44 +119,66 @@ fun replaceReg copyIn ins reg =
     in
         if has reg sources andalso not (isCondMove ins)
         then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of
-                 SOME ((src, _), _) => (* ( *)
-                  (* print ("Replaced [" ^ Util.iToS reg ^ "] with [" ^ Util.iToS src ^ "]\n"); *)
+                 SOME ((src, _), _) => (
+                  print ("Replaced [" ^ Util.iToS reg ^ "] with [" ^ Util.iToS src ^ "]\n");
                   (* print (insToStr ins ^ "\n"); *)
                   src
-               (* ) *)
+               )
                | NONE => reg
         else reg
     end
 
 
-fun bbCopyIn1 (LVA {gk=(gen, kill), copyIn=copyIn, ...}, preds) =
-    intersection (preds, union (gen, difference (copyIn, kill)))
+fun isTarget reg kill = exists (fn (_, tgt) => tgt = reg) kill
+
+
+fun removeKilled copyIn kill =
+    filter (fn (src, tgt) => not (isTarget src kill) andalso
+                             not (isTarget tgt kill)) copyIn
+
+
+fun bbCopyIn2 (DFA {gk=(gen, kill), copyIn=copyIn, ...}) =
+    union (gen, removeKilled copyIn kill)
+
+
+fun bbCopyIn1 (dfa, accum) = intersection (accum, bbCopyIn2 dfa)
 
 
 fun bbCopyIn node =
     let
-        val LVA {id=id, ins=ins, gk=gk, copyIn=copyIn, ...} = Cfg.getData node
-        val ci = List.foldr bbCopyIn1 (empty ()) (Cfg.getPreds node)
-        val ciDiff = not (equal (copyIn, ci))
+        val DFA {id=id, ins=ins, gk=gk, copyIn=copyIn, ...} = Cfg.getData node
+        val preds = Cfg.getPreds node
+        val ci = if length preds = 0 then empty ()
+                 else List.foldr bbCopyIn1 (bbCopyIn2 (hd preds)) (tl preds)
+        val diff = not (equal (copyIn, ci))
     in
-        LVA {id=id, ins=ins, gk=gk, copyIn=ci, ciDiff=ciDiff}
+        DFA {id=id, ins=ins, gk=gk, copyIn=ci, diff=diff}
     end
 
 
-fun diffCheck (LVA {ciDiff=ciD, ...}, diff) = if ciD then true else diff
+fun diffCheck (DFA {diff=d, ...}, diff) = if d then true else diff
+
+
+fun printCopyIn node =
+    let
+        val da as DFA {id=id, copyIn=copyIn, ...} = Cfg.getData node
+    in
+        print (id ^ " copyIn: [" ^ Util.foldd ", " copyToStr (listItems copyIn) ^ "]\n");
+        da
+    end
 
 
 fun buildLvas cfg =
     if Cfg.fold diffCheck false cfg
     then (Cfg.app bbCopyIn cfg; buildLvas cfg)
-    else cfg
+    else (Cfg.app printCopyIn cfg; cfg)
 
 
 fun findCopies1 (INS_RR {opcode=OP_MOV, r1=r1, dest=d}, cps) = (r1, d)::cps
   | findCopies1 (ins, copies) = copies
 
 
-fun findCopies ((_, ins), cps) = cps @ List.foldr findCopies1 [] ins
+fun findCopies ((_, ins), cps) = addList (cps, List.foldr findCopies1 [] ins)
 
 
 fun replaceCopies1 (i, (ins, copyIn)) =
@@ -147,15 +194,16 @@ fun replaceCopies1 (i, (ins, copyIn)) =
     end
 
 
-fun replaceCopies (LVA {id=id, ins=ins, copyIn=copyIn, ...}) =
+fun replaceCopies (DFA {id=id, ins=ins, copyIn=copyIn, ...}) =
     (id, #1 (List.foldl replaceCopies1 ([], copyIn) ins))
 
 
 fun optFunc (id, cfg) =
     let
-        val copies = Cfg.fold findCopies [] cfg
-        val lvas = buildLvas (Cfg.map (bbToGK copies) cfg)
+        val copies = Cfg.fold findCopies (empty ()) cfg
+        val lvas = buildLvas (Cfg.map (bbToDFA copies) cfg)
     in
+        print "----------------------------\n";
         (id, Cfg.map replaceCopies lvas)
     end
 

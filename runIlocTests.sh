@@ -8,11 +8,11 @@ get_dir_name () {
     NAME=${arr[1]}
 }
 
-echo "Testing static checker...."
+# echo "Testing static checker...."
 
-for f in tests/*.mini; do
-    ./mc.sh $f
-done
+# for f in tests/*.mini; do
+#     ./mc.sh $f
+# done
 
 N=0
 
