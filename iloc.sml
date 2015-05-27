@@ -75,51 +75,52 @@ exception RegisterType of opcode
 
 
 local
-    fun getSTrr r1 d OP_MOVEQ = ([r1], [r1, d])
-      | getSTrr r1 d OP_MOVNE = ([r1], [r1, d])
-      | getSTrr r1 d OP_MOVLT = ([r1], [r1, d])
-      | getSTrr r1 d OP_MOVGT = ([r1], [r1, d])
-      | getSTrr r1 d OP_MOVLE = ([r1], [r1, d])
-      | getSTrr r1 d OP_MOVGE = ([r1], [r1, d])
-      | getSTrr r1 d OP_MOV   = ([r1], [d])
+    fun getSTrr r1 d OP_MOVEQ = ([r1, d], SOME d)
+      | getSTrr r1 d OP_MOVNE = ([r1, d], SOME d)
+      | getSTrr r1 d OP_MOVLT = ([r1, d], SOME d)
+      | getSTrr r1 d OP_MOVGT = ([r1, d], SOME d)
+      | getSTrr r1 d OP_MOVLE = ([r1, d], SOME d)
+      | getSTrr r1 d OP_MOVGE = ([r1, d], SOME d)
+      | getSTrr r1 d OP_MOV   = ([r1], SOME d)
       | getSTrr _ _ opc       = raise RegisterType opc
 
 
-    fun getSTir r1 OP_MOVEQ = ([r1], [r1])
-      | getSTir r1 OP_MOVNE = ([r1], [r1])
-      | getSTir r1 OP_MOVLT = ([r1], [r1])
-      | getSTir r1 OP_MOVGT = ([r1], [r1])
-      | getSTir r1 OP_MOVLE = ([r1], [r1])
-      | getSTir r1 OP_MOVGE = ([r1], [r1])
-      | getSTir r1 OP_LOADI = ([], [r1])
+    (* This is for Mochi compatibility. *)
+    fun getSTir d OP_MOVEQ = ([d], SOME d)
+      | getSTir d OP_MOVNE = ([d], SOME d)
+      | getSTir d OP_MOVLT = ([d], SOME d)
+      | getSTir d OP_MOVGT = ([d], SOME d)
+      | getSTir d OP_MOVLE = ([d], SOME d)
+      | getSTir d OP_MOVGE = ([d], SOME d)
+      | getSTir d OP_LOADI = ([], SOME d)
       | getSTir _ opc       = raise RegisterType opc
 
 
-    fun getSTr r1 OP_PRINT    = ([r1], [])
-      | getSTr r1 OP_PRINTLN  = ([r1], [])
-      | getSTr r1 OP_READ     = ([r1], [])
-      | getSTr r1 OP_STORERET = ([r1], [])
-      | getSTr r1 OP_LOADRET  = ([], [r1])
-      | getSTr r1 OP_DEL      = ([r1], [])
+    fun getSTr r1 OP_PRINT    = ([r1], NONE)
+      | getSTr r1 OP_PRINTLN  = ([r1], NONE)
+      | getSTr r1 OP_READ     = ([r1], NONE)
+      | getSTr r1 OP_STORERET = ([r1], NONE)
+      | getSTr r1 OP_LOADRET  = ([], SOME r1)
+      | getSTr r1 OP_DEL      = ([r1], NONE)
       | getSTr _ opc          = raise RegisterType opc
 
 in
 
     val getST =
-     fn INS_RRR {dest=d, r1=r1, r2=r2, ...} => ([r1, r2], [d])
-      | INS_RIR {dest=d, r1=r1, ...}        => ([r1], [d])
-      | INS_RRI {r1=r1, r2=r2, ...}         => ([r1, r2], [])
-      | INS_RRC {r1=r1, r2=r2, ...}         => ([r1, r2], [])
-      | INS_RIC {r1=r1, ...}                => ([r1], [])
-      | INS_SIR {r1=r1, ...}                => ([], [r1])
-      | INS_NEW {dest=d, ...}               => ([], [d])
+     fn INS_RRR {dest=d, r1=r1, r2=r2, ...} => ([r1, r2], SOME d)
+      | INS_RIR {dest=d, r1=r1, ...}        => ([r1], SOME d)
+      | INS_RRI {r1=r1, r2=r2, ...}         => ([r1, r2], NONE)
+      | INS_RRC {r1=r1, r2=r2, ...}         => ([r1, r2], NONE)
+      | INS_RIC {r1=r1, ...}                => ([r1], NONE)
+      | INS_SIR {r1=r1, ...}                => ([], SOME r1)
+      | INS_NEW {dest=d, ...}               => ([], SOME d)
+      | INS_RI  {dest=d, ...}               => ([d], NONE)
+      | INS_SR  {r1=r1, ...}                => ([], SOME r1)
+      | INS_RS  {r1=r1, ...}                => ([r1], NONE)
       | INS_IR  {opcode=opc, dest=d, ...}   => getSTir d opc
-      | INS_RI  {dest=d, ...}               => ([d], [])
-      | INS_SR  {r1=r1, ...}                => ([], [r1])
-      | INS_RS  {r1=r1, ...}                => ([r1], [])
       | INS_RR  {opcode=opc, dest=d, r1=r1} => getSTrr r1 d opc
       | INS_R   {opcode=opc, r1=r1}         => getSTr r1 opc
-      | _                                   => ([], [])
+      | _                                   => ([], NONE)
 end
 
 

@@ -57,8 +57,8 @@ fun main () =
         val mochiCompat = getBool (args, 2)
         val noOpt = getBool (args, 3)
         val noCopyProp = getBool (args, 4)
-        val noRegAlloc = getBool (args, 5)
-        val noStrip = getBool (args, 6)
+        val noStrip = getBool (args, 5)
+        val noRegAlloc = getBool (args, 6)
         val staticCheck = getBool (args, 7)
         val platform = if Array.sub (args, 8) = "Darwin" then OS_X else LINUX
         val ins = openIn (fname ^ ".json")

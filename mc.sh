@@ -19,8 +19,8 @@ Options:
 -no-opt        Disable all optimizations.
 -no-opt-copy-propagation
                Disable copy propagation optimization.
+-no-opt-strip  Disable dead code stripping optimization.
 -no-reg-alloc  Don't run the register allocation algorithm.
--no-strip      Disable dead code stripping optimization.
 -o <file>      Specify name of output binary. Default is \"a.out\".
 -S             Generate the target assembly and stop.
 -static-check  Run the static checker and stop.\n"
@@ -31,8 +31,8 @@ DUMP_IL=false
 MOCHI_COMPAT=false
 NO_OPT=false
 NO_OPT_COPY_PROPAGATION=false
+NO_OPT_STRIP=false
 NO_REG_ALLOC=false
-NO_STRIP=false
 O="a.out"
 S=false
 STATIC_CHECK=false
@@ -47,8 +47,8 @@ case $key in
     -mochi-compat)            MOCHI_COMPAT=true;;
     -no-opt)                  NO_OPT=true;;
     -no-opt-copy-propagation) NO_OPT_COPY_PROPAGATION=true;;
+    -no-opt-strip)            NO_OPT_STRIP=true;;
     -no-reg-alloc)            NO_REG_ALLOC=true;;
-    -no-strip)                NO_STRIP=true;;
     -o)                       O="$2"; shift;;
     -S)                       S=true;;
     -static-check)            STATIC_CHECK=true;;
@@ -81,7 +81,7 @@ if [ -n "$PARSER_OUPUT" ]; then
     exit 1
 fi
 
-./compiler "$NAME" "$DUMP_IL" "$MOCHI_COMPAT" "$NO_OPT" "$NO_OPT_COPY_PROPAGATION" "$NO_REG_ALLOC" "$NO_STRIP" "$STATIC_CHECK" `uname`
+./compiler "$NAME" "$DUMP_IL" "$MOCHI_COMPAT" "$NO_OPT" "$NO_OPT_COPY_PROPAGATION" "$NO_OPT_STRIP" "$NO_REG_ALLOC" "$STATIC_CHECK" `uname`
 
 if [ $? -ne 0 ]; then
     exit 1

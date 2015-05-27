@@ -18,22 +18,17 @@ datatype dataflow_analysis =
          }
 
 
-fun has thing L = List.exists (fn t => t = thing) L
+fun involved t (src, tgt) = src = t orelse tgt = t
 
 
-(* DEBUGGING FUNCTIONS *)
-fun copyToStr (src, dest) = "(" ^ rToStr src ^ ", " ^ rToStr dest ^ ")"
-(* /DEBUGGING FUNCTIONS *)
-
-
-(* If an instruction IS a copy and HAS NOT been killed add it to the gen set. *)
-(* If the register target of an instruction HAS been involved in a copy
- * then add it to the kill set. *)
+(* If an instruction IS a copy and HAS NOT been killed add it to the gen set.
+ * If the register target of an instruction HAS been involved in a copy then
+ * add it to the kill set. *)
 fun insToGK copies (gen, kill) ins =
     let
-        val (_, targets) = getST ins
-        val copies = filter (fn (src, tgt) => has src targets orelse
-                                              has tgt targets) copies
+        val copies = case #2 (getST ins) of
+                         NONE => copies
+                       | SOME t => filter (involved t) copies
     in
         case ins of
             INS_RR {opcode=OP_MOV, r1=r1, dest=d} =>
@@ -85,7 +80,7 @@ fun replaceIns f ins =
 
 
 fun isCondMove (INS_RR {opcode=opc, ...}) =
-     has opc [OP_MOVEQ, OP_MOVNE, OP_MOVLT, OP_MOVGT, OP_MOVLE, OP_MOVGE]
+    Util.has opc [OP_MOVEQ, OP_MOVNE, OP_MOVLT, OP_MOVGT, OP_MOVLE, OP_MOVGE]
   | isCondMove _ = false
 
 
@@ -93,7 +88,7 @@ fun isCondMove (INS_RR {opcode=opc, ...}) =
 (*     let *)
 (*         val (sources, _) = getST ins *)
 (*     in *)
-(*         if has reg sources andalso not (isCondMove ins) *)
+(*         if Util.has reg sources andalso not (isCondMove ins) *)
 (*         then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of *)
 (*                  SOME ((src, _), _) => src *)
 (*                | NONE => reg *)
@@ -104,7 +99,7 @@ fun replaceReg copyIn ins reg =
     let
         val (sources, _) = getST ins
     in
-        if has reg sources andalso not (isCondMove ins)
+        if Util.has reg sources andalso not (isCondMove ins)
         then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of
                  SOME ((src, _), _) => (
                   print ("Replaced [" ^ Util.iToS reg ^ "] with [" ^ Util.iToS src ^ "] in ");
@@ -146,19 +141,10 @@ fun bbCopyIn node =
 fun diffCheck (DFA {diff=d, ...}, diff) = if d then true else diff
 
 
-fun printCopyIn node =
-    let
-        val da as DFA {id=id, copyIn=copyIn, ...} = Cfg.getData node
-    in
-        print (id ^ " copyIn: [" ^ Util.foldd ", " copyToStr (listItems copyIn) ^ "]\n");
-        da
-    end
-
-
 fun buildLvas cfg =
     if Cfg.fold diffCheck false cfg
     then (Cfg.app bbCopyIn cfg; buildLvas cfg)
-    else (Cfg.app printCopyIn cfg; cfg)
+    else cfg
 
 
 fun findCopies1 (INS_RR {opcode=OP_MOV, r1=r1, dest=d}, cps) = (r1, d)::cps
@@ -170,9 +156,9 @@ fun findCopies ((_, ins), cps) = addList (cps, List.foldr findCopies1 [] ins)
 
 fun replaceCopies1 (i, (ins, copyIn)) =
     let
-        val (_, targets) = getST i
-        val copyIn = filter (fn (src, tgt) => not (has src targets) andalso
-                                              not (has tgt targets)) copyIn
+        val copyIn = case #2 (getST i) of
+                         NONE => copyIn
+                       | SOME t => filter (fn st => not (involved t st)) copyIn
     in
         (ins @ [replaceIns (replaceReg copyIn) i],
          case i of
@@ -185,13 +171,17 @@ fun replaceCopies (DFA {id=id, ins=ins, copyIn=copyIn, ...}) =
     (id, #1 (List.foldl replaceCopies1 ([], copyIn) ins))
 
 
+fun dash s n = if n = 0 then s else dash (s ^ "-") (n - 1)
+
+
 fun optFunc (id, cfg) =
     let
         val copies = Cfg.fold findCopies (empty ()) cfg
         val lvas = buildLvas (Cfg.map (bbToDFA copies) cfg)
     in
+        print ("/-----" ^ id ^ "-----\\\n");
         (id, Cfg.map replaceCopies lvas) before
-        print "----------------------------\n"
+        print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
     end
 
 

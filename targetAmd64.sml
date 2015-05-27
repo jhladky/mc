@@ -83,47 +83,47 @@ local
     fun getOffReg off = case off of SOME (r, _) => [r] | NONE => []
 
 
-    fun getSTrr r1 r2 OP_MOVQ   = ([r1], [r2])
-      | getSTrr r1 r2 OP_ADDQ   = ([r1, r2], [r2])
-      | getSTrr r1 r2 OP_SUBQ   = ([r1, r2], [r2])
-      | getSTrr r1 r2 OP_IMULQ  = ([r1, r2], [r2])
-      | getSTrr r1 r2 OP_ANDQ   = ([r1, r2], [r2])
-      | getSTrr r1 r2 OP_ORQ    = ([r1, r2], [r2])
-      | getSTrr r1 r2 OP_CMP    = ([r1, r2], [])
-      | getSTrr r1 r2 OP_CMOVE  = ([r1], [r1, r2])
-      | getSTrr r1 r2 OP_CMOVNE = ([r1], [r1, r2])
-      | getSTrr r1 r2 OP_CMOVL  = ([r1], [r1, r2])
-      | getSTrr r1 r2 OP_CMOVG  = ([r1], [r1, r2])
-      | getSTrr r1 r2 OP_CMOVLE = ([r1], [r1, r2])
-      | getSTrr r1 r2 OP_CMOVGE = ([r1], [r1, r2])
+    fun getSTrr r1 r2 OP_MOVQ   = ([r1], SOME r2)
+      | getSTrr r1 r2 OP_ADDQ   = ([r1, r2], SOME r2)
+      | getSTrr r1 r2 OP_SUBQ   = ([r1, r2], SOME r2)
+      | getSTrr r1 r2 OP_IMULQ  = ([r1, r2], SOME r2)
+      | getSTrr r1 r2 OP_ANDQ   = ([r1, r2], SOME r2)
+      | getSTrr r1 r2 OP_ORQ    = ([r1, r2], SOME r2)
+      | getSTrr r1 r2 OP_CMP    = ([r1, r2], NONE)
+      | getSTrr r1 r2 OP_CMOVE  = ([r1, r2], SOME r2)
+      | getSTrr r1 r2 OP_CMOVNE = ([r1, r2], SOME r2)
+      | getSTrr r1 r2 OP_CMOVL  = ([r1, r2], SOME r2)
+      | getSTrr r1 r2 OP_CMOVG  = ([r1, r2], SOME r2)
+      | getSTrr r1 r2 OP_CMOVLE = ([r1, r2], SOME r2)
+      | getSTrr r1 r2 OP_CMOVGE = ([r1, r2], SOME r2)
       | getSTrr _ _ opc         = raise RegisterType opc
 
 
-    fun getSTir r OP_SUBQ    = ([r], [r])
-      | getSTir r OP_ADDQ    = ([r], [r])
-      | getSTir r OP_XORQ    = ([r], [r])
-      | getSTir r OP_CMP     = ([r], [])
-      | getSTir r OP_MOVQ    = ([], [r])
-      | getSTir r OP_SARQ    = ([r], [r])
+    fun getSTir r OP_SUBQ    = ([r], SOME r)
+      | getSTir r OP_ADDQ    = ([r], SOME r)
+      | getSTir r OP_XORQ    = ([r], SOME r)
+      | getSTir r OP_CMP     = ([r], NONE)
+      | getSTir r OP_MOVQ    = ([], SOME r)
+      | getSTir r OP_SARQ    = ([r], SOME r)
       | getSTir _ opc        = raise RegisterType opc
 
 
-    fun getSTsr d OP_MOVQ = ([], [d]) | getSTsr _ opc = raise RegisterType opc
-    fun getSTgr d OP_MOVQ = ([], [d]) | getSTgr _ opc = raise RegisterType opc
-    fun getSTrg r OP_MOVQ = ([r], []) | getSTrg _ opc = raise RegisterType opc
+    fun getSTsr d OP_MOVQ = ([], SOME d) | getSTsr _ c = raise RegisterType c
+    fun getSTgr d OP_MOVQ = ([], SOME d) | getSTgr _ c = raise RegisterType c
+    fun getSTrg r OP_MOVQ = ([r], NONE)    | getSTrg _ c = raise RegisterType c
 
 
-    fun getSTmr base offset dest OP_MOVQ = (base::getOffReg offset, [dest])
+    fun getSTmr base offset d OP_MOVQ = (base::getOffReg offset, SOME d)
       | getSTmr _ _ _ opc = raise RegisterType opc
 
 
-    fun getSTrm reg base offset OP_MOVQ = (reg::base::getOffReg offset, [])
+    fun getSTrm reg base offset OP_MOVQ = (reg::base::getOffReg offset, NONE)
       | getSTrm _ _ _ opc = raise RegisterType opc
 
 
-    fun getSTr r OP_PUSHQ = ([r], [])
-      | getSTr r OP_POPQ  = ([], [r])
-      | getSTr r OP_IDIVQ = ([REG_RAX, REG_RDX, r], [REG_RAX])
+    fun getSTr r OP_PUSHQ = ([r], NONE)
+      | getSTr r OP_POPQ  = ([], SOME r)
+      | getSTr r OP_IDIVQ = ([REG_RAX, REG_RDX, r], SOME REG_RAX)
       | getSTr _ opc      = raise RegisterType opc
 
 
@@ -131,7 +131,7 @@ local
      * considered targets, which means that any virtual registers that span
      * the call will have an edge with the caller saved registers, forcing
      * them into the callee saved registers. *)
-    fun getSTcall () = ([], [REG_RAX])
+    fun getSTcall () = ([], SOME REG_RAX)
 in
 
     val getST =
@@ -144,7 +144,7 @@ in
       | INS_RM {opcode=opc, r1=r, base=b, offset=f, ...}   => getSTrm r b f opc
       | INS_R  {opcode=opc, r1=r1}                         => getSTr r1 opc
       | INS_L  {opcode=OP_CALL, ...}                       => getSTcall ()
-      | _                                                  => ([], [])
+      | _                                                  => ([], NONE)
 end
 
 

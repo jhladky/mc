@@ -61,9 +61,10 @@ fun addEdgeNoCreate ife node reg =
 
 fun regToGK (ins, (gen, kill)) =
     let
-        val (sources, targets) = getST ins
+        val (sources, tOpt) = getST ins
     in
-        (condAddList (gen, kill) sources, addList (kill, targets))
+        (condAddList (gen, kill) sources,
+         case tOpt of NONE => kill | SOME tgt => add (kill, tgt))
     end
 
 
@@ -89,13 +90,15 @@ fun bbLiveOut node =
     end
 
 
-fun insIfeGraph ife (ins, liveNow) =
+fun insIfeGraph ife (ins, lo) =
     let
-        val (sources, targets) = getST ins
+        val (sources, tOpt) = getST ins
     in
-        List.app (fn t => app (addEdge ife t) liveNow) targets;
-        addList (List.foldr (fn (t, ln) => delete (ln, t) handle NotFound => ln)
-                            liveNow targets, sources)
+        case tOpt of
+            NONE => addList (lo, sources)
+          | SOME tgt =>
+            (app (addEdge ife tgt) lo;
+             addList (delete (lo, tgt) handle NotFound => lo, sources))
     end
 
 
@@ -274,13 +277,13 @@ fun buildVtr f [] = NONE
 
 fun spillReg n reg ins =
     let
-        val (sources, targets) = getST ins
+        val (sources, tOpt) = getST ins
     in
         if List.exists (fn r => r = reg) sources then
             [INS_MR {opcode=OP_MOVQ, immed=(~((n + 1) * Util.WORD_SIZE)),
                      base=REG_RBP, dest=reg, offset=NONE},
              ins]
-        else if List.exists (fn r => r = reg) targets then
+        else if (case tOpt of NONE => false | SOME tgt => tgt = reg) then
             [ins,
              INS_RM {opcode=OP_MOVQ, immed=(~((n + 1) * Util.WORD_SIZE)),
                      base=REG_RBP, offset=NONE, r1=reg}]
