@@ -131,8 +131,6 @@ local
      * considered targets, which means that any virtual registers that span
      * the call will have an edge with the caller saved registers, forcing
      * them into the callee saved registers. *)
-    (* fun getSTcall () = ([REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_8, REG_9], *)
-    (*                     [REG_RAX, REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_8, REG_9, REG_10, REG_11]) *)
     fun getSTcall () = ([], [REG_RAX])
 in
 

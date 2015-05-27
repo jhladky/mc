@@ -50,13 +50,7 @@ fun getNode ife reg =
       | NONE => IfeGraph.mkNode ife reg
 
 
-fun addEdge ife r1 r2 =
-    let
-        val node1 = getNode ife r1
-        val node2 = getNode ife r2
-    in
-        IfeGraph.addEdge node1 node2
-    end
+fun addEdge ife r1 r2 = IfeGraph.addEdge (getNode ife r1) (getNode ife r2)
 
 
 fun addEdgeNoCreate ife node reg =
@@ -74,13 +68,11 @@ fun regToGK (ins, (gen, kill)) =
 
 
 fun bbToGK (id, ins) =
-    LVA {
-        id=id,
-        ins=ins,
-        gk=List.foldl regToGK (empty (), empty ()) ins,
-        liveOut=empty (),
-        diff=true
-    }
+    let
+        val gk = List.foldl regToGK (empty (), empty ()) ins
+    in
+        LVA {id=id, ins=ins, gk=gk, liveOut=empty (), diff=true}
+    end
 
 
 fun bbLiveOut1 (LVA {gk=(gen, kill), liveOut=liveOut, ...}, s) =
@@ -102,7 +94,6 @@ fun insIfeGraph ife (ins, liveNow) =
         val (sources, targets) = getST ins
     in
         List.app (fn t => app (addEdge ife t) liveNow) targets;
-        (*since we're going to modify the livenow set, we have to pass it back*)
         addList (List.foldr (fn (t, ln) => delete (ln, t) handle NotFound => ln)
                             liveNow targets, sources)
     end
@@ -314,7 +305,6 @@ fun color n (id, cfg) =
     in
         Cfg.app (bbIfeGraph oldIfe) lvas;
         case buildVtr (addToIfe vtr newIfe) (deconstruct oldIfe) of
-            (* SOME reg => (OS.Process.exit OS.Process.failure; color (n + 1) (id, Cfg.map (spill n reg) cfg)) *)
             SOME reg => color (n + 1) (id, Cfg.map (spill n reg) cfg)
           | NONE => (id, Cfg.map (colorBB n id vtr) cfg)
     end

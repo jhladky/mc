@@ -23,14 +23,6 @@ fun has thing L = List.exists (fn t => t = thing) L
 
 (* DEBUGGING FUNCTIONS *)
 fun copyToStr (src, dest) = "(" ^ rToStr src ^ ", " ^ rToStr dest ^ ")"
-
-
-fun printGK id (gen, kill) =
-    (print (id ^ "\ngen: [");
-     print (Util.foldd ", " copyToStr (listItems gen));
-     print "]\nkill: [";
-     print (Util.foldd ", " copyToStr (listItems kill));
-     print "]\n")
 (* /DEBUGGING FUNCTIONS *)
 
 
@@ -53,25 +45,11 @@ fun insToGK copies (gen, kill) ins =
     end
 
 
-(*fun bbToDFA copies (id, ins) =
-    DFA {
-        id=id,
-        ins=ins,
-        gk=List.foldr (fn (ins, gk) => insToGK copies gk ins)
-                      (empty (), empty ()) ins,
-        copyIn=copies,
-        diff=true
-    }*)
-
-
 fun bbToDFA copies (id, ins) =
     let
-        (* val _ = print "/--------------\\\n"; *)
         val gk = List.foldr (fn (i, gk) => insToGK copies gk i)
                             (empty (), empty ()) ins
     in
-        (* printGK id gk; *)
-        (* print "\\--------------/\n"; *)
         DFA {id=id, ins=ins, gk=gk, copyIn=copies, diff=true}
     end
 
@@ -125,14 +103,12 @@ fun isCondMove (INS_RR {opcode=opc, ...}) =
 fun replaceReg copyIn ins reg =
     let
         val (sources, _) = getST ins
-        val involved = filter (fn (_, tgt) => tgt = reg) copyIn
     in
         if has reg sources andalso not (isCondMove ins)
-        then case pick involved of
+        then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of
                  SOME ((src, _), _) => (
-                  print ("Replaced [" ^ Util.iToS reg ^ "] with [" ^ Util.iToS src ^ "]\n");
+                  print ("Replaced [" ^ Util.iToS reg ^ "] with [" ^ Util.iToS src ^ "] in ");
                   print (insToStr ins ^ "\n");
-                  (* print (Util.iToS (numItems involved) ^ "\n"); *)
                   src
                )
                | NONE => reg
