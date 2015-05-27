@@ -37,43 +37,41 @@ fun printGK id (gen, kill) =
 (* If an instruction IS a copy and HAS NOT been killed add it to the gen set. *)
 (* If the register target of an instruction HAS been involved in a copy
  * then add it to the kill set. *)
-fun insToGK copies (gen, kill) (INS_RR {opcode=OP_MOV, r1=r1, dest=d}) =
+fun insToGK copies (gen, kill) ins =
     let
-        val c = (r1, d)
-    in
-        (if not (member (kill, c)) then add (gen, c) else gen,
-         add (kill, c))
-    end
-  | insToGK copies (gen, kill) ins =
-    let
-        (* The instruction IS NOT a copy so we add nothing to the gen set. *)
         val (_, targets) = getST ins
         val copies = filter (fn (src, tgt) => has src targets orelse
                                               has tgt targets) copies
     in
-        (gen, union (kill, copies))
+        case ins of
+            INS_RR {opcode=OP_MOV, r1=r1, dest=d} =>
+            (if not (exists (fn (src, tgt) => tgt = d orelse src = d) kill)
+             then add (gen, (r1, d))
+             else gen,
+             add (union (kill, copies), (r1, d)))
+          | _ => (gen, union (kill, copies))
     end
 
 
-(* fun bbToDFA copies (id, ins) = *)
-(*     DFA { *)
-(*         id=id, *)
-(*         ins=ins, *)
-(*         gk=List.foldr (fn (ins, gk) => insToGK copies gk ins) *)
-(*                       (empty (), empty ()) ins, *)
-(*         copyIn=empty (), *)
-(*         diff=true *)
-(*     } *)
+(*fun bbToDFA copies (id, ins) =
+    DFA {
+        id=id,
+        ins=ins,
+        gk=List.foldr (fn (ins, gk) => insToGK copies gk ins)
+                      (empty (), empty ()) ins,
+        copyIn=copies,
+        diff=true
+    }*)
 
 
 fun bbToDFA copies (id, ins) =
     let
-        val _ = print "/--------------\\\n";
+        (* val _ = print "/--------------\\\n"; *)
         val gk = List.foldr (fn (i, gk) => insToGK copies gk i)
                             (empty (), empty ()) ins
     in
-        printGK id gk;
-        print "\\--------------/\n";
+        (* printGK id gk; *)
+        (* print "\\--------------/\n"; *)
         DFA {id=id, ins=ins, gk=gk, copyIn=copies, diff=true}
     end
 
@@ -109,19 +107,32 @@ fun replaceIns f ins =
 
 
 fun isCondMove (INS_RR {opcode=opc, ...}) =
-    has opc [OP_MOVEQ, OP_MOVNE, OP_MOVLT, OP_MOVGT, OP_MOVLE, OP_MOVGE]
-  | isCondMove ins = false
+     has opc [OP_MOVEQ, OP_MOVNE, OP_MOVLT, OP_MOVGT, OP_MOVLE, OP_MOVGE]
+  | isCondMove _ = false
 
+
+(* fun replaceReg copyIn ins reg = *)
+(*     let *)
+(*         val (sources, _) = getST ins *)
+(*     in *)
+(*         if has reg sources andalso not (isCondMove ins) *)
+(*         then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of *)
+(*                  SOME ((src, _), _) => src *)
+(*                | NONE => reg *)
+(*         else reg *)
+(*     end *)
 
 fun replaceReg copyIn ins reg =
     let
         val (sources, _) = getST ins
+        val involved = filter (fn (_, tgt) => tgt = reg) copyIn
     in
         if has reg sources andalso not (isCondMove ins)
-        then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of
+        then case pick involved of
                  SOME ((src, _), _) => (
                   print ("Replaced [" ^ Util.iToS reg ^ "] with [" ^ Util.iToS src ^ "]\n");
-                  (* print (insToStr ins ^ "\n"); *)
+                  print (insToStr ins ^ "\n");
+                  (* print (Util.iToS (numItems involved) ^ "\n"); *)
                   src
                )
                | NONE => reg
@@ -203,8 +214,8 @@ fun optFunc (id, cfg) =
         val copies = Cfg.fold findCopies (empty ()) cfg
         val lvas = buildLvas (Cfg.map (bbToDFA copies) cfg)
     in
-        print "----------------------------\n";
-        (id, Cfg.map replaceCopies lvas)
+        (id, Cfg.map replaceCopies lvas) before
+        print "----------------------------\n"
     end
 
 

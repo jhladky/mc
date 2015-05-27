@@ -85,6 +85,16 @@ local
       | getSTrr _ _ opc       = raise RegisterType opc
 
 
+    fun getSTir r1 OP_MOVEQ = ([r1], [r1])
+      | getSTir r1 OP_MOVNE = ([r1], [r1])
+      | getSTir r1 OP_MOVLT = ([r1], [r1])
+      | getSTir r1 OP_MOVGT = ([r1], [r1])
+      | getSTir r1 OP_MOVLE = ([r1], [r1])
+      | getSTir r1 OP_MOVGE = ([r1], [r1])
+      | getSTir r1 OP_LOADI = ([], [r1])
+      | getSTir _ opc       = raise RegisterType opc
+
+
     fun getSTr r1 OP_PRINT    = ([r1], [])
       | getSTr r1 OP_PRINTLN  = ([r1], [])
       | getSTr r1 OP_READ     = ([r1], [])
@@ -103,7 +113,7 @@ in
       | INS_RIC {r1=r1, ...}                => ([r1], [])
       | INS_SIR {r1=r1, ...}                => ([], [r1])
       | INS_NEW {dest=d, ...}               => ([], [d])
-      | INS_IR  {dest=d, ...}               => ([], [d])
+      | INS_IR  {opcode=opc, dest=d, ...}   => getSTir d opc
       | INS_RI  {dest=d, ...}               => ([d], [])
       | INS_SR  {r1=r1, ...}                => ([], [r1])
       | INS_RS  {r1=r1, ...}                => ([r1], [])
