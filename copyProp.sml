@@ -119,19 +119,19 @@ fun removeKilled copyIn kill =
                              not (isTarget tgt kill)) copyIn
 
 
-fun bbCopyIn2 (DFA {gk=(gen, kill), copyIn=copyIn, ...}) =
+fun propagate2 (DFA {gk=(gen, kill), copyIn=copyIn, ...}) =
     union (gen, removeKilled copyIn kill)
 
 
-fun bbCopyIn1 (dfa, accum) = intersection (accum, bbCopyIn2 dfa)
+fun propagate1 (dfa, accum) = intersection (accum, propagate2 dfa)
 
 
-fun bbCopyIn node =
+fun propagate node =
     let
         val DFA {id=id, ins=ins, gk=gk, copyIn=copyIn, ...} = Cfg.getData node
         val preds = Cfg.getPreds node
         val ci = if length preds = 0 then empty ()
-                 else List.foldr bbCopyIn1 (bbCopyIn2 (hd preds)) (tl preds)
+                 else List.foldr propagate1 (propagate2 (hd preds)) (tl preds)
         val diff = not (equal (copyIn, ci))
     in
         DFA {id=id, ins=ins, gk=gk, copyIn=ci, diff=diff}
@@ -143,7 +143,7 @@ fun diffCheck (DFA {diff=d, ...}, diff) = if d then true else diff
 
 fun buildLvas cfg =
     if Cfg.fold diffCheck false cfg
-    then (Cfg.app bbCopyIn cfg; buildLvas cfg)
+    then (Cfg.app propagate cfg; buildLvas cfg)
     else cfg
 
 

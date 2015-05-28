@@ -14,7 +14,6 @@ signature CFG = sig
     val getData : 'a node -> 'a
     val getSuccs : 'a node -> 'a list
     val getPreds : 'a node -> 'a list
-    (* val getPredNodes : 'a node -> 'a node list (* Remove later? *) *)
     val getExit : 'a cfg -> 'a node (* Remove later *)
 end
 
@@ -65,7 +64,6 @@ fun getData (NODE {data=data, ...}) = !data
 fun find nId nodes = List.find (fn NODE {id=id, ...} => id = nId) nodes
 fun getSuccs (NODE {next=next, ...}) = List.map getData (!next)
 fun getPreds (NODE {prev=prev, ...}) = List.map getData (!prev)
-(* fun getPredNodes (NODE {prev=prev, ...}) = (!prev) *)
 
 
 fun toList (CFG {nodes=nodes, entry=en as NODE {id=enId, ...},

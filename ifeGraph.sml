@@ -40,17 +40,14 @@ fun find (IG {nodes=nodes}) data =
     List.find (fn NODE {data=d, ...} => d = data) (!nodes)
 
 
-fun has (IG {nodes=nodes}) node =
-    case List.find (fn n => node = n) (!nodes) of
-        SOME _ => true
-      | NONE => false
+fun has (IG {nodes=nodes}) node = List.exists (fn n => node = n) (!nodes)
 
 
 fun delEdge toRemove (NODE {adj=adj, ...}) =
     adj := List.filter (fn n => n <> toRemove) (!adj)
 
 
-fun delEdges (node as NODE {adj=adj, ...}) = List.app (delEdge node) (!adj)
+fun delEdges (node as NODE {adj=adj, ...}) = app (delEdge node) (!adj)
 
 
 (* Remove the node from the graph.
@@ -60,8 +57,13 @@ fun remove (ig as IG {nodes=nodes}) node =
     else (delEdges node; nodes := List.filter (fn n => n <> node) (!nodes))
 
 
+fun hasEdge (NODE {adj=adj, ...}) node = List.exists (fn n => n = node) (!adj)
+
+
 fun addEdge (node1 as NODE {adj=adj1, ...}) (node2 as NODE {adj=adj2, ...}) =
-    (adj1 := node2::(!adj1); adj2 := node1::(!adj2))
+    if not (hasEdge node1 node2)
+    then (adj1 := node2::(!adj1); adj2 := node1::(!adj2))
+    else ()
 
 
 fun mkGraph () = IG {nodes=ref []}
