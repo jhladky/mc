@@ -87,7 +87,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-if [ "$S" = true ] || [ "$NO_REG_ALLOC" = true ] || [ "$DUMP_IL" = true ]; then
+if [ "$S" = true ] || [ "$NO_REG_ALLOC" = true ] || [ "$DUMP_IL" = true ] || [ "$STATIC_CHECK" = true ]; then
     rm "$NAME.json"
 else
     as -o "$NAME.o" "$NAME.s"

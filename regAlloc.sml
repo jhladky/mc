@@ -26,7 +26,7 @@ val actual = addList (empty (), [REG_RAX, REG_RBX, REG_RCX, REG_RDX,
 val avail = addList (empty (), [REG_RAX, REG_RBX, REG_RDX, REG_RSI, REG_12,
                                 REG_13, REG_14, REG_15, REG_RCX,
                                 REG_8, REG_9, REG_10, REG_11,
-                                REG_RDI, REG_RBP])
+                                REG_RDI(*, REG_RBP*)])
 
 (* Registers that must be preserved in the function i.e. callee saved. *)
 val preserved = addList (empty (), [REG_RBX, REG_RSP, REG_RBP,
@@ -36,21 +36,8 @@ val preserved = addList (empty (), [REG_RBX, REG_RSP, REG_RBP,
 val scratch = addList (empty (), [REG_RAX, REG_RDI, REG_RSI, REG_RDX, REG_RCX,
                                   REG_8, REG_9, REG_10, REG_11])
 
-(* Helper functions. *)
 fun condAdd kill (reg, gen) =
     if not (member (kill, reg)) then add (gen, reg) else gen
-
-
-fun getNode ife reg =
-    case IfeGraph.find ife reg of
-        SOME node => node
-      | NONE => IfeGraph.mkNode ife reg
-
-
-fun addEdgeNoCreate ife node reg =
-    case IfeGraph.find ife reg of
-        SOME other => IfeGraph.addEdge node other
-      | NONE => ()
 
 
 fun condAddList (gen, kill) regs = List.foldr (condAdd kill) gen regs
@@ -86,6 +73,12 @@ fun propagate node =
     end
 
 
+fun getNode ife reg =
+    case IfeGraph.find ife reg of
+        SOME node => node
+      | NONE => IfeGraph.mkNode ife reg
+
+
 fun addEdge ife r1 r2 =
     if r1 <> r2 then IfeGraph.addEdge (getNode ife r1) (getNode ife r2) else ()
 
@@ -113,11 +106,11 @@ fun mkIfeGraph ife node =
  * reanalyzing the graph every time.
  * Unconstrained nodes will form the base of our stack.
  * Right now we need to get the adjacency information for each node. *)
-fun deconstruct ife =
+fun deconstruct spilled ife =
     let
         val (real, virt) = List.partition (fn (r, _) => member (actual, r))
                                           (IfeGraph.toListRep ife)
-        val f = fn ((_, adjs1), (_, adjs2)) => length adjs1 > length adjs2
+        val f = fn ((_, adjs1), (_, adjs2)) => length adjs1 < length adjs2
     in
         real @ ListMergeSort.sort f virt
     end
@@ -137,18 +130,16 @@ fun getAvailRegs vtr adjs =
     difference (avail, List.foldr (addRealRegToSet vtr) (empty ()) adjs)
 
 
-(* Return a reg option, it is SOME reg then we have to spill. *)
-fun addToIfe vtr ife (REG_V n, adjs) =
-    (* Here we're dealing with a virtual register. *)
+(* Return a reg option, it is SOME reg then we have to spill.
+ * Here we're dealing with a virtual register.
+ * `Pick` also returns the rest of the list, we don't use it.*)
+fun buildVtr vtr [] = NONE
+  | buildVtr vtr ((REG_V n, adjs)::nodes) =
     (case pick (getAvailRegs vtr adjs) of
-         (* `Pick` also returns the rest of the list, we don't use it.*)
-         SOME (reg, _) =>
-         (List.app (addEdgeNoCreate ife (IfeGraph.mkNode ife reg)) adjs;
-          HashTable.insert vtr (Int.toString n, reg);
-          NONE)
+         SOME (reg, _) => (HashTable.insert vtr (Int.toString n, reg);
+                           buildVtr vtr nodes)
        | NONE => SOME (REG_V n))
-  | addToIfe vtr ife (reg, adjs) =
-    (List.app (addEdgeNoCreate ife (IfeGraph.mkNode ife reg)) adjs; NONE)
+  | buildVtr vtr (node::nodes) = buildVtr vtr nodes
 
 
 fun replace vtr (REG_V n) = HashTable.lookup vtr (Int.toString n)
@@ -199,12 +190,12 @@ fun buildLvas cfg =
     else cfg
 
 
-(* calculate how much spill space we need. Make sure it is 16-byte aligned.
+(* Calculate how much spill space we need. Make sure it is 16-byte aligned.
  * Check the existing amount of space as well as how many registers we have to
  * save at the top.*)
 fun calcStackOffset existing vtr n =
     let
-        val numSaves = length (getSaveList vtr) + 1
+        val numSaves = length (getSaveList vtr) + 1 (* The +1 is for %rbp *)
         val new = existing div Util.WORD_SIZE + n
     in
         (* Then branch: we might need to align the stack. *)
@@ -224,65 +215,60 @@ fun updatePP vtr n (INS_IR {opcode=OP_SUBQ, r2=REG_RSP, immed=immed}) =
   | updatePP _ _ ins = ins
 
 
-(* n      : Number of times we've spilled.
- * funcId : Name of the function. We use it to find the entry BB.
- * vtr    : Virtual-to-real register mapping*)
-fun colorBB n funcId vtr (id, ins) =
+(* spilled : List of registers we've spilled already.
+ * funcId  : Name of the function. We use it to find the entry BB.
+ * vtr     : Virtual-to-real register mapping*)
+fun colorBB spilled funcId vtr (id, ins) =
     let
         val L = if id = funcId
                 then List.map (fn reg => INS_R {opcode=OP_PUSHQ, r1=reg})
                               (getSaveList vtr)
                 else []
         val L = L @ List.foldr (fn (ins, L) => colorIns vtr ins @ L) [] ins
+        val n = length spilled
     in
         (id, List.map (updatePP vtr n) L)
     end
 
 
-fun buildVtr f [] = NONE
-  | buildVtr f (node::nodes) =
-    case f node of SOME reg => SOME reg | NONE => buildVtr f nodes
-
-
-fun spillReg n reg ins =
+fun spillReg spilled reg ins =
     let
         val (sources, targets) = getST ins
+        val immed = ~((length spilled + 1) * Util.WORD_SIZE)
     in
-        if List.exists (fn r => r = reg) sources then
-            [INS_MR {opcode=OP_MOVQ, immed=(~((n + 1) * Util.WORD_SIZE)),
-                     base=REG_RBP, dest=reg, offset=NONE},
-             ins]
-        else if List.exists (fn r => r = reg) targets then
-            [ins,
-             INS_RM {opcode=OP_MOVQ, immed=(~((n + 1) * Util.WORD_SIZE)),
-                     base=REG_RBP, offset=NONE, r1=reg}]
-        else
-            [ins]
+        (if Util.has reg sources
+         then [INS_MR {opcode=OP_MOVQ, immed=immed, base=REG_RBP, dest=reg,
+                       offset=NONE}]
+         else [])
+        @ [ins]
+        @ (if Util.has reg targets
+           then [INS_RM {opcode=OP_MOVQ, immed=immed, base=REG_RBP,
+                         offset=NONE, r1=reg}]
+           else [])
   end
 
 
-fun spill n reg (id, ins) =
-    (id, List.foldr (fn (ins, L) => spillReg n reg ins @ L) [] ins)
+fun spill spilled reg (id, ins) =
+    (id, List.foldr (fn (ins, L) => spillReg spilled reg ins @ L) [] ins)
 
 
 (* Build the interference graph. Then build the vtr. If we can color the
  * registers then map them the old ones, otherwise spill and try again.
- * n is the number of times we've had to spill. *)
-fun color n (id, cfg) =
+ * Spilled has registers we've had to spill. *)
+fun color spilled (id, cfg) =
     let
-        val lvas = buildLvas (Cfg.map bbToGK cfg)
-        val oldIfe = IfeGraph.mkGraph ()
-        val newIfe = IfeGraph.mkGraph ()
+        val ife = IfeGraph.mkGraph ()
         val vtr = Util.mkHt ()
     in
-        Cfg.app (mkIfeGraph oldIfe) lvas;
-        case buildVtr (addToIfe vtr newIfe) (deconstruct oldIfe) of
-            SOME reg => color (n + 1) (id, Cfg.map (spill n reg) cfg)
-          | NONE => (id, Cfg.map (colorBB n id vtr) cfg)
+        Cfg.app (mkIfeGraph ife) (buildLvas (Cfg.map bbToGK cfg));
+        case buildVtr vtr (deconstruct spilled ife) of
+            SOME reg => color (reg::spilled)
+                              (id, Cfg.map (spill spilled reg) cfg)
+          | NONE => (id, Cfg.map (colorBB spilled id vtr) cfg)
     end
 
 
 fun regAlloc (PROGRAM {text=text, data=data}) =
-    PROGRAM {text=List.map (fn func => color 0 func) text, data=data}
+    PROGRAM {text=List.map (color []) text, data=data}
 
 end

@@ -50,16 +50,16 @@ fun bbToGK (id, ins) =
 fun diffCheck (DFA {diff=d, ...}, diff) = if d then true else diff
 
 
-fun bbReaches1 (DFA {gk=(gen, kill), reaches=reaches, ...}, s) =
+fun propagate1 (DFA {gk=(gen, kill), reaches=reaches, ...}, s) =
     union (s, union (gen, difference (reaches, kill)))
 
 
 (* Reaches(n) = the union of each basic block m for all m in pred(n),
  * where n is the current basic block OF gen(m) U (Reaches(m) - kill(m)) *)
-fun bbReaches node =
+fun propagate node =
     let
         val DFA {id=id, ins=ins, gk=gk, reaches=reaches, ...} = Cfg.getData node
-        val rs = List.foldr bbReaches1 (empty ()) (Cfg.getPreds node)
+        val rs = List.foldr propagate1 (empty ()) (Cfg.getPreds node)
         val diff = not (equal (reaches, rs))
     in
         DFA {id=id, ins=ins, gk=gk, reaches=rs, diff=diff}
@@ -68,7 +68,7 @@ fun bbReaches node =
 
 fun buildLvas cfg =
     if Cfg.fold diffCheck false cfg
-    then (Cfg.app bbReaches cfg; buildLvas cfg)
+    then (Cfg.app propagate cfg; buildLvas cfg)
     else cfg
 
 

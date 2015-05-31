@@ -96,19 +96,13 @@ fun isCondMove (INS_RR {opcode=opc, ...}) =
 (*     end *)
 
 fun replaceReg copyIn ins reg =
-    let
-        val (sources, _) = getST ins
-    in
-        if Util.has reg sources andalso not (isCondMove ins)
-        then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of
-                 SOME ((src, _), _) => (
-                  print ("Replaced [" ^ Util.iToS reg ^ "] with [" ^ Util.iToS src ^ "] in ");
-                  print (insToStr ins ^ "\n");
-                  src
-               )
-               | NONE => reg
-        else reg
-    end
+    if Util.has reg (#1 (getST ins)) andalso not (isCondMove ins)
+    then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of
+             SOME ((src, _), _) =>
+             (print ("Replaced [" ^ Util.iToS reg ^ "] with [" ^ Util.iToS src ^ "] in " ^  insToStr ins ^ "\n");
+              src)
+           | NONE => reg
+    else reg
 
 
 fun isTarget reg kill = exists (fn (_, tgt) => tgt = reg) kill
@@ -171,13 +165,11 @@ fun replaceCopies (DFA {id=id, ins=ins, copyIn=copyIn, ...}) =
     (id, #1 (List.foldl replaceCopies1 ([], copyIn) ins))
 
 
-fun dash s n = if n = 0 then s else dash (s ^ "-") (n - 1)
-
-
 fun optFunc (id, cfg) =
     let
         val copies = Cfg.fold findCopies (empty ()) cfg
         val lvas = buildLvas (Cfg.map (bbToDFA copies) cfg)
+        fun dash s n = if n = 0 then s else dash (s ^ "-") (n - 1)
     in
         print ("/-----" ^ id ^ "-----\\\n");
         (id, Cfg.map replaceCopies lvas) before
