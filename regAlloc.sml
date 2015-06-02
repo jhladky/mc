@@ -7,8 +7,8 @@ open TargetAmd64
 open UnorderedSet
 
 
-datatype live_variable_analysis =
-         LVA of {
+datatype dataflow_analysis =
+         DFA of {
              id: string,
              ins: instruction list,
              gk: register set * register set,
@@ -43,7 +43,7 @@ fun condAdd kill (reg, gen) =
 fun condAddList (gen, kill) regs = List.foldr (condAdd kill) gen regs
 
 
-fun insToGK (ins, (gen, kill)) =
+fun iToGK (ins, (gen, kill)) =
     let
         val (sources, targets) = getST ins
     in
@@ -51,25 +51,24 @@ fun insToGK (ins, (gen, kill)) =
     end
 
 
-fun bbToGK (id, ins) =
-    let
-        val gk = List.foldl insToGK (empty (), empty ()) ins
-    in
-        LVA {id=id, ins=ins, gk=gk, liveOut=empty (), diff=true}
-    end
+fun insToGK (id, ins) = List.foldl iToGK (empty (), empty ()) ins
 
 
-fun propagate1 (LVA {gk=(gen, kill), liveOut=liveOut, ...}, s) =
+fun bbToDFA (id, ins) =
+    DFA {id=id, ins=ins, gk=insToGK (id, ins), liveOut=empty (), diff=true}
+
+
+fun propagate1 (DFA {gk=(gen, kill), liveOut=liveOut, ...}, s) =
     union (s, union (gen, difference (liveOut, kill)))
 
 
 fun propagate node =
     let
-        val LVA {id=id, ins=ins, gk=gk, liveOut=liveOut, ...} = Cfg.getData node
+        val DFA {id=id, ins=ins, gk=gk, liveOut=liveOut, ...} = Cfg.getData node
         val lo = List.foldr propagate1 (empty ()) (Cfg.getSuccs node)
         val diff = not (equal (liveOut, lo))
     in
-        LVA {id=id, ins=ins, gk=gk, liveOut=lo, diff=diff}
+        DFA {id=id, ins=ins, gk=gk, liveOut=lo, diff=diff}
     end
 
 
@@ -95,17 +94,13 @@ fun insIfeGraph ife (i, liveNow) =
 
 fun mkIfeGraph ife node =
     let
-        val lva as LVA {ins=ins, liveOut=liveOut, ...} = Cfg.getData node
+        val lva as DFA {ins=ins, liveOut=liveOut, ...} = Cfg.getData node
     in
         List.foldr (insIfeGraph ife) liveOut ins;
         lva
     end
 
 
-(* TODO: Make this much better, by actually using the heuristic and by
- * reanalyzing the graph every time.
- * Unconstrained nodes will form the base of our stack.
- * Right now we need to get the adjacency information for each node. *)
 fun deconstruct spilled ife =
     let
         val (real, virt) = List.partition (fn (r, _) => member (actual, r))
@@ -132,7 +127,7 @@ fun getAvailRegs vtr adjs =
 
 (* Return a reg option, it is SOME reg then we have to spill.
  * Here we're dealing with a virtual register.
- * `Pick` also returns the rest of the list, we don't use it.*)
+ * `Pick` also returns the rest of the list, we don't use it. *)
 fun buildVtr vtr [] = NONE
   | buildVtr vtr ((REG_V n, adjs)::nodes) =
     (case pick (getAvailRegs vtr adjs) of
@@ -181,7 +176,7 @@ fun colorIns vtr (INS_RR {opcode=opc, r1=r1, r2=r2}) =
   | colorIns _ ins = [ins]
 
 
-fun diffCheck (LVA {diff=d, ...}, diff) = if d then true else diff
+fun diffCheck (DFA {diff=d, ...}, diff) = if d then true else diff
 
 
 fun buildLvas cfg =
@@ -260,7 +255,7 @@ fun color spilled (id, cfg) =
         val ife = IfeGraph.mkGraph ()
         val vtr = Util.mkHt ()
     in
-        Cfg.app (mkIfeGraph ife) (buildLvas (Cfg.map bbToGK cfg));
+        Cfg.app (mkIfeGraph ife) (buildLvas (Cfg.map bbToDFA cfg));
         case buildVtr vtr (deconstruct spilled ife) of
             SOME reg => color (reg::spilled)
                               (id, Cfg.map (spill spilled reg) cfg)

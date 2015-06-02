@@ -17,30 +17,31 @@ datatype dataflow_analysis =
              diff: bool
          }
 
+fun hasNewerDef reg gen = exists (fn (def, _, _) => def = reg) gen
 
 
-fun hasNewerDef reg genSet = exists (fn (def, _, _) => def = reg) genSet
-
-
-(* gen(n) = the defs in n of r for which the defined name (r) is not redefined later.
- * In a given block it is just the last definition of the register.
- * kill(n) = All the definitions of r that are killed in n only.
- * (the register in the definition is a target of the an instruction in n) *)
-fun insToGK id (ins, (gen, kill, n)) =
-    (* The kill set part is probably wrong! *)
+(* If the instruction is the last definition in the basic block, then add
+ * the definition formed from the target of the instruction, the label
+ * of the basic block, and the index position of the instruction to the gen
+ * set. Then add to the kill set all definitions which match the target
+ * register *)
+fun iToGK defs id (ins, (gen, kill, n)) =
     case #2 (getST ins) of
         NONE =>
         (gen, kill, n -1)
       | SOME tgt =>
         (if not (hasNewerDef tgt gen) then add (gen, (tgt, id, n)) else gen,
-         add (kill, (tgt, id, n)),
+         union (kill, filter (fn (reg, _, _) => reg <> tgt) defs),
          n - 1)
 
 
-fun bbToGK (id, ins) =
+fun insToGK defs (id, ins) =
+    List.foldr (iToGK defs id) (empty (), empty (), length ins - 1) ins
+
+
+fun bbToDFA defs (id, ins) =
     let
-        val (gen, kill, n) = List.foldr (insToGK id) (empty (), empty (),
-                                                      length ins - 1) ins
+        val (gen, kill, _) = insToGK defs (id, ins)
         val ins = List.map (fn i => (i, true)) ins
     in
         DFA {id=id, ins=ins, gk=(gen, kill), reaches=empty (), diff=true}
@@ -66,10 +67,25 @@ fun propagate node =
     end
 
 
+
+fun defToStr (reg, label, position) =
+    "(" ^ rToStr reg ^ " " ^ label ^ " " ^ Util.iToS position ^ ")"
+
+
+(* TODO: Remove these later! *)
+fun printReaches node =
+    let
+        val dfa as DFA {id=id, reaches=reaches, ...} = Cfg.getData node
+    in
+        print (id ^ " reaches: [" ^ Util.foldd ", " defToStr (listItems reaches) ^ "]\n");
+        dfa
+    end
+
+
 fun buildLvas cfg =
     if Cfg.fold diffCheck false cfg
     then (Cfg.app propagate cfg; buildLvas cfg)
-    else cfg
+    else (Cfg.app printReaches cfg; cfg)
 
 
 fun isCriticalRR opc =
@@ -110,10 +126,6 @@ fun markCritical ((i, _), (ins, work)) =
     else ((i, false)::ins, work)
 
 
-fun getDefs reaches (source, accum) =
-    union (accum, filter (fn (reg, _, _) => reg = source) reaches)
-
-
 fun markDefIns1 iRef pos ((i, mark), (ins, n)) =
     ((if n = pos
       then (i, true) before iRef := i
@@ -135,7 +147,13 @@ fun markDefNode iRef (_, defId, pos) node =
             Cfg.getData node
     in
         if defId <> id then dfa
-        else DFA {id=id, ins=markDefIns iRef pos ins, gk=gk, reaches=rs, diff=false}
+        else DFA {
+                id=id,
+                ins=markDefIns iRef pos ins,
+                gk=gk,
+                reaches=rs,
+                diff=false
+            }
     end
 
 
@@ -148,24 +166,75 @@ fun getDefI cfg def =
     end
 
 
+(* --- Strip Dead Code version of the local updating ---
+ * The reaches set needs to be updated at every instructions.
+ * The target of an instruction kills any previous instruction with the same target.
+ * This definition is then added to the reaches set for the instructions that follow.
+ * In terms of ordering, we take the current reaches set and use it to get the definitions
+ * for the SOURCES of the instruction, and THEN when we pass reaches down, we update it.
+ * As usual this reaches we create we just toss when we're done.
+ * NO! mark1 is not ITERATING through the instructions!. It is iterating through the workList.
+ * So we have to update reaches on a per-instruction basis with the local block info.
+ * And it has to be computed then and there every time, per instruction.
+ * Computing it:
+ * 1. Get rid of all instructions under and including that instruction.
+ * 2. Calculate the reaching defs for that little block.
+ * 3. Add that to the reaching we already have, making sure to remove the defs that are killed
+ *    previously in reaching. *)
+
+fun getDefs reaches (source, accum) =
+    union (accum, filter (fn (reg, _, _) => reg = source) reaches)
+
+
+fun getBefore1 _ _ [] = []
+  | getBefore1 doAdd i (x::xs) =
+    if x = i then getBefore1 false i xs
+    else if doAdd then [x] @ getBefore1 doAdd i xs
+    else getBefore1 doAdd i xs
+
+
+fun getBefore i ins = getBefore1 true i ins
+
+
+(* how are we going to do this???? *)
+
+(*how calculate the reaching defs for there instructions*)
+(*split ins into two list, before i, and after and including i*)
+fun reachesLocal reaches ins i =
+    let
+        val ins = getBefore i ins
+    (*does having the id matter in this case??? I don't *think* it does.... but it might
+         * I think we might need to pass it in. *)
+        (* val (gen, kill, _) = insToGK ("", ins) *)
+
+    in
+        reaches
+    end
+
+
 fun mark1 cfg reaches work ins =
     case pick work of
         NONE => ins
       | SOME (i, rest) =>
         let
             val (sources, _) = getST i
+            (* defs will be a set of all the definitions of all the sources. *)
             val defs = foldr (getDefs reaches) (empty ())
                              (addList (empty (), sources))
+            val _ = print ("source defs: [" ^ Util.foldd ", " defToStr (listItems defs) ^ "]\n")
             val defIns = map (getDefI cfg) defs
         in
             mark1 cfg reaches (union (rest, defIns)) ins
         end
 
 
+(* fun imToStr (i, mark) = "(" ^ insToStr i ^ ", " ^ Bool.toString mark ^ ")" *)
+
 fun mark cfg node =
     let
         val DFA {id=id, ins=ins, gk=gk, reaches=reaches, ...} = Cfg.getData node
         val (ins, work) = List.foldr markCritical ([], empty ()) ins
+        val _ = print (id ^ " critical: [" ^ Util.foldd ", " insToStr (listItems work) ^ "]\n")
         val ins = mark1 cfg reaches work ins
     in
         DFA {id=id, ins=ins, gk=gk, reaches=reaches, diff=false}
@@ -181,12 +250,23 @@ fun sweepIns ((i, mark), L) = (* if mark then i::L else L *)
 fun sweep (DFA {id=id, ins=ins, ...}) = (id, List.foldr sweepIns [] ins)
 
 
+(*needs to add all defs possible to the list*)
+fun findDefs1 id (i, (defs, n)) =
+    (case #2 (getST i) of NONE => defs | SOME tgt => (tgt, id, n)::defs, n + 1)
+
+
+fun findDefs ((id, ins), defs) =
+    addList (defs, #1 (List.foldl (findDefs1 id) ([], 0) ins))
+
+
 fun optFunc (id, cfg) =
     let
-        val lvas = buildLvas (Cfg.map bbToGK cfg)
+        val defs = Cfg.fold findDefs (empty ()) cfg
+        val lvas = buildLvas (Cfg.map (bbToDFA defs) cfg)
     in
         Cfg.app (mark lvas) lvas;
-        (id, Cfg.map sweep lvas) before print "----------------------\n"
+        (id, Cfg.map sweep lvas)
+        before print "----------------------\n"
     end
 
 

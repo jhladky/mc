@@ -176,22 +176,22 @@ fun x2Amd64 len Iloc.OP_RET = genEpilogue len
 
 
 fun iloc2Amd64 len =
- fn Iloc.INS_RRR {opcode=opc, r1=r1, dest=d, r2=r2}     => rrr2Amd64 r1 r2 d opc
-  | Iloc.INS_RIR {opcode=opc, r1=r1, dest=d, immed=i}   => rir2Amd64 r1 i d opc
-  | Iloc.INS_RRI {opcode=opc, r1=r1, r2=r2, immed=i}    => rri2Amd64 r1 r2 i opc
-  | Iloc.INS_RRC {opcode=opc, r1=r1, r2=r2}             => rrc2Amd64 r1 r2 opc
-  | Iloc.INS_RIC {opcode=opc, r1=r1, immed=i}           => ric2Amd64 r1 i opc
-  | Iloc.INS_SIR {opcode=opc, r1=r1, id=id, immed=i}    => sir2Amd64 r1 i id opc
-  | Iloc.INS_CLL {opcode=opc, l1=l1, l2=l2}             => cll2Amd64 l1 l2 opc
-  | Iloc.INS_NEW {opcode=opc, dest=d, id=id, fields=fs} => new2Amd64 id fs d opc
-  | Iloc.INS_IR  {opcode=opc, dest=d, immed=i}          => ir2Amd64 i d opc
-  | Iloc.INS_RI  {opcode=opc, dest=d, immed=i}          => ri2Amd64 i d opc
-  | Iloc.INS_RR  {opcode=opc, r1=r1, dest=d}            => rr2Amd64 r1 d opc
-  | Iloc.INS_SR  {opcode=opc, r1=r1, id=id}             => sr2Amd64 r1 id opc
-  | Iloc.INS_RS  {opcode=opc, r1=r1, id=id}             => rs2Amd64 r1 id opc
-  | Iloc.INS_R   {opcode=opc, r1=r1}                    => r2Amd64 r1 opc
-  | Iloc.INS_L   {opcode=opc, l1=l1}                    => l2Amd64 l1 opc
-  | Iloc.INS_X   {opcode=opc}                           => x2Amd64 len opc
+ fn Iloc.INS_RRR {opcode=c, r1=r1, dest=d, r2=r2}     => rrr2Amd64 r1 r2 d c
+  | Iloc.INS_RIR {opcode=c, r1=r1, dest=d, immed=i}   => rir2Amd64 r1 i d c
+  | Iloc.INS_RRI {opcode=c, r1=r1, r2=r2, immed=i}    => rri2Amd64 r1 r2 i c
+  | Iloc.INS_RRC {opcode=c, r1=r1, r2=r2}             => rrc2Amd64 r1 r2 c
+  | Iloc.INS_RIC {opcode=c, r1=r1, immed=i}           => ric2Amd64 r1 i c
+  | Iloc.INS_SIR {opcode=c, r1=r1, id=id, immed=i}    => sir2Amd64 r1 i id c
+  | Iloc.INS_CLL {opcode=c, l1=l1, l2=l2}             => cll2Amd64 l1 l2 c
+  | Iloc.INS_NEW {opcode=c, dest=d, id=id, fields=fs} => new2Amd64 id fs d c
+  | Iloc.INS_IR  {opcode=c, dest=d, immed=i}          => ir2Amd64 i d c
+  | Iloc.INS_RI  {opcode=c, dest=d, immed=i}          => ri2Amd64 i d c
+  | Iloc.INS_RR  {opcode=c, r1=r1, dest=d}            => rr2Amd64 r1 d c
+  | Iloc.INS_SR  {opcode=c, r1=r1, id=id}             => sr2Amd64 r1 id c
+  | Iloc.INS_RS  {opcode=c, r1=r1, id=id}             => rs2Amd64 r1 id c
+  | Iloc.INS_R   {opcode=c, r1=r1}                    => r2Amd64 r1 c
+  | Iloc.INS_L   {opcode=c, l1=l1}                    => l2Amd64 l1 c
+  | Iloc.INS_X   {opcode=c}                           => x2Amd64 len c
 
 
 fun getPLen1 funcs (call, max) =

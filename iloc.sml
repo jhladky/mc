@@ -222,7 +222,7 @@ in
     fun programToStr funcs =
         foldr (fn (func, s) => (funcToStr func) ^ s) "" funcs
 
-    val rToStr = rToStr
+    val rToStr = rToStr (* TODO: Remove these later! *)
     val insToStr = insToStr
 end
 

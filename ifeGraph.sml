@@ -6,7 +6,8 @@ signature IFE_GRAPH = sig
 
     val mkGraph : unit -> ife_graph
     val toList : ife_graph -> TargetAmd64.register list
-    val toListRep : ife_graph -> (TargetAmd64.register * TargetAmd64.register list) list
+    val toListRep : ife_graph -> (TargetAmd64.register *
+                                  TargetAmd64.register list) list
     val mkNode : ife_graph -> TargetAmd64.register -> node
     val find : ife_graph -> TargetAmd64.register -> node option
     val remove : ife_graph -> node -> unit

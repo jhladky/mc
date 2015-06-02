@@ -21,10 +21,10 @@ datatype dataflow_analysis =
 fun involved t (src, tgt) = src = t orelse tgt = t
 
 
-(* If an instruction IS a copy and HAS NOT been killed add it to the gen set.
- * If the register target of an instruction HAS been involved in a copy then
- * add it to the kill set. *)
-fun insToGK copies (gen, kill) ins =
+(* If an instruction is a copy and HAS NOT been killed add it to the gen set.
+ * If the target of an instruction HAS been involved in a copy then add it to
+ * the kill set. *)
+fun iToGK copies (ins, (gen, kill)) =
     let
         val copies = case #2 (getST ins) of
                          NONE => copies
@@ -40,13 +40,12 @@ fun insToGK copies (gen, kill) ins =
     end
 
 
+fun insToGK copies (id, ins) =
+    List.foldr (iToGK copies) (empty (), empty ()) ins
+
+
 fun bbToDFA copies (id, ins) =
-    let
-        val gk = List.foldr (fn (i, gk) => insToGK copies gk i)
-                            (empty (), empty ()) ins
-    in
-        DFA {id=id, ins=ins, gk=gk, copyIn=copies, diff=true}
-    end
+    DFA {id=id, ins=ins, gk=insToGK copies (id, ins), copyIn=copies, diff=true}
 
 
 fun replaceIns f ins =

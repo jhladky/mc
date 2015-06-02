@@ -37,8 +37,8 @@ fun mkIi st cfg (Ast.FUNCTION {params=params, decls=decls, id=id, ...}) compat =
         val addVD = (fn (Ast.VAR_DECL {id=s, typ=t, ...}) =>
                         HashTable.insert ht (s, t))
     in
-        app addVD decls;
-        app addVD params;
+        List.app addVD decls;
+        List.app addVD params;
         II {
             id=id,
             st=st,
@@ -75,8 +75,13 @@ fun mkWhile cfg node =
     end
 
 
-fun mkReturn cfg = (Cfg.getExit cfg, Cfg.mkNode cfg (nextLabel (), []))
-fun getLabel (n: (string * Iloc.instruction list) Cfg.node) = #1 (Cfg.getData n)
+local
+    open Cfg
+    open Iloc
+in
+    fun mkReturn cfg = (getExit cfg, mkNode cfg (nextLabel (), []))
+    fun getLabel (n: (string * instruction list) node) = #1 (getData n)
+end
 
 
 fun fill node L =
