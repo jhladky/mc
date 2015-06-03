@@ -179,9 +179,9 @@ fun colorIns vtr (INS_RR {opcode=opc, r1=r1, r2=r2}) =
 fun diffCheck (DFA {diff=d, ...}, diff) = if d then true else diff
 
 
-fun buildLvas cfg =
+fun buildDFAs cfg =
     if Cfg.fold diffCheck false cfg
-    then (Cfg.app propagate cfg; buildLvas cfg)
+    then (Cfg.app propagate cfg; buildDFAs cfg)
     else cfg
 
 
@@ -255,7 +255,7 @@ fun color spilled (id, cfg) =
         val ife = IfeGraph.mkGraph ()
         val vtr = Util.mkHt ()
     in
-        Cfg.app (mkIfeGraph ife) (buildLvas (Cfg.map bbToDFA cfg));
+        Cfg.app (mkIfeGraph ife) (buildDFAs (Cfg.map bbToDFA cfg));
         case buildVtr vtr (deconstruct spilled ife) of
             SOME reg => color (reg::spilled)
                               (id, Cfg.map (spill spilled reg) cfg)

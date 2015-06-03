@@ -134,9 +134,9 @@ fun propagate node =
 fun diffCheck (DFA {diff=d, ...}, diff) = if d then true else diff
 
 
-fun buildLvas cfg =
+fun buildDFAs cfg =
     if Cfg.fold diffCheck false cfg
-    then (Cfg.app propagate cfg; buildLvas cfg)
+    then (Cfg.app propagate cfg; buildDFAs cfg)
     else cfg
 
 
@@ -167,7 +167,7 @@ fun replaceCopies (DFA {id=id, ins=ins, copyIn=copyIn, ...}) =
 fun optFunc (id, cfg) =
     let
         val copies = Cfg.fold findCopies (empty ()) cfg
-        val lvas = buildLvas (Cfg.map (bbToDFA copies) cfg)
+        val lvas = buildDFAs (Cfg.map (bbToDFA copies) cfg)
         fun dash s n = if n = 0 then s else dash (s ^ "-") (n - 1)
     in
         print ("/-----" ^ id ^ "-----\\\n");

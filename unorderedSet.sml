@@ -23,6 +23,7 @@ signature UORD_SET = sig
     val difference : ''a set * ''a set -> ''a set
     val map : (''a -> ''b) -> ''a set -> ''b set
     val app : (''a -> unit) -> ''a set -> unit
+    (* TODO: Order doesn't matter in sets. Get rid of one of the fold functions. *)
     val foldl : ((''a * 'b) -> 'b) -> 'b -> ''a set -> 'b
     val foldr : ((''a * 'b) -> 'b) -> 'b -> ''a set -> 'b
     val filter : (''a -> bool) -> ''a set -> ''a set
