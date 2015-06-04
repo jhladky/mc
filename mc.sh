@@ -17,8 +17,9 @@ Options:
 -dump-il       Generate the ILOC and stop.
 -mochi-compat  Make generated ILOC runnable by the Mochi simulator.
 -no-opt        Disable all optimizations.
--no-opt-copy-propagation
+-no-opt-copy-prop
                Disable copy propagation optimization.
+-no-opt-lvn    Disable local value numbering optimization.
 -no-opt-strip  Disable dead code stripping optimization.
 -no-reg-alloc  Don't run the register allocation algorithm.
 -o <file>      Specify name of output binary. Default is \"a.out\".
@@ -30,7 +31,8 @@ Options:
 DUMP_IL=false
 MOCHI_COMPAT=false
 NO_OPT=false
-NO_OPT_COPY_PROPAGATION=false
+NO_OPT_COPY_PROP=false
+NO_OPT_LVN=false
 NO_OPT_STRIP=false
 NO_REG_ALLOC=false
 O="a.out"
@@ -42,16 +44,17 @@ do
 key="$1"
 
 case $key in
-    -dump-il)                 DUMP_IL=true;;
-    -h|-help)                 print_usage;;
-    -mochi-compat)            MOCHI_COMPAT=true;;
-    -no-opt)                  NO_OPT=true;;
-    -no-opt-copy-propagation) NO_OPT_COPY_PROPAGATION=true;;
-    -no-opt-strip)            NO_OPT_STRIP=true;;
-    -no-reg-alloc)            NO_REG_ALLOC=true;;
-    -o)                       O="$2"; shift;;
-    -S)                       S=true;;
-    -static-check)            STATIC_CHECK=true;;
+    -dump-il)          DUMP_IL=true;;
+    -h|-help)          print_usage;;
+    -mochi-compat)     MOCHI_COMPAT=true;;
+    -no-opt)           NO_OPT=true;;
+    -no-opt-copy-prop) NO_OPT_COPY_PROP=true;;
+    -no-opt-lvn)       NO_OPT_LVN=true;;
+    -no-opt-strip)     NO_OPT_STRIP=true;;
+    -no-reg-alloc)     NO_REG_ALLOC=true;;
+    -o)                O="$2"; shift;;
+    -S)                S=true;;
+    -static-check)     STATIC_CHECK=true;;
     *)
         printf "Unknown option $1\n"
     print_usage
@@ -81,7 +84,7 @@ if [ -n "$PARSER_OUPUT" ]; then
     exit 1
 fi
 
-./compiler "$NAME" "$DUMP_IL" "$MOCHI_COMPAT" "$NO_OPT" "$NO_OPT_COPY_PROPAGATION" "$NO_OPT_STRIP" "$NO_REG_ALLOC" "$STATIC_CHECK" `uname`
+./compiler "$NAME" "$DUMP_IL" "$MOCHI_COMPAT" "$NO_OPT" "$NO_OPT_COPY_PROP" "$NO_OPT_LVN" "$NO_OPT_STRIP" "$NO_REG_ALLOC" "$STATIC_CHECK" `uname`
 
 if [ $? -ne 0 ]; then
     exit 1

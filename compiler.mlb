@@ -13,14 +13,14 @@ static.sml
 (* Generic data structures. *)
 cfg.sml
 unorderedSet.sml
+dfa.sml
 
 iloc.sml
 ilocUtil.sml
 ast2Iloc.sml
 
-dfa.sml
-
 (* Optimizations *)
+lvNumbering.sml
 copyProp.sml
 stripDeadCode.sml
 
