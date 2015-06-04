@@ -3,6 +3,7 @@ signature COPY_PROP = sig
 end
 
 structure CopyProp :> COPY_PROP = struct
+open Util
 open Iloc
 open UnorderedSet
 
@@ -79,7 +80,7 @@ fun replaceIns f ins =
 
 
 fun isCondMove (INS_RR {opcode=opc, ...}) =
-    Util.has opc [OP_MOVEQ, OP_MOVNE, OP_MOVLT, OP_MOVGT, OP_MOVLE, OP_MOVGE]
+    has opc [OP_MOVEQ, OP_MOVNE, OP_MOVLT, OP_MOVGT, OP_MOVLE, OP_MOVGE]
   | isCondMove _ = false
 
 
@@ -87,7 +88,7 @@ fun isCondMove (INS_RR {opcode=opc, ...}) =
 (*     let *)
 (*         val (sources, _) = getST ins *)
 (*     in *)
-(*         if Util.has reg sources andalso not (isCondMove ins) *)
+(*         if has reg sources andalso not (isCondMove ins) *)
 (*         then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of *)
 (*                  SOME ((src, _), _) => src *)
 (*                | NONE => reg *)
@@ -95,10 +96,10 @@ fun isCondMove (INS_RR {opcode=opc, ...}) =
 (*     end *)
 
 fun replaceReg copyIn ins reg =
-    if Util.has reg (#1 (getST ins)) andalso not (isCondMove ins)
+    if has reg (#1 (getST ins)) andalso not (isCondMove ins)
     then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of
              SOME ((src, _), _) =>
-             (print ("Replaced [" ^ Util.iToS reg ^ "] with [" ^ Util.iToS src ^ "] in " ^  insToStr ins ^ "\n");
+             (print ("Replaced [" ^ iToS reg ^ "] with [" ^ iToS src ^ "] in " ^  insToStr ins ^ "\n");
               src)
            | NONE => reg
     else reg

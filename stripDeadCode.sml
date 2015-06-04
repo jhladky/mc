@@ -50,11 +50,8 @@ fun bbToDFA defs (id, ins) =
 fun diffCheck (DFA {diff=d, ...}, diff) = if d then true else diff
 
 
-fun notInKill tgt1 kill = not (exists (fn (tgt2, _, _) => tgt1 = tgt2) kill)
-
-
 fun removeKilled reaches kill =
-    filter (fn (tgt, _, _) => notInKill tgt kill) reaches
+    filter (fn (tgt, _, _) => not (exists (involved tgt) kill)) reaches
 
 
 fun propagate1 (DFA {gk=(gen, kill), reaches=reaches, ...}, s) =
@@ -81,31 +78,25 @@ fun isCriticalRR opc =
     has opc [OP_MOVEQ, OP_MOVNE, OP_MOVLT, OP_MOVGT, OP_MOVLE, OP_MOVGE]
 
 
-(* -> INS_R is OP_PRINT, OP_PRINTLN, OP_READ, OP_STORERET, OP_LOADRET, OP_DEL
- * -> INS_L is OP_CALL, OP_JUMPI
- * -> INS_CLL is OP_CBREQ
- * -> INS_RIC is OP_COMPI
- * -> INS_RI is OP_STOREOUTARGUMENT
- * -> INS_RRC is OP_COMP
- * -> INS_SR is OP_COMPUTEGLOBALADDRESS, OP_LOADGLOBAL
- * -> INS_RS is OP_STOREGLOBAL
- * -> INS_X is OP_RET
- * -> INS_RRI is OP_STOREAI
- * -> INS_RR is OP_MOVEQ, OP_MOVNE, OP_MOVLT, OP_MOVGT, OP_MOVLE, OP_MOVGE*)
+(* INS_R:   {OP_PRINT, OP_PRINTLN, OP_READ, OP_STORERET, OP_LOADRET, OP_DEL}
+ * INS_L:   {OP_CALL, OP_JUMPI}
+ * INS_CLL: {OP_CBREQ}
+ * INS_SR:  {OP_COMPUTEGLOBALADDRESS, OP_LOADGLOBAL}
+ * INS_RR:  {OP_MOVEQ, OP_MOVNE, OP_MOVLT, OP_MOVGT, OP_MOVLE, OP_MOVGE} *)
 val isCritical =
- fn INS_R {...}                     => true
-  | INS_L {...}                     => true
-  | INS_X {...}                     => true
-  | INS_CLL {...}                   => true
-  | INS_RIC {...}                   => true
-  | INS_RI {...}                    => true
-  | INS_RRC {...}                   => true
-  | INS_SR {...}                    => true
-  | INS_RS {...}                    => true
-  | INS_RRI {...}                   => true
-  | INS_RIR {opcode=OP_LOADAI, ...} => true
-  | INS_RR {opcode=opc, ...}        => isCriticalRR opc
-  | _                               => false
+ fn INS_R {...}                              => true
+  | INS_L {...}                              => true
+  | INS_X {opcode=OP_RET, ...}               => true
+  | INS_CLL {...}                            => true
+  | INS_RIC {opcode=OP_COMPI, ...}           => true
+  | INS_RI {opcode=OP_STOREOUTARGUMENT, ...} => true
+  | INS_RRC {opcode=OP_COMP, ...}            => true
+  | INS_SR {...}                             => true
+  | INS_RS {opcode=OP_STOREGLOBAL, ...}      => true
+  | INS_RRI {opcode=OP_STOREAI, ...}         => true
+  | INS_RIR {opcode=OP_LOADAI, ...}          => true
+  | INS_RR {opcode=opc, ...}                 => isCriticalRR opc
+  | _                                        => false
 
 
 fun getCriticalIns id ((i, _), (critical, n)) =
