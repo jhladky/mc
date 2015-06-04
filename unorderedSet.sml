@@ -23,9 +23,7 @@ signature UORD_SET = sig
     val difference : ''a set * ''a set -> ''a set
     val map : (''a -> ''b) -> ''a set -> ''b set
     val app : (''a -> unit) -> ''a set -> unit
-    (* TODO: Order doesn't matter in sets. Get rid of one of the fold functions. *)
-    val foldl : ((''a * 'b) -> 'b) -> 'b -> ''a set -> 'b
-    val foldr : ((''a * 'b) -> 'b) -> 'b -> ''a set -> 'b
+    val fold : ((''a * 'b) -> 'b) -> 'b -> ''a set -> 'b
     val filter : (''a -> bool) -> ''a set -> ''a set
     val exists : (''a -> bool) -> ''a set -> bool
     val find : (''a -> bool) -> ''a set -> ''a option
@@ -97,8 +95,7 @@ fun numItems (SET L) = length L
 fun listItems (SET L) = L
 fun map f (SET L) = SET (List.map f L)
 fun app f (SET L) = List.app f L
-fun foldl f start (SET L) = List.foldl f start L
-fun foldr f start (SET L) = List.foldr f start L
+fun fold f start (SET L) = List.foldr f start L
 fun exists f (SET L) = List.exists f L
 fun filter f (SET L) = SET (List.filter f L)
 fun find f (SET L) = List.find f L

@@ -2,6 +2,7 @@ signature UTIL = sig
     val mkHt : unit -> (string, 'a) HashTable.hash_table
     val fail : string -> int -> string -> unit
     val foldd : string -> ('a -> string) -> 'a list -> string
+    val mapn : ('a -> int -> 'b) -> 'a list -> 'b list
     val iToS : int -> string (* Handles negatives properly. *)
     val has : ''a  -> ''a list -> bool
     datatype platform = LINUX | OS_X
@@ -22,6 +23,10 @@ fun fail file l msg =
 fun foldd sep f [] = ""
   | foldd sep f (x::[]) = f x
   | foldd sep f (x::xs) = (f x) ^ sep ^ (foldd sep f xs)
+
+
+fun mapn f L =
+    #1 (foldl (fn (item, (items, n)) => (items @ [f item n], n + 1)) ([], 0) L)
 
 
 fun iToS n = if n < 0 then "-" ^ Int.toString (~n) else Int.toString n

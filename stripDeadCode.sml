@@ -3,6 +3,7 @@ signature STRIP_DEAD_CODE = sig
 end
 
 structure StripDeadCode :> STRIP_DEAD_CODE = struct
+open Util
 open Iloc
 open UnorderedSet
 
@@ -20,6 +21,7 @@ datatype dataflow_analysis =
 fun getTOpt i = #2 (getST i)
 fun hasNewerDef reg gen = exists (fn (def, _, _) => def = reg) gen
 fun notInvolved tgt (reg, _, _) = tgt <> reg
+fun involved tgt (reg, _, _) = tgt = reg
 
 
 (* If the instruction is the last definition in the basic block, then add
@@ -33,7 +35,7 @@ fun iToGK defs id (i, (gen, kill, n)) =
         (gen, kill, n -1)
       | SOME tgt =>
         (if not (hasNewerDef tgt gen) then add (gen, (tgt, id, n)) else gen,
-         union (kill, filter (notInvolved tgt) defs),
+         union (kill, filter (involved tgt) defs),
          n - 1)
 
 
@@ -41,11 +43,18 @@ fun insToGK defs (id, ins) =
     List.foldr (iToGK defs id) (empty (), empty (), length ins - 1) ins
 
 
+(* TODO: Remove these later! *)
+fun defToStr (reg, label, position) =
+    "(" ^ rToStr reg ^ " " ^ label ^ " " ^ iToS position ^ ")"
+
+
 fun bbToDFA defs (id, ins) =
     let
         val (gen, kill, _) = insToGK defs (id, ins)
-        val ins = List.map (fn i => (i, true)) ins
+        val ins = List.map (fn i => (i, false)) ins
     in
+        (* print (id ^ " gen: " ^ toString defToStr gen ^ "\n"); *)
+        (* print (id ^ " kill: " ^ toString defToStr kill ^ "\n"); *)
         DFA {id=id, ins=ins, gk=(gen, kill), reaches=empty (), diff=true}
     end
 
@@ -53,9 +62,18 @@ fun bbToDFA defs (id, ins) =
 fun diffCheck (DFA {diff=d, ...}, diff) = if d then true else diff
 
 
-fun propagate1 (DFA {gk=(gen, kill), reaches=reaches, ...}, s) =
-    union (s, union (gen, difference (reaches, kill)))
+fun notInKill tgt1 kill = not (exists (fn (tgt2, _, _) => tgt1 = tgt2) kill)
 
+
+fun removeKilled reaches kill =
+    filter (fn (tgt, _, _) => notInKill tgt kill) reaches
+
+
+fun propagate1 (DFA {gk=(gen, kill), reaches=reaches, ...}, s) =
+    union (s, union (gen, removeKilled reaches kill))
+
+
+(*There is a problem here!*)
 
 (* Reaches(n) = the union of each basic block m for all m in pred(n),
  * where n is the current basic block OF gen(m) U (Reaches(m) - kill(m)) *)
@@ -65,13 +83,11 @@ fun propagate node =
         val rs = List.foldr propagate1 (empty ()) (Cfg.getPreds node)
         val diff = not (equal (reaches, rs))
     in
+        (* print (id ^ " tmp reaches: " ^ toString defToStr reaches ^ "\n"); *)
+        (* print (id ^ " tmp rs:      " ^ toString defToStr rs ^ "\n"); *)
+        (* print (id ^ " diff:        " ^ Bool.toString diff ^ "\n"); *)
         DFA {id=id, ins=ins, gk=gk, reaches=rs, diff=diff}
     end
-
-
-(* TODO: Remove these later! *)
-fun defToStr (reg, label, position) =
-    "(" ^ rToStr reg ^ " " ^ label ^ " " ^ Util.iToS position ^ ")"
 
 
 (* TODO: Remove these later! *)
@@ -79,19 +95,19 @@ fun printReaches node =
     let
         val dfa as DFA {id=id, reaches=reaches, ...} = Cfg.getData node
     in
-        print (id ^ " reaches: [" ^ Util.foldd ", " defToStr (listItems reaches) ^ "]\n");
-        dfa
+        print (id ^ " reaches: " ^ toString defToStr reaches ^ "\n"); dfa
     end
 
 
 fun buildDFAs cfg =
     if Cfg.fold diffCheck false cfg
     then (Cfg.app propagate cfg; buildDFAs cfg)
-    else (Cfg.app printReaches cfg; cfg)
+    (* else (Cfg.app printReaches cfg; cfg) *)
+    else cfg
 
 
 fun isCriticalRR opc =
-    Util.has opc [OP_MOVEQ, OP_MOVNE, OP_MOVLT, OP_MOVGT, OP_MOVLE, OP_MOVGE]
+    has opc [OP_MOVEQ, OP_MOVNE, OP_MOVLT, OP_MOVGT, OP_MOVLE, OP_MOVGE]
 
 
 (* -> INS_R is OP_PRINT, OP_PRINTLN, OP_READ, OP_STORERET, OP_LOADRET, OP_DEL
@@ -192,55 +208,84 @@ fun reachesLocal reaches id ins i =
     #1 (List.foldl (reachesLocal1 id) (reaches, 0) (getBefore ins i))
 
 
-fun getLocalDefI1 pos ((i, mark), (ins, n)) =
-    (if n = pos andalso not mark then i::ins else ins, n + 1)
+fun getCriticalIns id ((i, _), (critical, n)) =
+    (if isCritical i then add (critical, (i, id, n)) else critical,
+     n + 1)
 
 
-fun getLocalDefI ins ((_, _, pos), defIns) =
+fun getCritical (DFA {id=id, ins=ins, ...}, accum) =
     let
-        val (ins, _) = List.foldl (getLocalDefI1 pos) ([], 0) ins
+        val (critical, _) = List.foldl (getCriticalIns id) (empty (), 0) ins
     in
-        addList (defIns, ins)
+        union (accum, critical)
     end
 
 
-fun markLocalDef locals (i, mark) =
-    if member (locals, i) then (i, true) else (i, mark)
+(* TODO: Debugging function. Remove later. *)
+fun wToStr (i, id, pos) = "<" ^ insToStr i ^ ", " ^ id ^ ", " ^ iToS pos ^ ">"
 
 
-fun mark1 cfg reaches work id ins =
+fun markI pos (i, mark) n = if pos = n then (i, true) (*before print ("marking " ^ wToStr (i, "_", pos) ^ "\n") *)else (i, mark)
+
+
+fun markIns1 (_, defId, pos) node =
+    let
+        val dfa as DFA {id=id, ins=ins, gk=gk, reaches=rs, ...} =
+            Cfg.getData node
+    in
+        if defId = id
+        then DFA {id=id, ins=mapn (markI pos) ins, gk=gk,
+                  reaches=rs, diff=false}
+        else dfa
+    end
+
+
+fun markIns cfg def = Cfg.app (markIns1 def) cfg
+
+
+fun getDfa cfg defId = valOf (Cfg.find (fn DFA {id=id, ...} => defId = id) cfg)
+
+
+fun getToMarkI id pos ((i, mark), (toMark, n)) =
+    (if n = pos andalso not mark then add (toMark, (i, id, pos)) else toMark,
+     n + 1)
+
+
+fun getToMark1 (_, defId, pos) (DFA {id=id, ins=ins, ...}, toMark) =
+    if defId = id
+    then union (toMark, #1 (List.foldl (getToMarkI id pos) (empty (), 0) ins))
+    else toMark
+
+
+fun getToMark cfg (def, toMark) =
+    union (toMark, Cfg.fold (getToMark1 def) (empty ()) cfg)
+
+
+(* return a list of instructions to mark *)
+fun mark1 cfg (i, id, pos) =
+    let
+        val (sources, _) = getST i
+        val DFA {reaches=reaches, ins=ins, ...} = getDfa cfg id
+        val defs = fold (getDefs (reachesLocal reaches id ins i)) (empty ())
+                        (addList (empty (), sources))
+        val toMark = fold (getToMark cfg) (empty ()) defs
+        (* val _ = print (insToStr i ^ " source defs: " ^ toString defToStr defs ^ ", ") *)
+        (* val _ = print ("toMark: " ^ toString wToStr toMark ^ "\n") *)
+    in
+        toMark
+    end
+
+
+fun mark work cfg =
     case pick work of
-        NONE => ins
+        NONE => ()
       | SOME (i, rest) =>
         let
-            val (sources, _) = getST i
-            (* defs will be a set of all the definitions of all the sources. *)
-            val defs = foldr (getDefs (reachesLocal reaches id ins i)) (empty ())
-                             (addList (empty (), sources))
-            val _ = print ("source defs for " ^ insToStr i ^ ": [" ^ Util.foldd ", " defToStr (listItems defs) ^ "]\n")
-            val awayDefs = filter (fn (_, defId, _) => defId <> id) defs
-            val localDefs = difference (defs, awayDefs)
-            val awayIns = foldr (getDefI cfg) (empty ()) awayDefs
-            val localIns = foldr (getLocalDefI ins) (empty ()) localDefs
+            val toMark = mark1 cfg i
         in
-            (*possible bug here? looks like ins never changes?? *)
-            mark1 cfg reaches (union (rest, union (awayIns, localIns))) id
-                  (List.map (markLocalDef localIns) ins)
+            app (markIns cfg) toMark;
+            mark (union (rest, toMark)) cfg
         end
-
-
-(* fun imToStr (i, mark) = "(" ^ insToStr i ^ ", " ^ Bool.toString mark ^ ")" *)
-
-fun mark cfg node =
-    let
-        val DFA {id=id, ins=ins, gk=gk, reaches=reaches, ...} = Cfg.getData node
-        val (ins, work) = List.foldr markCritical ([], empty ()) ins
-        val _ = print (id ^ " critical: [" ^ Util.foldd ", " insToStr (listItems work) ^ "]\n")
-        val ins = mark1 cfg reaches work id ins
-    in
-        (* The diff field doesn't matter now. *)
-        DFA {id=id, ins=ins, gk=gk, reaches=reaches, diff=false}
-    end
 
 
 fun sweepIns ((i, mark), L) = (* if mark then i::L else L *)
@@ -263,12 +308,20 @@ fun findDefs ((id, ins), defs) =
 
 fun optFunc (id, cfg) =
     let
+        val _ = print ("/-----" ^ id ^ "-----\\\n");
         val defs = Cfg.fold findDefs (empty ()) cfg
         val lvas = buildDFAs (Cfg.map (bbToDFA defs) cfg)
-    in (*I actually think we're OK up to here...*)
-        Cfg.app (mark lvas) lvas;
-        (id, Cfg.map sweep lvas)
-        before print "----------------------\n"
+        (* I actually think we're OK up to this line. *)
+
+        (*merge this back in at some point*)
+        val critical = Cfg.fold getCritical (empty ()) lvas
+        (* val _ = print ("critical: " ^ toString wToStr critical ^ "\n") *)
+        fun dash s n = if n = 0 then s else dash (s ^ "-") (n - 1)
+    in
+        app (markIns lvas) critical;
+        mark critical lvas;
+        (id, Cfg.map sweep lvas) before
+        print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
     end
 
 

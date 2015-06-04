@@ -9,6 +9,7 @@ signature CFG = sig
     val map : ('a -> 'b) -> 'a cfg -> 'b cfg
     val app : ('a node -> 'a) -> 'a cfg -> unit
     val fold : ('a * 'b -> 'b) -> 'b -> 'a cfg -> 'b
+    val find : ('a -> bool) -> 'a cfg -> 'a option
     val update : 'a node -> 'a -> unit
 
     val getData : 'a node -> 'a
@@ -61,9 +62,10 @@ fun addEdge (node1 as NODE {next=next, ...}) (node2 as NODE {prev=prev, ...}) =
 fun update (NODE {data=data, ...}) newData = data := newData
 fun getExit (CFG {exit=exit, ...}) = exit
 fun getData (NODE {data=data, ...}) = !data
-fun find nId nodes = List.find (fn NODE {id=id, ...} => id = nId) nodes
+fun find' nId nodes = List.find (fn NODE {id=id, ...} => id = nId) nodes
 fun getSuccs (NODE {next=next, ...}) = List.map getData (!next)
 fun getPreds (NODE {prev=prev, ...}) = List.map getData (!prev)
+fun find f (CFG {nodes=nodes, ...}) = List.find f (map getData (!nodes))
 
 
 fun toList (CFG {nodes=nodes, entry=en as NODE {id=enId, ...},
@@ -80,7 +82,7 @@ fun fold f init cfg = foldl f init (toList cfg)
 
 
 fun map1 f L (NODE {id=id, data=data, next=next, prev=prev}) =
-    case find id (!L) of
+    case find' id (!L) of
         SOME newNode => newNode
       | NONE =>
         let
@@ -101,7 +103,7 @@ fun map f (CFG {entry=entry, exit=NODE {id=id, ...}, ...}) =
         val nodes = ref []
         val newEntry = map1 f nodes entry
     in
-        CFG {entry=newEntry, exit=valOf (find id (!nodes)), nodes=nodes}
+        CFG {entry=newEntry, exit=valOf (find' id (!nodes)), nodes=nodes}
     end
 
 
