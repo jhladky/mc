@@ -3,18 +3,10 @@ signature REG_ALLOC = sig
 end
 
 structure RegAlloc :> REG_ALLOC = struct
+open Dfa
 open TargetAmd64
 open UnorderedSet
 
-
-datatype dataflow_analysis =
-         DFA of {
-             id: string,
-             ins: instruction list,
-             gk: register set * register set,
-             liveOut: register set,
-             diff: bool
-         }
 
 (* Set of all the actual i.e. not virtual, registers. *)
 val actual = addList (empty (), [REG_RAX, REG_RBX, REG_RCX, REG_RDX,
@@ -55,20 +47,20 @@ fun insToGK (id, ins) = List.foldl iToGK (empty (), empty ()) ins
 
 
 fun bbToDFA (id, ins) =
-    DFA {id=id, ins=ins, gk=insToGK (id, ins), liveOut=empty (), diff=true}
+    DFA {id=id, ins=ins, gk=insToGK (id, ins), propSet=empty (), diff=true}
 
 
-fun propagate1 (DFA {gk=(gen, kill), liveOut=liveOut, ...}, s) =
+fun propagate1 (DFA {gk=(gen, kill), propSet=liveOut, ...}, s) =
     union (s, union (gen, difference (liveOut, kill)))
 
 
 fun propagate node =
     let
-        val DFA {id=id, ins=ins, gk=gk, liveOut=liveOut, ...} = Cfg.getData node
+        val DFA {id=id, ins=ins, gk=gk, propSet=liveOut, ...} = Cfg.getData node
         val lo = List.foldr propagate1 (empty ()) (Cfg.getSuccs node)
         val diff = not (equal (liveOut, lo))
     in
-        DFA {id=id, ins=ins, gk=gk, liveOut=lo, diff=diff}
+        DFA {id=id, ins=ins, gk=gk, propSet=lo, diff=diff}
     end
 
 
@@ -94,7 +86,7 @@ fun insIfeGraph ife (i, liveNow) =
 
 fun mkIfeGraph ife node =
     let
-        val lva as DFA {ins=ins, liveOut=liveOut, ...} = Cfg.getData node
+        val lva as DFA {ins=ins, propSet=liveOut, ...} = Cfg.getData node
     in
         List.foldr (insIfeGraph ife) liveOut ins;
         lva
@@ -176,15 +168,6 @@ fun colorIns vtr (INS_RR {opcode=opc, r1=r1, r2=r2}) =
   | colorIns _ ins = [ins]
 
 
-fun diffCheck (DFA {diff=d, ...}, diff) = if d then true else diff
-
-
-fun buildDFAs cfg =
-    if Cfg.fold diffCheck false cfg
-    then (Cfg.app propagate cfg; buildDFAs cfg)
-    else cfg
-
-
 (* Calculate how much spill space we need. Make sure it is 16-byte aligned.
  * Check the existing amount of space as well as how many registers we have to
  * save at the top.*)
@@ -255,7 +238,7 @@ fun color spilled (id, cfg) =
         val ife = IfeGraph.mkGraph ()
         val vtr = Util.mkHt ()
     in
-        Cfg.app (mkIfeGraph ife) (buildDFAs (Cfg.map bbToDFA cfg));
+        Cfg.app (mkIfeGraph ife) (buildDFAs propagate (Cfg.map bbToDFA cfg));
         case buildVtr vtr (deconstruct spilled ife) of
             SOME reg => color (reg::spilled)
                               (id, Cfg.map (spill spilled reg) cfg)

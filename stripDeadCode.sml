@@ -4,19 +4,12 @@ end
 
 structure StripDeadCode :> STRIP_DEAD_CODE = struct
 open Util
+open Dfa
 open Iloc
 open UnorderedSet
 
 type definition = int * string * int
 
-datatype dataflow_analysis =
-         DFA of {
-             id: string,
-             ins: (instruction * bool) list,
-             gk: definition set * definition set,
-             reaches: definition set,
-             diff: bool
-         }
 
 fun getTOpt i = #2 (getST i)
 fun hasNewerDef reg gen = exists (fn (def, _, _) => def = reg) gen
@@ -43,35 +36,26 @@ fun bbToDFA defs (id, ins) =
         val (gen, kill, _) = insToGK defs (id, ins)
         val ins = List.map (fn i => (i, false)) ins
     in
-        DFA {id=id, ins=ins, gk=(gen, kill), reaches=empty (), diff=true}
+        DFA {id=id, ins=ins, gk=(gen, kill), propSet=empty (), diff=true}
     end
-
-
-fun diffCheck (DFA {diff=d, ...}, diff) = if d then true else diff
 
 
 fun removeKilled reaches kill =
     filter (fn (tgt, _, _) => not (exists (involved tgt) kill)) reaches
 
 
-fun propagate1 (DFA {gk=(gen, kill), reaches=reaches, ...}, s) =
+fun propagate1 (DFA {gk=(gen, kill), propSet=reaches, ...}, s) =
     union (s, union (gen, removeKilled reaches kill))
 
 
 fun propagate node =
     let
-        val DFA {id=id, ins=ins, gk=gk, reaches=reaches, ...} = Cfg.getData node
+        val DFA {id=id, ins=ins, gk=gk, propSet=reaches, ...} = Cfg.getData node
         val rs = List.foldr propagate1 (empty ()) (Cfg.getPreds node)
         val diff = not (equal (reaches, rs))
     in
-        DFA {id=id, ins=ins, gk=gk, reaches=rs, diff=diff}
+        DFA {id=id, ins=ins, gk=gk, propSet=rs, diff=diff}
     end
-
-
-fun buildDFAs cfg =
-    if Cfg.fold diffCheck false cfg
-    then (Cfg.app propagate cfg; buildDFAs cfg)
-    else cfg
 
 
 fun isCriticalRR opc =
@@ -116,12 +100,12 @@ fun markI pos (i, mark) n = if pos = n then (i, true) else (i, mark)
 
 fun markIns1 (_, defId, pos) node =
     let
-        val dfa as DFA {id=id, ins=ins, gk=gk, reaches=rs, ...} =
+        val dfa as DFA {id=id, ins=ins, gk=gk, propSet=rs, ...} =
             Cfg.getData node
     in
         if defId = id
         then DFA {id=id, ins=mapn (markI pos) ins, gk=gk,
-                  reaches=rs, diff=false}
+                  propSet=rs, diff=false}
         else dfa
     end
 
@@ -153,7 +137,7 @@ fun addLocalDef id ((i, _), (reaches, n)) =
 
 fun getDefs cfg (i, id, pos) (source, accum) =
     let
-        val DFA {reaches=reaches, ins=ins, ...} =
+        val DFA {propSet=reaches, ins=ins, ...} =
             valOf (Cfg.find (fn DFA {id=id2, ...} => id = id2) cfg)
         val reaches = #1 (foldl (addLocalDef id) (reaches, 0)
                                 (List.take (ins, pos)))
@@ -202,12 +186,12 @@ fun findDefs ((id, ins), defs) =
 fun optFunc (id, cfg) =
     let
         val defs = Cfg.fold findDefs (empty ()) cfg
-        val lvas = buildDFAs (Cfg.map (bbToDFA defs) cfg)
+        val dfas = buildDFAs propagate (Cfg.map (bbToDFA defs) cfg)
         fun dash s n = if n = 0 then s else dash (s ^ "-") (n - 1)
     in
         print ("/-----" ^ id ^ "-----\\\n");
-        mark lvas;
-        (id, Cfg.map sweep lvas) before
+        mark dfas;
+        (id, Cfg.map sweep dfas) before
         print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
     end
 

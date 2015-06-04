@@ -4,19 +4,11 @@ end
 
 structure CopyProp :> COPY_PROP = struct
 open Util
+open Dfa
 open Iloc
 open UnorderedSet
 
 type copy = int * int
-
-datatype dataflow_analysis =
-         DFA of {
-             id: string,
-             ins: instruction list,
-             gk: copy set * copy set,
-             copyIn: copy set,
-             diff: bool
-         }
 
 
 fun involved t (src, tgt) = src = t orelse tgt = t
@@ -46,7 +38,7 @@ fun insToGK copies (id, ins) =
 
 
 fun bbToDFA copies (id, ins) =
-    DFA {id=id, ins=ins, gk=insToGK copies (id, ins), copyIn=copies, diff=true}
+    DFA {id=id, ins=ins, gk=insToGK copies (id, ins), propSet=copies, diff=true}
 
 
 fun replaceIns f ins =
@@ -113,7 +105,7 @@ fun removeKilled copyIn kill =
                              not (isTarget tgt kill)) copyIn
 
 
-fun propagate2 (DFA {gk=(gen, kill), copyIn=copyIn, ...}) =
+fun propagate2 (DFA {gk=(gen, kill), propSet=copyIn, ...}) =
     union (gen, removeKilled copyIn kill)
 
 
@@ -122,23 +114,14 @@ fun propagate1 (dfa, accum) = intersection (accum, propagate2 dfa)
 
 fun propagate node =
     let
-        val DFA {id=id, ins=ins, gk=gk, copyIn=copyIn, ...} = Cfg.getData node
+        val DFA {id=id, ins=ins, gk=gk, propSet=copyIn, ...} = Cfg.getData node
         val preds = Cfg.getPreds node
         val ci = if length preds = 0 then empty ()
                  else List.foldr propagate1 (propagate2 (hd preds)) (tl preds)
         val diff = not (equal (copyIn, ci))
     in
-        DFA {id=id, ins=ins, gk=gk, copyIn=ci, diff=diff}
+        DFA {id=id, ins=ins, gk=gk, propSet=ci, diff=diff}
     end
-
-
-fun diffCheck (DFA {diff=d, ...}, diff) = if d then true else diff
-
-
-fun buildDFAs cfg =
-    if Cfg.fold diffCheck false cfg
-    then (Cfg.app propagate cfg; buildDFAs cfg)
-    else cfg
 
 
 fun findCopies1 (INS_RR {opcode=OP_MOV, r1=r1, dest=d}, cps) = (r1, d)::cps
@@ -161,18 +144,18 @@ fun replaceCopies1 (i, (ins, copyIn)) =
     end
 
 
-fun replaceCopies (DFA {id=id, ins=ins, copyIn=copyIn, ...}) =
+fun replaceCopies (DFA {id=id, ins=ins, propSet=copyIn, ...}) =
     (id, #1 (List.foldl replaceCopies1 ([], copyIn) ins))
 
 
 fun optFunc (id, cfg) =
     let
         val copies = Cfg.fold findCopies (empty ()) cfg
-        val lvas = buildDFAs (Cfg.map (bbToDFA copies) cfg)
+        val dfas = buildDFAs propagate (Cfg.map (bbToDFA copies) cfg)
         fun dash s n = if n = 0 then s else dash (s ^ "-") (n - 1)
     in
         print ("/-----" ^ id ^ "-----\\\n");
-        (id, Cfg.map replaceCopies lvas) before
+        (id, Cfg.map replaceCopies dfas) before
         print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
     end
 

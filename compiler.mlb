@@ -18,6 +18,8 @@ iloc.sml
 ilocUtil.sml
 ast2Iloc.sml
 
+dfa.sml
+
 (* Optimizations *)
 copyProp.sml
 stripDeadCode.sml
