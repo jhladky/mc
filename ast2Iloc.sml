@@ -1,6 +1,6 @@
 signature AST2ILOC = sig
     val ast2Iloc : SymbolTable.symbol_table -> Ast.program -> bool
-                   -> Iloc.program
+                   -> IlocUtil.iloc_info list
 end
 
 structure Ast2Iloc :> AST2ILOC = struct
@@ -29,18 +29,18 @@ fun idExpr2Ins (ii as II {regs=regs, ...}) id =
 
 
 val bop2Op =
- fn BOP_PLUS => OP_ADD
-  | BOP_MINUS => OP_SUB
-  | BOP_TIMES => OP_MULT
+ fn BOP_PLUS   => OP_ADD
+  | BOP_MINUS  => OP_SUB
+  | BOP_TIMES  => OP_MULT
   | BOP_DIVIDE => OP_DIV
-  | BOP_AND => OP_AND
-  | BOP_OR => OP_OR
-  | BOP_EQ => OP_MOVEQ
-  | BOP_NE => OP_MOVNE
-  | BOP_LT => OP_MOVLT
-  | BOP_GT => OP_MOVGT
-  | BOP_LE => OP_MOVLE
-  | BOP_GE => OP_MOVGE
+  | BOP_AND    => OP_AND
+  | BOP_OR     => OP_OR
+  | BOP_EQ     => OP_MOVEQ
+  | BOP_NE     => OP_MOVNE
+  | BOP_LT     => OP_MOVLT
+  | BOP_GT     => OP_MOVGT
+  | BOP_LE     => OP_MOVLE
+  | BOP_GE     => OP_MOVGE
 
 
 local
@@ -298,7 +298,7 @@ fun mkFuncEntry _ _ [] = []
     ::mkFuncEntry (n + 1) ii xs
 
 
-fun func2Cfg st mc (func as FUNCTION {id=id, body=body, params=params, ...}) =
+fun funcToII st mc (func as FUNCTION {id=id, body=body, params=params, ...}) =
     let
         val (entry, exit, cfg) = Cfg.mkCfg (id, []) (nextLabel (), [])
         val ii = mkIi st cfg func mc
@@ -306,15 +306,13 @@ fun func2Cfg st mc (func as FUNCTION {id=id, body=body, params=params, ...}) =
         val _ = fill exit [INS_X {opcode=OP_RET}]
         val res = foldl (fn (s, node) => stmt2BB ii node s) entry body
     in
-        Cfg.addEdge res exit;
-        fill res (genJump exit);
-        (id, cfg)
+        Cfg.addEdge res exit; fill res (genJump exit); ii
     end
 
 
 fun ast2Iloc st (PROGRAM {funcs=fs, types=ts, ...}) mochiCompat =
     (app (addType types) ts;
      app (calcOffsets offsets) ts;
-     map (func2Cfg st mochiCompat) fs)
+     map (funcToII st mochiCompat) fs)
 
 end

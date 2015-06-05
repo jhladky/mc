@@ -38,9 +38,9 @@ fun doDumpIl fname iloc =
 fun stage2 st ast fname dumpIl mochiCompat noOpt
            noCopyProp noRegAlloc noStrip noLvn platform =
     let
-        val iloc = Ast2Iloc.ast2Iloc st ast mochiCompat
-        val iloc = if noOpt orelse noLvn then iloc
-                   else LvNumbering.lvNumbering iloc
+        val iis = Ast2Iloc.ast2Iloc st ast mochiCompat
+        val iloc = if noOpt orelse noLvn then map IlocUtil.iiToIloc iis
+                   else LvNumbering.lvNumbering iis
         val iloc = if noOpt orelse noCopyProp then iloc
                    else CopyProp.copyProp iloc
         val iloc = if noOpt orelse noStrip then iloc

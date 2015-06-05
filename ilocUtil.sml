@@ -108,4 +108,7 @@ val getVDId = fn (Ast.VAR_DECL {id=s, ...}) => s
 fun addType types (Ast.TYPE_DECL {id=id, decls=decls, ...}) =
     HashTable.insert types (id, List.map getVDId decls)
 
+
+fun iiToIloc (II {id=id, cfg=cfg, ...}) = (id, cfg)
+
 end
