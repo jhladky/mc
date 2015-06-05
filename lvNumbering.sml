@@ -12,8 +12,7 @@ val insert = HashTable.insert
 fun nextNum nextNum = (!nextNum) before nextNum := (!nextNum) + 1
 fun exprToStr opc nums = opToStr opc ^ ", " ^ foldd ", " iToS nums
 (* TODO: Double check these later. *)
-fun replaceOK opc = not (has opc [OP_LOADRET, OP_NEW,
-                                  OP_LOADGLOBAL, OP_LOADAI])
+fun replaceOK opc = not (has opc [OP_LOADRET, OP_NEW, OP_MOVEQ, OP_LOADGLOBAL])
 
 
 val decompose =
@@ -74,8 +73,8 @@ fun numberVals ii next vtn i =
             let
                 val newI = INS_RR {opcode=OP_MOV, r1=dest, dest=tgt}
             in
-                insert vtn (regToStr tgt, (n, SOME dest));
-                print ("Replaced " ^ insToStr i ^ " with " ^ insToStr newI ^ "\n");
+                numberTarget next vtn tgt;
+                print (insToStr i ^ " --> " ^ insToStr newI ^ "\n");
                 (newI, NONE)
             end
           (* The instruction has a target, and a value already exists for it,
@@ -86,9 +85,9 @@ fun numberVals ii next vtn i =
                 val dest = nextReg ii
                 val newI = INS_RR {opcode=OP_MOV, r1=dest, dest=tgt}
             in
+                numberTarget next vtn tgt;
                 insert vtn (exprToStr opc nums, (n, SOME dest));
-                insert vtn (regToStr tgt, (n, SOME dest));
-                print ("Replaced " ^ insToStr i ^ " with " ^ insToStr newI ^ "\n");
+                print (insToStr i ^ " --> " ^ insToStr newI ^ "\n");
                 (newI, NONE)
             end
           (* The instruction has a target, but a value goes not exist for it.
@@ -98,12 +97,15 @@ fun numberVals ii next vtn i =
                 val n = numberTarget next vtn tgt
                 val key = exprToStr opc nums
             in
-                HashTable.insert vtn (key, (n, NONE)); (i, SOME key)
+                insert vtn (key, (n, NONE)); (i, SOME key)
             end
-          (* The instruction does not have a target. Do nothing. *)
-          | (true, NONE, _) => (i, NONE)
+          (* The instruction cannot be replaced, but has a target. Kill the
+           * target in the vtn but don't try to replace the instruction. *)
+          | (false, SOME tgt, NONE) => (numberTarget next vtn tgt; (i, NONE))
           (* The instruction cannot be replaced. Do nothing. *)
           | (false, _, _) => (i, NONE)
+          (* The instruction does not have a target. Do nothing. *)
+          | (true, NONE, _) => (i, NONE)
     end
 
 
@@ -112,9 +114,11 @@ fun addValMoves1 vtn ins i key =
         (n, SOME dest) =>
         let
             val tgt = valOf (#2 (getST i))
+            val newI = INS_RR {opcode=OP_MOV, r1=tgt, dest=dest}
         in
-            print ("Added move from " ^ regToStr tgt ^ " to " ^ regToStr dest ^ "\n");
-            ins @ [i, INS_RR {opcode=OP_MOV, r1=tgt, dest=dest}]
+            print ("+ " ^ insToStr i ^ " --> " ^ insToStr i ^ ", " ^
+                   insToStr newI ^ "\n");
+            ins @ [i, newI]
         end
       | (n, NONE) => ins @ [i]
 
@@ -123,26 +127,16 @@ fun addValMoves vtn ((i, replOpt), ins) =
     case replOpt of SOME key => addValMoves1 vtn ins i key | NONE => ins @ [i]
 
 
-(* TODO: Debugging functions, remove later. *)
-(* fun optToStr regOpt = case regOpt of NONE => "NONE" | SOME r => "SOME " ^ iToS r *)
-(* fun printPair (expr, (number, regOpt)) = *)
-(*     print (expr ^ " -> (" ^ iToS number ^ ", " ^ optToStr regOpt ^ ")\n") *)
-(* fun printVtn id vtn = app printPair (HashTable.listItemsi vtn) *)
-
-
 fun optBB ii node =
     let
         val (id, ins) = Cfg.getData node
-        val _ = print ("/----BB" ^ id ^ "----\\\n");
         val vtn = mkHt () (* Value-to-Number map *)
         val nextNum = ref 0
-        val newIns = map (numberVals ii nextNum vtn) ins
-        val newIns = foldl (addValMoves vtn) [] newIns
         fun dash s n = if n = 0 then s else dash (s ^ "-") (n - 1)
     in
-        (* printVtn id vtn; *)
-        (id, newIns) before
-        print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
+        print ("/----BB" ^ id ^ "----\\\n");
+        (id, foldl (addValMoves vtn) [] (map (numberVals ii nextNum vtn) ins))
+        before print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
     end
 
 

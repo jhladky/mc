@@ -167,9 +167,7 @@ fun mark cfg =
 
 
 fun sweepIns ((i, mark), L) = (* if mark then i::L else L *)
-    if mark
-    then i::L
-    else L before print ("Removing instruction: " ^ insToStr i ^ "\n")
+    if mark then i::L else L before print ("- " ^ insToStr i ^ "\n")
 
 
 fun sweep (DFA {id=id, ins=ins, ...}) = (id, List.foldr sweepIns [] ins)
@@ -191,8 +189,8 @@ fun optFunc (id, cfg) =
     in
         print ("/-----" ^ id ^ "-----\\\n");
         mark dfas;
-        (id, Cfg.map sweep dfas) before
-        print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
+        (id, Cfg.map sweep dfas)
+        before print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
     end
 
 

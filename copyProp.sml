@@ -76,23 +76,13 @@ fun isCondMove (INS_RR {opcode=opc, ...}) =
   | isCondMove _ = false
 
 
-(* fun replaceReg copyIn ins reg = *)
-(*     let *)
-(*         val (sources, _) = getST ins *)
-(*     in *)
-(*         if has reg sources andalso not (isCondMove ins) *)
-(*         then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of *)
-(*                  SOME ((src, _), _) => src *)
-(*                | NONE => reg *)
-(*         else reg *)
-(*     end *)
-
 fun replaceReg copyIn ins reg =
     if has reg (#1 (getST ins)) andalso not (isCondMove ins)
     then case pick (filter (fn (_, tgt) => tgt = reg) copyIn) of
-             SOME ((src, _), _) =>
-             (print ("Replaced [" ^ iToS reg ^ "] with [" ^ iToS src ^ "] in " ^  insToStr ins ^ "\n");
-              src)
+             SOME ((src, _), _) => src
+                                   before print ("Replaced " ^ regToStr reg ^
+                                                 " with " ^ regToStr src ^
+                                                 " in " ^ insToStr ins ^ "\n")
            | NONE => reg
     else reg
 
@@ -155,8 +145,8 @@ fun optFunc (id, cfg) =
         fun dash s n = if n = 0 then s else dash (s ^ "-") (n - 1)
     in
         print ("/-----" ^ id ^ "-----\\\n");
-        (id, Cfg.map replaceCopies dfas) before
-        print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
+        (id, Cfg.map replaceCopies dfas)
+        before print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
     end
 
 
