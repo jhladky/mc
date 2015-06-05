@@ -93,7 +93,7 @@ fun mkIfeGraph ife node =
     end
 
 
-fun deconstruct spilled ife =
+fun deconstruct ife =
     let
         val (real, virt) = List.partition (fn (r, _) => member (actual, r))
                                           (IfeGraph.toListRep ife)
@@ -117,16 +117,21 @@ fun getAvailRegs vtr adjs =
     difference (avail, List.foldr (addRealRegToSet vtr) (empty ()) adjs)
 
 
+fun getSpillCandidate spilled [] = raise Fail "No spill candidate!"
+  | getSpillCandidate spilled ((reg, _)::nodes) =
+    if Util.has reg spilled then getSpillCandidate spilled nodes else SOME reg
+
+
 (* Return a reg option, it is SOME reg then we have to spill.
  * Here we're dealing with a virtual register.
  * `Pick` also returns the rest of the list, we don't use it. *)
-fun buildVtr vtr [] = NONE
-  | buildVtr vtr ((REG_V n, adjs)::nodes) =
+fun buildVtr spilled vtr [] = NONE
+  | buildVtr spilled vtr ((REG_V n, adjs)::nodes) =
     (case pick (getAvailRegs vtr adjs) of
          SOME (reg, _) => (HashTable.insert vtr (Int.toString n, reg);
-                           buildVtr vtr nodes)
-       | NONE => SOME (REG_V n))
-  | buildVtr vtr (node::nodes) = buildVtr vtr nodes
+                           buildVtr spilled vtr nodes)
+       | NONE => getSpillCandidate spilled ((REG_V n, adjs)::nodes))
+  | buildVtr spilled vtr (node::nodes) = buildVtr spilled vtr nodes
 
 
 fun replace vtr (REG_V n) = HashTable.lookup vtr (Int.toString n)
@@ -239,11 +244,9 @@ fun color spilled (id, cfg) =
         val vtr = Util.mkHt ()
     in
         Cfg.app (mkIfeGraph ife) (buildDFAs propagate (Cfg.map bbToDFA cfg));
-        case buildVtr vtr (deconstruct spilled ife) of
+        case buildVtr spilled vtr (deconstruct ife) of
             SOME reg =>
-            (print "SPILL\n"; OS.Process.exit OS.Process.failure)
-            (* color (reg::spilled) *)
-            (*                   (id, Cfg.map (spill spilled reg) cfg) *)
+            color (reg::spilled) (id, Cfg.map (spill spilled reg) cfg)
           | NONE => (id, Cfg.map (colorBB spilled id vtr) cfg)
     end
 
