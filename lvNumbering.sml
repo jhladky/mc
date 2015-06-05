@@ -12,7 +12,8 @@ val insert = HashTable.insert
 fun nextNum nextNum = (!nextNum) before nextNum := (!nextNum) + 1
 fun exprToStr opc nums = opToStr opc ^ ", " ^ foldd ", " iToS nums
 (* TODO: Double check these later. *)
-fun replaceOK opc = not (has opc [OP_LOADRET, OP_NEW, OP_LOADGLOBAL])
+fun replaceOK opc = not (has opc [OP_LOADRET, OP_NEW,
+                                  OP_LOADGLOBAL, OP_LOADAI])
 
 
 val decompose =
@@ -56,6 +57,8 @@ fun numberTarget next vtn tgt =
     let val n = nextNum next in insert vtn (regToStr tgt, (n, NONE)); n end
 
 
+(* The string option we pass back with the instruction indicates whether we
+ * will have to add mov instruction later. *)
 fun numberVals ii next vtn i =
     let
         val (opc, constants, (sources, tOpt)) = decompose i
@@ -72,8 +75,8 @@ fun numberVals ii next vtn i =
                 val newI = INS_RR {opcode=OP_MOV, r1=dest, dest=tgt}
             in
                 insert vtn (regToStr tgt, (n, SOME dest));
-                print ("Replacing " ^ insToStr i ^ " with " ^ insToStr newI ^ "\n");
-                newI
+                print ("Replaced " ^ insToStr i ^ " with " ^ insToStr newI ^ "\n");
+                (newI, NONE)
             end
           (* The instruction has a target, and a value already exists for it,
            * but it has not been given a register. So update the vtn for the
@@ -85,68 +88,61 @@ fun numberVals ii next vtn i =
             in
                 insert vtn (exprToStr opc nums, (n, SOME dest));
                 insert vtn (regToStr tgt, (n, SOME dest));
-                print ("Replacing " ^ insToStr i ^ " with " ^ insToStr newI ^ "\n");
-                newI
+                print ("Replaced " ^ insToStr i ^ " with " ^ insToStr newI ^ "\n");
+                (newI, NONE)
             end
           (* The instruction has a target, but a value goes not exist for it.
            * Insert one into the vtn. *)
           | (true, SOME tgt, NONE) =>
             let
                 val n = numberTarget next vtn tgt
+                val key = exprToStr opc nums
             in
-                HashTable.insert vtn (exprToStr opc nums, (n, NONE));
-                i
+                HashTable.insert vtn (key, (n, NONE)); (i, SOME key)
             end
           (* The instruction does not have a target. Do nothing. *)
-          | (true, NONE, _) => i
+          | (true, NONE, _) => (i, NONE)
           (* The instruction cannot be replaced. Do nothing. *)
-          | (false, _, _) => i
+          | (false, _, _) => (i, NONE)
     end
 
 
-fun addValMoves ii vtn ((i, repl), ins) =
-    ins @ [i]
-    (* let *)
-    (*     val (sources, tOpt) = getST i *)
-    (*     val opc = getOpcode i *)
-    (*     val skipRef = ref false *)
-    (*     val sourceNums = List.map (#1 o HashTable.lookup vtn o iToS) sources *)
-    (*                      handle Fail _ => [] before skipRef := true *)
-    (* in *)
-    (*     if repl andalso not (!skipRef) *)
-    (*     then let *)
-    (*         val (n, dOpt) = HashTable.lookup vtn (exprToStr opc sourceNums) *)
-    (*     in *)
-    (*         case dOpt of *)
-    (*             NONE => ins @ [i] *)
-    (*           | SOME dest => *)
-    (*             (print ("Added move from " ^ iToS (valOf tOpt) ^ " to " ^ iToS dest ^ "\n"); *)
-    (*              ins @ [i, INS_RR {opcode=OP_MOV, r1=valOf tOpt, dest=dest}]) *)
-    (*     end *)
-    (*     else ins @ [i] *)
-    (* end *)
+fun addValMoves1 vtn ins i key =
+    case HashTable.lookup vtn key of
+        (n, SOME dest) =>
+        let
+            val tgt = valOf (#2 (getST i))
+        in
+            print ("Added move from " ^ regToStr tgt ^ " to " ^ regToStr dest ^ "\n");
+            ins @ [i, INS_RR {opcode=OP_MOV, r1=tgt, dest=dest}]
+        end
+      | (n, NONE) => ins @ [i]
+
+
+fun addValMoves vtn ((i, replOpt), ins) =
+    case replOpt of SOME key => addValMoves1 vtn ins i key | NONE => ins @ [i]
 
 
 (* TODO: Debugging functions, remove later. *)
-fun optToStr regOpt = case regOpt of NONE => "NONE" | SOME r => "SOME " ^ iToS r
-fun printPair (expr, (number, regOpt)) =
-    print (expr ^ " -> (" ^ iToS number ^ ", " ^ optToStr regOpt ^ ")\n")
-fun printVtn id vtn = List.app printPair (HashTable.listItemsi vtn)
+(* fun optToStr regOpt = case regOpt of NONE => "NONE" | SOME r => "SOME " ^ iToS r *)
+(* fun printPair (expr, (number, regOpt)) = *)
+(*     print (expr ^ " -> (" ^ iToS number ^ ", " ^ optToStr regOpt ^ ")\n") *)
+(* fun printVtn id vtn = app printPair (HashTable.listItemsi vtn) *)
 
 
 fun optBB ii node =
     let
         val (id, ins) = Cfg.getData node
-        val _ = print (id ^ ":\n")
+        val _ = print ("/----BB" ^ id ^ "----\\\n");
         val vtn = mkHt () (* Value-to-Number map *)
         val nextNum = ref 0
         val newIns = map (numberVals ii nextNum vtn) ins
-        (* val newIns = foldl (addValMoves ii vtn) [] newIns *)
+        val newIns = foldl (addValMoves vtn) [] newIns
+        fun dash s n = if n = 0 then s else dash (s ^ "-") (n - 1)
     in
-        printVtn id vtn;
-        (id, ins) before
-        (* (id, newIns) before *)
-        print "------------\n"
+        (* printVtn id vtn; *)
+        (id, newIns) before
+        print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
     end
 
 

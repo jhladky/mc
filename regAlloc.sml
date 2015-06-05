@@ -240,8 +240,10 @@ fun color spilled (id, cfg) =
     in
         Cfg.app (mkIfeGraph ife) (buildDFAs propagate (Cfg.map bbToDFA cfg));
         case buildVtr vtr (deconstruct spilled ife) of
-            SOME reg => color (reg::spilled)
-                              (id, Cfg.map (spill spilled reg) cfg)
+            SOME reg =>
+            (print "SPILL\n"; OS.Process.exit OS.Process.failure)
+            (* color (reg::spilled) *)
+            (*                   (id, Cfg.map (spill spilled reg) cfg) *)
           | NONE => (id, Cfg.map (colorBB spilled id vtr) cfg)
     end
 
