@@ -53,6 +53,8 @@ for dir in mini-benchmarks/*/; do
         done
 
         if [ "$FAIL" = false ]; then
+            SIZE="$(wc -c a.out | sed 's/ *\([^ ]*\)\ *.*/\1/')"
+            printf "size: ${SIZE}B time: "
             echo "scale=4; $SUM / $REPEAT" | bc
         fi
         FAIL=false
