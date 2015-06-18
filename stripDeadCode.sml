@@ -166,8 +166,7 @@ fun mark cfg =
     end
 
 
-fun sweepIns ((i, mark), L) = (* if mark then i::L else L *)
-    if mark then i::L else L before print ("- " ^ insToStr i ^ "\n")
+fun sweepIns ((i, mark), L) = if mark then i::L else L
 
 
 fun sweep (DFA {id=id, ins=ins, ...}) = (id, List.foldr sweepIns [] ins)
@@ -187,10 +186,7 @@ fun optFunc (id, cfg) =
         val dfas = buildDFAs propagate (Cfg.map (bbToDFA defs) cfg)
         fun dash s n = if n = 0 then s else dash (s ^ "-") (n - 1)
     in
-        print ("/-----" ^ id ^ "-----\\\n");
-        mark dfas;
-        (id, Cfg.map sweep dfas)
-        before print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
+        mark dfas; (id, Cfg.map sweep dfas)
     end
 
 

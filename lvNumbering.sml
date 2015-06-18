@@ -74,7 +74,6 @@ fun numberVals ii next vtn i =
                 val newI = INS_RR {opcode=OP_MOV, r1=dest, dest=tgt}
             in
                 numberTarget next vtn tgt;
-                print (insToStr i ^ " --> " ^ insToStr newI ^ "\n");
                 (newI, NONE)
             end
           (* The instruction has a target, and a value already exists for it,
@@ -87,7 +86,6 @@ fun numberVals ii next vtn i =
             in
                 numberTarget next vtn tgt;
                 insert vtn (exprToStr opc nums, (n, SOME dest));
-                print (insToStr i ^ " --> " ^ insToStr newI ^ "\n");
                 (newI, NONE)
             end
           (* The instruction has a target, but a value goes not exist for it.
@@ -116,8 +114,6 @@ fun addValMoves1 vtn ins i key =
             val tgt = valOf (#2 (getST i))
             val newI = INS_RR {opcode=OP_MOV, r1=tgt, dest=dest}
         in
-            print ("+ " ^ insToStr i ^ " --> " ^ insToStr i ^ ", " ^
-                   insToStr newI ^ "\n");
             ins @ [i, newI]
         end
       | (n, NONE) => ins @ [i]
@@ -132,11 +128,8 @@ fun optBB ii node =
         val (id, ins) = Cfg.getData node
         val vtn = mkHt () (* Value-to-Number map *)
         val nextNum = ref 0
-        fun dash s n = if n = 0 then s else dash (s ^ "-") (n - 1)
     in
-        print ("/----BB" ^ id ^ "----\\\n");
         (id, foldl (addValMoves vtn) [] (map (numberVals ii nextNum vtn) ins))
-        before print ("\\" ^ dash "" ((size id) + 10) ^ "/\n")
     end
 
 

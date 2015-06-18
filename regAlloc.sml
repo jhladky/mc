@@ -86,6 +86,9 @@ fun mkIfe (DFA {ins=ins, propSet=liveOut, ...}, ife) =
     (foldr (insIfeGraph ife) liveOut ins; ife)
 
 
+(* TODO: Better Graph Deconstruction
+ * First you pull out unconstrained nodes, and by doing so, removing all the edges,
+ * and then keep pulling out, and that will hopefully make more nodes unconstrained. *)
 fun deconstruct ife =
     let
         val (virt, real) = List.partition (isVirt o #1) (IfeGraph.toListRep ife)

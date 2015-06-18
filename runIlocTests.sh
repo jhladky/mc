@@ -11,7 +11,7 @@ get_dir_name () {
 # echo "Testing static checker...."
 
 # for f in tests/*.mini; do
-#     ./mc.sh $f
+#     ./mc $f
 # done
 
 N=0
@@ -23,9 +23,9 @@ for dir in mini-benchmarks/*/; do
         get_dir_name $dir
         printf "test %-24s (%02d/19): " "$NAME" $N
         if [ -n "$1" ]; then
-            ./mc.sh "$1" -dump-il -mochi-compat $f > .tmp 2>&1
+            ./mc "$1" -dump-il -mochi-compat $f > .tmp 2>&1
         else
-            ./mc.sh -dump-il -mochi-compat $f > .tmp 2>&1
+            ./mc -dump-il -mochi-compat $f > .tmp 2>&1
         fi
 
         if [ $? -ne 0 ]; then
